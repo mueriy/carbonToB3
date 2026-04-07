@@ -82,7 +82,12 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     if ((exps map (_._1.isPure) forall identity) || !havocHeap || isAssert) {
       // if all expressions are pure, then there is no need for heap copies
       // if this is a translation of an Assert statement, there is also no need for heap copies
-      wellDefStateInitStmtOpt ++ initStmtWand ++ exhaleStmt ++ assumptions
+      // print("1:", wellDefStateInitStmtOpt) // [[B3 tests]]
+      // print("2:", initStmtWand) // [[B3 tests]]
+      // print("3:", exhaleStmt) // [[B3 tests]]
+      // print("4:", assumptions) // [[B3 tests]]
+      // wellDefStateInitStmtOpt ++ //[[B3 temp: Remove ExhaleWellDef#Heap lines]]
+      initStmtWand ++ exhaleStmt ++ assumptions
     } else {
       beginExhale ++
       wellDefStateInitStmtOpt ++

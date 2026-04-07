@@ -121,7 +121,8 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
           Seq("Dependencies:") ++
           deps ++
           Seq("")
-        Program(header, preambles ++ members)
+        // Program(header, preambles ++ members) [[B3 temp: remove preambles]]
+        Program(header, members)
     }
 
     (output.optimized.asInstanceOf[Program], nameMaps.map(e => e._1 -> e._2.toMap))
@@ -151,10 +152,10 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
             val body: Stmt = translateStmt(method.bodyOrAssumeFalse)
               /* TODO: Might be worth special-casing on methods with empty bodies */
             val proc = Procedure(Identifier(name), ins, outs,
-              Seq(init,
+              Seq(Statements.EmptyStmt, //init,  [[B3 temp: Replace heap state initialization with EmptyStmt]]
                 MaybeCommentBlock("Assumptions about method arguments", paramAssumptions),
                 inhalePre,
-                MaybeCommentBlock(initOldStateComment, initOld),
+                Statements.EmptyStmt, // MaybeCommentBlock(initOldStateComment, initOld), [[B3 temp: Replace heap state initialization with EmptyStmt]]
                 checkPost, body, exhalePost))
         CommentedDecl(s"Translation of method $name", proc)
     }
