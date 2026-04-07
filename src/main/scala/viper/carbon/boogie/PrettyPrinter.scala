@@ -151,18 +151,19 @@ class PrettyPrinter(n: Node) extends BracketPrettyPrinter {
     }
     s match {
       case Assume(e) =>
-        text("assume") <+> show(quantifyOverFreeTypeVars(e)) <> char (';')
+        text("assume") <+> show(quantifyOverFreeTypeVars(e)) //[B3] <> char (';')
       case a@Assert(e, error) =>
         text("assert") <+>
-          "{:msg" <+> "\"  " <> showError(error, a.id) <> "\"}" <> line <>
-          space <> space <> show(quantifyOverFreeTypeVars(e)) <>
-          char (';')
+          // "{:msg" <+> "\"  " <> showError(error, a.id) <> "\"}" <> line <> //[[B* temp?: remove assert error msg (no B3 feature)]]
+          // space <> space <> //[[B* temp?: remove assert error msg (no B3 feature)]]
+          show(quantifyOverFreeTypeVars(e)) //[B3] <>
+          //[B3] char (';')
       case HavocImpl(vars) =>
-        text("havoc") <+> commasep(vars) <> char (';')
+        text("havoc") <+> commasep(vars) //[B3] <> char (';')
       case Goto(dests) =>
-        text("goto") <+> ssep((dests map (x => ident2doc(x.name))).to(collection.immutable.Seq), char (',') <> space) <> char (';')
+        text("goto") <+> ssep((dests map (x => ident2doc(x.name))).to(collection.immutable.Seq), char (',') <> space) //[B3] <> char (';')
       case Assign(lhs, rhs) =>
-        show(lhs) <+> ":=" <+> show(rhs) <> char (';')
+        show(lhs) <+> ":=" <+> show(rhs) //[B3] <> char (';')
       case Label(lbl) =>
         ident2doc(lbl.name) <> char (':')
       case If(cond, thn, els) =>
@@ -251,12 +252,12 @@ class PrettyPrinter(n: Node) extends BracketPrettyPrinter {
           (if (unique) text("unique") <> space else nil) <>
           name <>
           char (':') <+>
-          show(typ) <>
-          char (';')
+          show(typ) //[B3] <>
+          //[B3] char (';')
       case TypeDecl(name) =>
-        text("type") <+> show(name) <> char (';')
+        text("type") <+> show(name) //[B3] <> char (';')
       case TypeAlias(name, definition) =>
-        text("type") <+> show(name) <+> "=" <+> show(definition) <> char (';')
+        text("type") <+> show(name) <+> "=" <+> show(definition) //[B3] <> char (';')
       case Func(name, args, typ, attributes) =>
         val typVars = (args map (_.typ)) ++ Seq(typ) flatMap (_.freeTypeVars)
         text("function") <+>
@@ -265,11 +266,11 @@ class PrettyPrinter(n: Node) extends BracketPrettyPrinter {
           showTypeVars(typVars, endWithSpace = false) <>
           parens(commasep(args)) <>
           char (':') <+>
-          show(typ) <> char (';')
+          show(typ) //[B3] <> char (';')
       case GlobalVarDecl(name, typ) =>
-        text("var") <+> name <> char (':') <+> show(typ) <> char (';')
+        text("var") <+> name <> char (':') <+> show(typ) //[B3] <> char (';')
       case Axiom(exp) =>
-        text("axiom") <+> show(quantifyOverFreeTypeVars(exp)) <> char (';')
+        text("axiom") <+> show(quantifyOverFreeTypeVars(exp)) //[B3] <> char (';')
       case Procedure(name, ins, outs, body) =>
         // collect all where clauses
         whereMap.clear()
@@ -284,15 +285,15 @@ class PrettyPrinter(n: Node) extends BracketPrettyPrinter {
         val body2 = show(body)
         val undecl = body.undeclLocalVars filter (v1 => (ins ++ outs).forall(v2 => v2.name != v1.name))
         val vars = undecl map (v => LocalVarDecl(v.name, v.typ, whereMap.get(v.name)))
-        val vars2 = vars map (v => text("var") <+> show(v) <> ";")
+        val vars2 = vars map (v => text("var") <+> show(v)) //[B3] <> ";")
         val vars3 = ssep(vars2.to(collection.immutable.Seq), line) <> (if (vars2.size == 0) nil else line)
         text("procedure") <+>
           name <>
           parens(commasep(ins)) <+>
-          "returns" <+>
-          parens(commasep(outs)) <>
-          line <> space <> space <>
-          "modifies" <+> ssep(modifies.to(collection.immutable.Seq), char (',') <> space) <> char (';')  <> line <>
+          // "returns" <+>
+          // parens(commasep(outs)) <> // [B3 temp: Instead of "procedure name(in1, in2) returns (out1, out2)", B3 has "procedure name(in1, in2, out out1, out out2)". For now we simply remove the return-part]
+          // line <> space <> space <>
+          // "modifies" <+> ssep(modifies.to(collection.immutable.Seq), char (',') <> space) <> char (';')  <> line <> //[[B3 temp?: remove "modifies"-line (does not exist in B3)
           showBlock(vars3 <> body2)
       case CommentedDecl(s, d, size, nlines) =>
         var linesep = nil
