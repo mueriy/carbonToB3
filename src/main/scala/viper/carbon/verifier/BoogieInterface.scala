@@ -90,78 +90,82 @@ trait BoogieInterface {
 
     // invoke Boogie
     val optOutput = run(program.toString, defaultOptions ++ options, timeout)
-    print(optOutput)
+    // print(optOutput)
     optOutput match {
       case None =>
         // Timeout
         (null, Failure(Seq(TimeoutOccurred(timeout.get, "second(s)"))))
       case Some(output) =>
         // parse the output
-        parse(output) match {
-          case (version, Nil) =>
-            (version, Success)
-          case (version, errorIds) => {
-            val errors = (0 until errorIds.length).map(i => {
-              val id = errorIds(i)
-              val error = errormap.get(id).get
-              if (models.nonEmpty) {
-                error.failureContexts = Seq(FailureContextImpl(Some(SimpleCounterexample(Model(models(i))))))
-              }
-              error
-            })
-            (version, Failure(errors))
-          }
-        }
+        print(output)
+        ("unknown", Success)
+        // [B3 base: currently we just print B3's response 1-by-1. Better error parsing is an extension goal.]
+        // parse(output) match {
+        //   case (version, Nil) =>
+        //     (version, Success)
+        //   case (version, errorIds) => {
+        //     val errors = (0 until errorIds.length).map(i => {
+        //       val id = errorIds(i)
+        //       val error = errormap.get(id).get
+        //       if (models.nonEmpty) {
+        //         error.failureContexts = Seq(FailureContextImpl(Some(SimpleCounterexample(Model(models(i))))))
+        //       }
+        //       error
+        //     })
+        //     (version, Failure(errors))
+        //   }
+        // }
     }
   }
 
-  /**
-    * Parse the output of Boogie. Returns a pair of the detected version number and a sequence of error identifiers.
-    */
-  private def parse(output: String): (String,Seq[Int]) = {
-    val LogoPattern = "Boogie program verifier version ([0-9.]+),.*".r
-    val SummaryPattern = "Boogie program verifier finished with ([0-9]+) verified, ([0-9]+) error.*".r
-    val ErrorPattern = "  .+ \\[([0-9]+)\\]".r
-    val errors = collection.mutable.ListBuffer[Int]()
-    var otherErrId = 0
-    var version_found : String = null
+  // [B3 base: currently we just print B3's response 1-by-1. Better error parsing is an extension goal.]
+  // /**
+  //   * Parse the output of Boogie. Returns a pair of the detected version number and a sequence of error identifiers.
+  //   */
+  // private def parse(output: String): (String,Seq[Int]) = {
+  //   val LogoPattern = "Boogie program verifier version ([0-9.]+),.*".r
+  //   val SummaryPattern = "Boogie program verifier finished with ([0-9]+) verified, ([0-9]+) error.*".r
+  //   val ErrorPattern = "  .+ \\[([0-9]+)\\]".r
+  //   val errors = collection.mutable.ListBuffer[Int]()
+  //   var otherErrId = 0
+  //   var version_found : String = null
 
-    val unexpected : (String => Unit) = (msg:String) => {
-      otherErrId -= 1
-      errors += otherErrId
-      val internalError = Internal(InternalReason(DummyNode, msg))
-      errormap += (otherErrId -> internalError)
-    }
+  //   val unexpected : (String => Unit) = (msg:String) => {
+  //     otherErrId -= 1
+  //     errors += otherErrId
+  //     val internalError = Internal(InternalReason(DummyNode, msg))
+  //     errormap += (otherErrId -> internalError)
+  //   }
 
-    var parsingModel : Option[StringBuilder] = None
-    var stateInitialBlock = false
-    for (l <- output.linesIterator) {
-      l match {
-        case "*** END_STATE" =>
-          stateInitialBlock = false
-        case "*** STATE <initial>" =>
-          stateInitialBlock = true
-        case _ if stateInitialBlock => //ignore everything within state block
-        case "*** END_MODEL" if parsingModel.isDefined =>
-          models.append(parsingModel.get.toString())
-          parsingModel = None
-        case _ if parsingModel.isDefined =>
-          parsingModel.get.append(l).append("\n")
-        case "*** MODEL" if parsingModel.isEmpty =>
-          parsingModel = Some(new StringBuilder)
-        case LogoPattern(version) =>
-          version_found = version
-        case ErrorPattern(id) =>
-          errors += id.toInt
-        case SummaryPattern(v, e) =>
-          if(e.toInt != errors.size) unexpected(s"Found ${errors.size} errors, but there should be $e. The output was: $output")
-        case "" => // ignore empty lines
-        case _ =>
-          unexpected(s"Found an unparsable output from Boogie: $l")
-      }
-    }
-    (version_found,errors.toSeq)
-  }
+  //   var parsingModel : Option[StringBuilder] = None
+  //   var stateInitialBlock = false
+  //   for (l <- output.linesIterator) {
+  //     l match {
+  //       case "*** END_STATE" =>
+  //         stateInitialBlock = false
+  //       case "*** STATE <initial>" =>
+  //         stateInitialBlock = true
+  //       case _ if stateInitialBlock => //ignore everything within state block
+  //       case "*** END_MODEL" if parsingModel.isDefined =>
+  //         models.append(parsingModel.get.toString())
+  //         parsingModel = None
+  //       case _ if parsingModel.isDefined =>
+  //         parsingModel.get.append(l).append("\n")
+  //       case "*** MODEL" if parsingModel.isEmpty =>
+  //         parsingModel = Some(new StringBuilder)
+  //       case LogoPattern(version) =>
+  //         version_found = version
+  //       case ErrorPattern(id) =>
+  //         errors += id.toInt
+  //       case SummaryPattern(v, e) =>
+  //         if(e.toInt != errors.size) unexpected(s"Found ${errors.size} errors, but there should be $e. The output was: $output")
+  //       case "" => // ignore empty lines
+  //       case _ =>
+  //         unexpected(s"Found an unparsable output from Boogie: $l")
+  //     }
+  //   }
+  //   (version_found,errors.toSeq)
+  // }
 
   /**
     * Invoke Boogie.
