@@ -17,9 +17,15 @@ import java.io._
 import scala.jdk.CollectionConverters._
 
 class BoogieDependency(_location: String) extends Dependency {
-  def name = "B3"
+  def name = "Boogie"
   def location = _location
   var version = "" // filled-in when Boogie is invoked
+}
+
+class B3Dependency(_location: String) extends Dependency {
+  def name = "B3"
+  def location = _location
+  var version = "" // filled-in when B3 is invoked
 }
 
 class InputStreamConsumer(val is: InputStream, actionBeforeConsumption: () => Unit) extends Runnable {
@@ -47,26 +53,33 @@ trait BoogieInterface {
 
   def reporter: Reporter
 
-  // def defaultOptions = Seq("/vcsCores:" + java.lang.Runtime.getRuntime.availableProcessors,
-  //   "/errorTrace:0",
-  //   "/errorLimit:10000000",
-  //   "/proverOpt:O:smt.AUTO_CONFIG=false",
-  //   "/proverOpt:O:smt.PHASE_SELECTION=0",
-  //   "/proverOpt:O:smt.RESTART_STRATEGY=0",
-  //   "/proverOpt:O:smt.RESTART_FACTOR=|1.5|",
-  //   "/proverOpt:O:smt.ARITH.RANDOM_INITIAL_VALUE=true",
-  //   "/proverOpt:O:smt.CASE_SPLIT=3",
-  //   "/proverOpt:O:smt.DELAY_UNITS=true",
-  //   "/proverOpt:O:NNF.SK_HACK=true",
-  //   "/proverOpt:O:smt.MBQI=false",
-  //   "/proverOpt:O:smt.QI.EAGER_THRESHOLD=100",
-  //   "/proverOpt:O:smt.BV.REFLECT=true",
-  //   "/proverOpt:O:smt.qi.max_multi_patterns=1000",
-  //   s"/proverOpt:PROVER_PATH=$z3Path")
-  def defaultOptions = Seq("--stdin")
+  sealed trait Mode
+  case object B3 extends Mode
+  case object Boogie extends Mode
+  def mode: Mode
+
+  def defaultOptions = mode match {
+    case Boogie => Seq("/vcsCores:" + java.lang.Runtime.getRuntime.availableProcessors,
+      "/errorTrace:0",
+      "/errorLimit:10000000",
+      "/proverOpt:O:smt.AUTO_CONFIG=false",
+      "/proverOpt:O:smt.PHASE_SELECTION=0",
+      "/proverOpt:O:smt.RESTART_STRATEGY=0",
+      "/proverOpt:O:smt.RESTART_FACTOR=|1.5|",
+      "/proverOpt:O:smt.ARITH.RANDOM_INITIAL_VALUE=true",
+      "/proverOpt:O:smt.CASE_SPLIT=3",
+      "/proverOpt:O:smt.DELAY_UNITS=true",
+      "/proverOpt:O:NNF.SK_HACK=true",
+      "/proverOpt:O:smt.MBQI=false",
+      "/proverOpt:O:smt.QI.EAGER_THRESHOLD=100",
+      "/proverOpt:O:smt.BV.REFLECT=true",
+      "/proverOpt:O:smt.qi.max_multi_patterns=1000",
+      s"/proverOpt:PROVER_PATH=$z3Path")
+    case B3 => Seq("--stdin") // [B3: will need to replace with Seq.empty[String] to use ASTs directly]
+  }
 
   /** The (resolved) path where Boogie is supposed to be located. */
-  def boogiePath: String
+  def verifierPath: String
 
   /** The (resolved) path where Z3 is supposed to be located. */
   def z3Path: String
@@ -172,14 +185,14 @@ trait BoogieInterface {
     * Returns None if there was a timeout, otherwise the Boogie output.
     */
   private def run(input: String, options: Seq[String], timeout: Option[Int]) = {
-    reporter report BackendSubProcessReport("carbon", boogiePath, BeforeInputSent, _boogieProcessPid)
+    reporter report BackendSubProcessReport("carbon", verifierPath, BeforeInputSent, _boogieProcessPid)
 
     // When the filename is "stdin.bpl" Boogie reads the program from standard input.
-    // val cmd: Seq[String] = Seq(boogiePath) ++ options ++ Seq("stdin.bpl")
+    // val cmd: Seq[String] = Seq(verifierPath) ++ options ++ Seq("stdin.bpl")
     val cmd: Seq[String] = Seq("java", "b3", "verify") ++ options //[B3]
     val pb: ProcessBuilder = new ProcessBuilder(cmd.asJava)
     val env = pb.environment()
-    env.put("CLASSPATH", boogiePath)
+    env.put("CLASSPATH", verifierPath)
     val proc: Process = pb.start()
     _boogieProcess = Some(proc)
     _boogieProcessPid = Some(proc.pid)
@@ -187,19 +200,19 @@ trait BoogieInterface {
     //proverShutDownHook approach taken from Silicon's codebase
     val proverShutdownHook = new Thread {
       override def run(): Unit = {
-        destroyProcessAndItsChildren(proc, boogiePath)
+        destroyProcessAndItsChildren(proc, verifierPath)
       }
     }
     Runtime.getRuntime.addShutdownHook(proverShutdownHook)
 
     // _z3ProcessStream = Some(proc.descendants().toScala(LazyList))
-    reporter report BackendSubProcessReport("carbon", boogiePath, AfterInputSent, _boogieProcessPid)
+    reporter report BackendSubProcessReport("carbon", verifierPath, AfterInputSent, _boogieProcessPid)
 
     val errorConsumer =
-      new InputStreamConsumer(proc.getErrorStream, () => reporter report BackendSubProcessReport("carbon", boogiePath, OnError, _boogieProcessPid))
+      new InputStreamConsumer(proc.getErrorStream, () => reporter report BackendSubProcessReport("carbon", verifierPath, OnError, _boogieProcessPid))
     val errorStreamThread = new Thread(errorConsumer)
     val inputConsumer =
-      new InputStreamConsumer(proc.getInputStream, () => reporter report BackendSubProcessReport("carbon", boogiePath, OnOutput, _boogieProcessPid))
+      new InputStreamConsumer(proc.getInputStream, () => reporter report BackendSubProcessReport("carbon", verifierPath, OnOutput, _boogieProcessPid))
     val inputStreamThread = new Thread(inputConsumer)
 
     errorStreamThread.start()
@@ -219,7 +232,7 @@ trait BoogieInterface {
           proc.waitFor()
       }
     } finally {
-      destroyProcessAndItsChildren(proc, boogiePath)
+      destroyProcessAndItsChildren(proc, verifierPath)
     }
 
     // Deregister the shutdown hook, otherwise the prover process that has been stopped cannot be garbage collected.
@@ -233,7 +246,7 @@ trait BoogieInterface {
     try {
       val errorOutput = errorConsumer.result.get
       val normalOutput = inputConsumer.result.get
-      reporter report BackendSubProcessReport("carbon", boogiePath, OnExit, _boogieProcessPid)
+      reporter report BackendSubProcessReport("carbon", verifierPath, OnExit, _boogieProcessPid)
 
       if (boogieTimeout)
         None
@@ -256,7 +269,7 @@ trait BoogieInterface {
   def stopBoogie(): Unit = {
     _boogieProcess match {
       case Some(proc) =>
-        destroyProcessAndItsChildren(proc, boogiePath)
+        destroyProcessAndItsChildren(proc, verifierPath)
       case None =>
     }
   }

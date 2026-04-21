@@ -129,5 +129,32 @@ class CarbonConfig(args: Seq[String]) extends SilFrontendConfig(args, "Carbon") 
     noshort = true
   )
 
+  //B3 options [[Will need to add explanations about which options can be used when using B3 vs Boogie]]
+
+  val b3Opt = opt[String]("b3Opt",
+  descr = "Option(s) to pass-through as options to B3 (default: none)",
+  default = None,
+  noshort = true
+  )
+
+  val b3Executable = opt[String]("b3Jar",
+    descr = "Manually-specified full path to B3.jar (default: ${B3_JAR})",
+    default = None,
+    noshort = true
+  )
+
+  val backendMode = opt[String]("mode",
+    descr = "Choose between Boogie and B3 (default: Boogie)",
+    default = None,
+    noshort = true
+  )
+
+  // val printPlus = opt[String]("printplus",
+  //   descr = "Print info about what Viper code resulted in the following statement(s) (default: False)",
+  //   default = Some(false),
+  //   noshort = true
+  // )
+
+
   verify()
 }

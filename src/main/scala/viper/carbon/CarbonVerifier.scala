@@ -6,7 +6,7 @@
 
 package viper.carbon
 
-import boogie.{BoogieModelTransformer, Namespace}
+import boogie.{BoogieModelTransformer, Namespace, CustomB3AST}
 import modules.impls._
 import viper.silver.ast.{MagicWand, Program, Quasihavoc, Quasihavocall}
 import viper.silver.utility.Paths
@@ -30,6 +30,11 @@ case class CarbonVerifier(override val reporter: Reporter,
 
   private var _config: CarbonConfig = _
   def config = _config
+
+  def mode = if (config != null) config.backendMode.toOption match {
+    case Some(backendChoice) if backendChoice == "B3" => B3
+    case _ => Boogie
+  } else Boogie
 
   def start(): Unit = {}
   def stop(): Unit = {
@@ -75,11 +80,22 @@ case class CarbonVerifier(override val reporter: Reporter,
   /** The default location for Z3 (the environment variable ${Z3_EXE}). */
   lazy val z3Default: String = new File(Paths.resolveEnvVars("${Z3_EXE}")).getAbsolutePath
 
-  /** The (resolved) path where Boogie is supposed to be located. */
+  /** The default location for B3 (the environment variable ${B3_JAR}). */
+  lazy val b3Default: String = new File(Paths.resolveEnvVars("${B3_JAR}")).getAbsolutePath
 
-  def boogiePath = if (config != null) config.boogieExecutable.toOption match {
-    case Some(path) => new File(path).getAbsolutePath
-    case None => boogieDefault
+  /** The (resolved) path where Boogie/B3 is supposed to be located. */
+
+  def verifierPath = if (config != null) mode match {
+    case Boogie =>
+      config.boogieExecutable.toOption match {
+        case Some(path) => new File(path).getAbsolutePath
+        case None => boogieDefault
+      }
+    case B3 => 
+      config.b3Executable.toOption match {
+        case Some(path) => {new File(path).getAbsolutePath}
+        case None => b3Default
+      }
   } else boogieDefault
 
   /** The (resolved) path where Z3 is supposed to be located. */
@@ -134,7 +150,7 @@ case class CarbonVerifier(override val reporter: Reporter,
   lazy val dependencies: Seq[Dependency] = {
     import scala.sys.process._
     val unknownVersion = "(?)"
-    List(new BoogieDependency(boogiePath), new Dependency {
+    List(new BoogieDependency(verifierPath), new Dependency {
       def name = "Z3"
       def version = {
         try {
@@ -156,6 +172,9 @@ case class CarbonVerifier(override val reporter: Reporter,
 
   def verify(program: Program) : VerificationResult = {
     _program = program
+
+
+    CustomB3AST.B3_test()
 
     val unsupportedFeatures : Seq[AbstractError] =
       program.shallowCollect(
@@ -188,34 +207,50 @@ case class CarbonVerifier(override val reporter: Reporter,
     _translated = tProg
 
 
-    val options = {
-      if (config == null) {
-        Nil
-      } else {
-        (config.boogieProverLog.toOption match {
-      case Some(l) =>
-        List("/proverLog:" + l + " ")
-      case None =>
-        Nil
-      }) ++
-        (config.boogieOpt.toOption match {
-          case Some(l) =>
-            l.split(" ")
-          case None =>
-            Nil
+    val options = mode match {
+      case Boogie => {
+        if (config == null) {
+          Nil
+        } else {
+          (config.boogieProverLog.toOption match {
+        case Some(l) =>
+          List("/proverLog:" + l + " ")
+        case None =>
+          Nil
         }) ++
-          (config.counterexample.toOption match {
-            case Some(_) => {
-              /* [2020-05-31 Marco] We use /mv:- instead of /printModel:1 because Boogie, at least the versions I tried,
-               * does not properly separate models for different errors when it prints multiple ones and uses multiple
-               * threads. I.e., it ill mix lines belonging to different models, which makes them useless.
-               */
-              List("/mv:-")
-            }
-            case _ => Nil
-          })
+          (config.boogieOpt.toOption match {
+            case Some(l) =>
+              l.split(" ")
+            case None =>
+              Nil
+          }) ++
+            (config.counterexample.toOption match {
+              case Some(_) => {
+                /* [2020-05-31 Marco] We use /mv:- instead of /printModel:1 because Boogie, at least the versions I tried,
+                * does not properly separate models for different errors when it prints multiple ones and uses multiple
+                * threads. I.e., it ill mix lines belonging to different models, which makes them useless.
+                */
+                List("/mv:-")
+              }
+              case _ => Nil
+            })
+        }
       }
-    }
+      case B3 =>
+        {
+          if (config == null) {
+            Nil
+          } else {
+            Nil ++ (config.b3Opt.toOption match {
+              case Some(l) =>
+                l.split(" ")
+              case None =>
+                Nil
+            })
+          }
+        }
+      case _ => Nil
+      }
 
     var timeout: Option[Int] = None
 
