@@ -22,12 +22,6 @@ class BoogieDependency(_location: String) extends Dependency {
   var version = "" // filled-in when Boogie is invoked
 }
 
-class B3Dependency(_location: String) extends Dependency {
-  def name = "B3"
-  def location = _location
-  var version = "" // filled-in when B3 is invoked
-}
-
 class InputStreamConsumer(val is: InputStream, actionBeforeConsumption: () => Unit) extends Runnable {
   var result : Option[String] = None
 
@@ -53,33 +47,25 @@ trait BoogieInterface {
 
   def reporter: Reporter
 
-  sealed trait Mode
-  case object B3 extends Mode
-  case object Boogie extends Mode
-  def mode: Mode
-
-  def defaultOptions = mode match {
-    case Boogie => Seq("/vcsCores:" + java.lang.Runtime.getRuntime.availableProcessors,
-      "/errorTrace:0",
-      "/errorLimit:10000000",
-      "/proverOpt:O:smt.AUTO_CONFIG=false",
-      "/proverOpt:O:smt.PHASE_SELECTION=0",
-      "/proverOpt:O:smt.RESTART_STRATEGY=0",
-      "/proverOpt:O:smt.RESTART_FACTOR=|1.5|",
-      "/proverOpt:O:smt.ARITH.RANDOM_INITIAL_VALUE=true",
-      "/proverOpt:O:smt.CASE_SPLIT=3",
-      "/proverOpt:O:smt.DELAY_UNITS=true",
-      "/proverOpt:O:NNF.SK_HACK=true",
-      "/proverOpt:O:smt.MBQI=false",
-      "/proverOpt:O:smt.QI.EAGER_THRESHOLD=100",
-      "/proverOpt:O:smt.BV.REFLECT=true",
-      "/proverOpt:O:smt.qi.max_multi_patterns=1000",
-      s"/proverOpt:PROVER_PATH=$z3Path")
-    case B3 => Seq("--stdin") // [B3: will need to replace with Seq.empty[String] to use ASTs directly]
-  }
+  def defaultOptions = Seq("/vcsCores:" + java.lang.Runtime.getRuntime.availableProcessors,
+    "/errorTrace:0",
+    "/errorLimit:10000000",
+    "/proverOpt:O:smt.AUTO_CONFIG=false",
+    "/proverOpt:O:smt.PHASE_SELECTION=0",
+    "/proverOpt:O:smt.RESTART_STRATEGY=0",
+    "/proverOpt:O:smt.RESTART_FACTOR=|1.5|",
+    "/proverOpt:O:smt.ARITH.RANDOM_INITIAL_VALUE=true",
+    "/proverOpt:O:smt.CASE_SPLIT=3",
+    "/proverOpt:O:smt.DELAY_UNITS=true",
+    "/proverOpt:O:NNF.SK_HACK=true",
+    "/proverOpt:O:smt.MBQI=false",
+    "/proverOpt:O:smt.QI.EAGER_THRESHOLD=100",
+    "/proverOpt:O:smt.BV.REFLECT=true",
+    "/proverOpt:O:smt.qi.max_multi_patterns=1000",
+    s"/proverOpt:PROVER_PATH=$z3Path")
 
   /** The (resolved) path where Boogie is supposed to be located. */
-  def verifierPath: String
+  def boogiePath: String
 
   /** The (resolved) path where Z3 is supposed to be located. */
   def z3Path: String
@@ -103,96 +89,88 @@ trait BoogieInterface {
 
     // invoke Boogie
     val optOutput = run(program.toString, defaultOptions ++ options, timeout)
-    // print(optOutput)
     optOutput match {
       case None =>
         // Timeout
         (null, Failure(Seq(TimeoutOccurred(timeout.get, "second(s)"))))
       case Some(output) =>
         // parse the output
-        print(output)
-        ("unknown", Success)
-        // [B3 base: currently we just print B3's response 1-by-1. Better error parsing is an extension goal.]
-        // parse(output) match {
-        //   case (version, Nil) =>
-        //     (version, Success)
-        //   case (version, errorIds) => {
-        //     val errors = (0 until errorIds.length).map(i => {
-        //       val id = errorIds(i)
-        //       val error = errormap.get(id).get
-        //       if (models.nonEmpty) {
-        //         error.failureContexts = Seq(FailureContextImpl(Some(SimpleCounterexample(Model(models(i))))))
-        //       }
-        //       error
-        //     })
-        //     (version, Failure(errors))
-        //   }
-        // }
+        parse(output) match {
+          case (version, Nil) =>
+            (version, Success)
+          case (version, errorIds) => {
+            val errors = (0 until errorIds.length).map(i => {
+              val id = errorIds(i)
+              val error = errormap.get(id).get
+              if (models.nonEmpty) {
+                error.failureContexts = Seq(FailureContextImpl(Some(SimpleCounterexample(Model(models(i))))))
+              }
+              error
+            })
+            (version, Failure(errors))
+          }
+        }
     }
   }
 
-  // [B3 base: currently we just print B3's response 1-by-1. Better error parsing is an extension goal.]
-  // /**
-  //   * Parse the output of Boogie. Returns a pair of the detected version number and a sequence of error identifiers.
-  //   */
-  // private def parse(output: String): (String,Seq[Int]) = {
-  //   val LogoPattern = "Boogie program verifier version ([0-9.]+),.*".r
-  //   val SummaryPattern = "Boogie program verifier finished with ([0-9]+) verified, ([0-9]+) error.*".r
-  //   val ErrorPattern = "  .+ \\[([0-9]+)\\]".r
-  //   val errors = collection.mutable.ListBuffer[Int]()
-  //   var otherErrId = 0
-  //   var version_found : String = null
+  /**
+    * Parse the output of Boogie. Returns a pair of the detected version number and a sequence of error identifiers.
+    */
+  private def parse(output: String): (String,Seq[Int]) = {
+    val LogoPattern = "Boogie program verifier version ([0-9.]+),.*".r
+    val SummaryPattern = "Boogie program verifier finished with ([0-9]+) verified, ([0-9]+) error.*".r
+    val ErrorPattern = "  .+ \\[([0-9]+)\\]".r
+    val errors = collection.mutable.ListBuffer[Int]()
+    var otherErrId = 0
+    var version_found : String = null
 
-  //   val unexpected : (String => Unit) = (msg:String) => {
-  //     otherErrId -= 1
-  //     errors += otherErrId
-  //     val internalError = Internal(InternalReason(DummyNode, msg))
-  //     errormap += (otherErrId -> internalError)
-  //   }
+    val unexpected : (String => Unit) = (msg:String) => {
+      otherErrId -= 1
+      errors += otherErrId
+      val internalError = Internal(InternalReason(DummyNode, msg))
+      errormap += (otherErrId -> internalError)
+    }
 
-  //   var parsingModel : Option[StringBuilder] = None
-  //   var stateInitialBlock = false
-  //   for (l <- output.linesIterator) {
-  //     l match {
-  //       case "*** END_STATE" =>
-  //         stateInitialBlock = false
-  //       case "*** STATE <initial>" =>
-  //         stateInitialBlock = true
-  //       case _ if stateInitialBlock => //ignore everything within state block
-  //       case "*** END_MODEL" if parsingModel.isDefined =>
-  //         models.append(parsingModel.get.toString())
-  //         parsingModel = None
-  //       case _ if parsingModel.isDefined =>
-  //         parsingModel.get.append(l).append("\n")
-  //       case "*** MODEL" if parsingModel.isEmpty =>
-  //         parsingModel = Some(new StringBuilder)
-  //       case LogoPattern(version) =>
-  //         version_found = version
-  //       case ErrorPattern(id) =>
-  //         errors += id.toInt
-  //       case SummaryPattern(v, e) =>
-  //         if(e.toInt != errors.size) unexpected(s"Found ${errors.size} errors, but there should be $e. The output was: $output")
-  //       case "" => // ignore empty lines
-  //       case _ =>
-  //         unexpected(s"Found an unparsable output from Boogie: $l")
-  //     }
-  //   }
-  //   (version_found,errors.toSeq)
-  // }
+    var parsingModel : Option[StringBuilder] = None
+    var stateInitialBlock = false
+    for (l <- output.linesIterator) {
+      l match {
+        case "*** END_STATE" =>
+          stateInitialBlock = false
+        case "*** STATE <initial>" =>
+          stateInitialBlock = true
+        case _ if stateInitialBlock => //ignore everything within state block
+        case "*** END_MODEL" if parsingModel.isDefined =>
+          models.append(parsingModel.get.toString())
+          parsingModel = None
+        case _ if parsingModel.isDefined =>
+          parsingModel.get.append(l).append("\n")
+        case "*** MODEL" if parsingModel.isEmpty =>
+          parsingModel = Some(new StringBuilder)
+        case LogoPattern(version) =>
+          version_found = version
+        case ErrorPattern(id) =>
+          errors += id.toInt
+        case SummaryPattern(v, e) =>
+          if(e.toInt != errors.size) unexpected(s"Found ${errors.size} errors, but there should be $e. The output was: $output")
+        case "" => // ignore empty lines
+        case _ =>
+          unexpected(s"Found an unparsable output from Boogie: $l")
+      }
+    }
+    (version_found,errors.toSeq)
+  }
 
   /**
     * Invoke Boogie.
     * Returns None if there was a timeout, otherwise the Boogie output.
     */
   private def run(input: String, options: Seq[String], timeout: Option[Int]) = {
-    reporter report BackendSubProcessReport("carbon", verifierPath, BeforeInputSent, _boogieProcessPid)
+    reporter report BackendSubProcessReport("carbon", boogiePath, BeforeInputSent, _boogieProcessPid)
 
     // When the filename is "stdin.bpl" Boogie reads the program from standard input.
-    // val cmd: Seq[String] = Seq(verifierPath) ++ options ++ Seq("stdin.bpl")
-    val cmd: Seq[String] = Seq("java", "b3", "verify") ++ options //[B3]
+    val cmd: Seq[String] = Seq(boogiePath) ++ options ++ Seq("stdin.bpl")
     val pb: ProcessBuilder = new ProcessBuilder(cmd.asJava)
-    val env = pb.environment()
-    env.put("CLASSPATH", verifierPath)
     val proc: Process = pb.start()
     _boogieProcess = Some(proc)
     _boogieProcessPid = Some(proc.pid)
@@ -200,19 +178,19 @@ trait BoogieInterface {
     //proverShutDownHook approach taken from Silicon's codebase
     val proverShutdownHook = new Thread {
       override def run(): Unit = {
-        destroyProcessAndItsChildren(proc, verifierPath)
+        destroyProcessAndItsChildren(proc, boogiePath)
       }
     }
     Runtime.getRuntime.addShutdownHook(proverShutdownHook)
 
     // _z3ProcessStream = Some(proc.descendants().toScala(LazyList))
-    reporter report BackendSubProcessReport("carbon", verifierPath, AfterInputSent, _boogieProcessPid)
+    reporter report BackendSubProcessReport("carbon", boogiePath, AfterInputSent, _boogieProcessPid)
 
     val errorConsumer =
-      new InputStreamConsumer(proc.getErrorStream, () => reporter report BackendSubProcessReport("carbon", verifierPath, OnError, _boogieProcessPid))
+      new InputStreamConsumer(proc.getErrorStream, () => reporter report BackendSubProcessReport("carbon", boogiePath, OnError, _boogieProcessPid))
     val errorStreamThread = new Thread(errorConsumer)
     val inputConsumer =
-      new InputStreamConsumer(proc.getInputStream, () => reporter report BackendSubProcessReport("carbon", verifierPath, OnOutput, _boogieProcessPid))
+      new InputStreamConsumer(proc.getInputStream, () => reporter report BackendSubProcessReport("carbon", boogiePath, OnOutput, _boogieProcessPid))
     val inputStreamThread = new Thread(inputConsumer)
 
     errorStreamThread.start()
@@ -232,7 +210,7 @@ trait BoogieInterface {
           proc.waitFor()
       }
     } finally {
-      destroyProcessAndItsChildren(proc, verifierPath)
+      destroyProcessAndItsChildren(proc, boogiePath)
     }
 
     // Deregister the shutdown hook, otherwise the prover process that has been stopped cannot be garbage collected.
@@ -246,7 +224,7 @@ trait BoogieInterface {
     try {
       val errorOutput = errorConsumer.result.get
       val normalOutput = inputConsumer.result.get
-      reporter report BackendSubProcessReport("carbon", verifierPath, OnExit, _boogieProcessPid)
+      reporter report BackendSubProcessReport("carbon", boogiePath, OnExit, _boogieProcessPid)
 
       if (boogieTimeout)
         None
@@ -269,7 +247,7 @@ trait BoogieInterface {
   def stopBoogie(): Unit = {
     _boogieProcess match {
       case Some(proc) =>
-        destroyProcessAndItsChildren(proc, verifierPath)
+        destroyProcessAndItsChildren(proc, boogiePath)
       case None =>
     }
   }
