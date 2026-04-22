@@ -1,4 +1,5 @@
-package viper.carbon.boogie
+package viper.carbon.b3
+import viper.carbon.b3.DafnyHelper
 
 
 object CustomB3AST {
@@ -7,8 +8,9 @@ object CustomB3AST {
     // import scala.collection.JavaConverters._ //(Needed to translate Scala List into Java List ("List(...).asJava"))
     import scala.jdk.CollectionConverters._
 
-    val typeDescrPParam = dafny.TypeDescriptor.reference(classOf[Ast.PParameter])
-    val noProcedureParameters = dafny.DafnySequence.empty(typeDescrPParam)
+    // val typeDescrPParam = dafny.TypeDescriptor.reference(classOf[Ast.PParameter])
+    // val noProcedureParameters = dafny.DafnySequence.empty(typeDescrPParam)
+    val noProcedureParameters = DafnyHelper.Seq_empty(classOf[Ast.PParameter])
 
     // Better way of creating empty DafnySequence of some type
     val typeDescrAExpr = dafny.TypeDescriptor.reference(classOf[Ast.AExpr])
@@ -21,8 +23,13 @@ object CustomB3AST {
     // val var11 = (Ast.Stmt)var10.Extract(Ast.Stmt._typeDescriptor(), DafnySequence._typeDescriptor(TypeDescriptor.UNICODE_CHAR));
     val assertLocation = new Ast.Location()
     assertLocation.__ctor(dafny.DafnySequence.asUnicodeString("assertLoc1"))
-    val var11 = new Ast.Stmt_Assert(new Ast.Expr_BLiteral(false), assertLocation)
-    val procedureBody = Std.Wrappers.Option.create_Some(Ast.Stmt._typeDescriptor(), Ast.Stmt.create_LabeledStmt(label, var11));
+    val var11 = new Ast.Stmt_Check(new Ast.Expr_BLiteral(true), assertLocation)
+    val var12 = new Ast.Stmt_Assert(new Ast.Expr_BLiteral(true), assertLocation)
+    val javaBlockStmtList = List(var11, var12).map(x => x: Ast.Stmt).asJava
+    // val typeDescrBlockStmts = dafny.TypeDescriptor.reference(Ast.Stmt.class)
+    val dafnyBlockStmtArr = dafny.Array.fromList(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), javaBlockStmtList)
+    val stmtBlock = new Ast.Stmt_Block(dafny.DafnySequence.fromArray(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), dafnyBlockStmtArr))
+    val procedureBody = Std.Wrappers.Option.create_Some(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), Ast.Stmt.create_LabeledStmt(label, stmtBlock));
 
     // PROCEDURE
     val name = dafny.DafnySequence.asUnicodeString("procedureName") // "= CodePoint"

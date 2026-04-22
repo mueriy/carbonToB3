@@ -6,12 +6,13 @@
 
 package viper.carbon
 
-import boogie.{BoogieModelTransformer, Namespace, CustomB3AST}
+import boogie.{BoogieModelTransformer, Namespace}
+import b3.{CustomB3AST}
 import modules.impls._
 import viper.silver.ast.{MagicWand, Program, Quasihavoc, Quasihavocall}
 import viper.silver.utility.Paths
 import viper.silver.verifier._
-import verifier.{BoogieDependency, BoogieInterface, Verifier}
+import verifier.{BoogieDependency, BoogieInterface, B3Dependency, B3Interface, Verifier}
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, IOException}
 import viper.silver.frontend.{MissingDependencyException, NativeModel, VariablesModel}
@@ -24,13 +25,17 @@ import viper.silver.reporter.Reporter
  * Debug information can either be set using the constructor argument or the setter.
  */
 case class CarbonVerifier(override val reporter: Reporter,
-                          private var _debugInfo: Seq[(String, Any)] = Nil) extends Verifier with viper.silver.verifier.Verifier with BoogieInterface {
+                          private var _debugInfo: Seq[(String, Any)] = Nil) extends Verifier with viper.silver.verifier.Verifier with BoogieInterface with B3Interface {
 
   var env = null
 
   private var _config: CarbonConfig = _
   def config = _config
 
+  /** Mode/mode defines which verifier we are using */
+  sealed trait Mode
+  case object B3 extends Mode
+  case object Boogie extends Mode
   def mode = if (config != null) config.backendMode.toOption match {
     case Some(backendChoice) if backendChoice == "B3" => B3
     case _ => Boogie
@@ -84,7 +89,6 @@ case class CarbonVerifier(override val reporter: Reporter,
   lazy val b3Default: String = new File(Paths.resolveEnvVars("${B3_JAR}")).getAbsolutePath
 
   /** The (resolved) path where Boogie/B3 is supposed to be located. */
-
   def verifierPath = if (config != null) mode match {
     case Boogie =>
       config.boogieExecutable.toOption match {
@@ -236,26 +240,25 @@ case class CarbonVerifier(override val reporter: Reporter,
             })
         }
       }
-      case B3 =>
-        {
-          if (config == null) {
-            Nil
-          } else {
-            Nil ++ (config.b3Opt.toOption match {
-              case Some(l) =>
-                l.split(" ")
-              case None =>
-                Nil
-            })
-          }
+      case B3 => {
+        if (config == null) {
+          Nil
+        } else {
+          Nil ++ (config.b3Opt.toOption match {
+            case Some(l) =>
+              l.split(" ")
+            case None =>
+              Nil
+          })
         }
-      case _ => Nil
       }
+      case _ => Nil
+    }
 
     var timeout: Option[Int] = None
 
     if(config != null)
-    {
+    { //[B3 todo: either rename the out option, or add b3Out and choose between the two. (Will have to check if we can reuse this code for B3)]
       config.boogieOut.toOption match {
         case Some(filename) =>
           // write Boogie program to the specified file
@@ -268,14 +271,21 @@ case class CarbonVerifier(override val reporter: Reporter,
       timeout = config.timeout.toOption
     }
 
-    invokeBoogie(_translated, options, timeout) match {
+    val invokeResult = mode match {
+      case Boogie => invokeBoogie(_translated, options, timeout)
+      case B3 => invokeB3(_translated, options, timeout)
+    }
+    invokeResult match {
       case (version,result) =>
         if (version!=null) { dependencies.foreach(_ match {
           case b:BoogieDependency => b.version = version
+          case b:B3Dependency => b.version = version
           case _ => }) }
 
         result match {
+          // [B3 base: Just dont use 'variables' counterexample mode. Later we could add a "B3ModelTransformer" here, modify BoogieModelTransformer, or not allow it at all.]
           case Failure(errors) if transformNames => {
+            if (mode == B3) throw new UnsupportedOperationException("Counterexample model 'variables' is currently not supported when using B3")
             errors.foreach(e =>  BoogieModelTransformer.transformCounterexample(e, translatedNames))
           }
           case _ => result

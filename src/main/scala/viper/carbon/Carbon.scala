@@ -132,7 +132,8 @@ class CarbonConfig(args: Seq[String]) extends SilFrontendConfig(args, "Carbon") 
   //B3 options [[Will need to add explanations about which options can be used when using B3 vs Boogie]]
 
   val b3Opt = opt[String]("b3Opt",
-  descr = "Option(s) to pass-through as options to B3 (default: none)",
+  descr = ("Option(s) to pass-through as options to B3. Currently all B3 flags except --stdin are supported. "
+        + "Must be provided as space-separated string of B3 flags (e.g. \\\"--z3 --rprint\\\") (default: none)"),
   default = None,
   noshort = true
   )
