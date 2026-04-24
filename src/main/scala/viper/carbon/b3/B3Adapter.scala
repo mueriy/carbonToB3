@@ -30,7 +30,7 @@ object DafnyHelper {
      *           This SHOULD always be provided, since it MUST be provided in case that seq is empty.  
      * @return The DafnySequence<T> corresponding to the given seq
      */
-    def Seq_fromSeq[T](seq: Seq[T])(implicit ct: ClassTag[T]): DafnySequence[T] = {
+    def SeqT_fromSeq[T](seq: Seq[T])(implicit ct: ClassTag[T]): DafnySequence[T] = {
         // (Type of non-empty seq could be inferred, but the caller should not have to know
         //  whether their seq is empty or not, so we always require and use T)
         if (seq.isEmpty) {
