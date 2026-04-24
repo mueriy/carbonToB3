@@ -7,7 +7,7 @@ import scala.reflect.ClassTag
 object DafnyHelper {
 
   /** returns TypeDescriptor<T> of given type T (for td[T]) */
-  private def td[T](implicit ct: ClassTag[T]): TypeDescriptor[T] = {
+  private[b3] def td[T](implicit ct: ClassTag[T]): TypeDescriptor[T] = {
     TypeDescriptor.reference(ct.runtimeClass.asInstanceOf[Class[T]])
   }
 
@@ -49,10 +49,7 @@ object DafnyHelper {
 
 /** Helper methods to work with B3 */
 object B3Helper {
-  /** returns TypeDescriptor<T> of given type T (for td[T]) */
-  private def td[T](implicit ct: ClassTag[T]): TypeDescriptor[T] = {
-    TypeDescriptor.reference(ct.runtimeClass.asInstanceOf[Class[T]])
-  }
+  import viper.carbon.b3.DafnyHelper._
 
   /** uses B3 to print the RawAst Program (= stage 1/2) */
   def printRawAst(program: RawAst.Program): Unit = {
@@ -122,6 +119,50 @@ object B3Helper {
     runVerify(b3, cli)
   }
 
+  /** Corresponds to "check true" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
+  def TODO_Stmt(): RawAst.Stmt_Check = {
+    val expr = new RawAst.Expr_BLiteral(true)
+    new RawAst.Stmt_Check(expr)
+  }
+
+  /** creates a B3 RawAst Program node using the provided scala sequences */
+  def Program(types: Seq[String], taggers: Seq[RawAst.Tagger], functions: Seq[RawAst.Function], 
+              axioms: Seq[RawAst.Axiom], procedures: Seq[RawAst.Procedure]): RawAst.Program = {
+
+    new RawAst.Program(SeqT_fromSeq[DafnySequence[CodePoint]](types.map(x => Seq_fromString(x))),
+                        SeqT_fromSeq[RawAst.Tagger](taggers),
+                        SeqT_fromSeq[RawAst.Function](functions),
+                        SeqT_fromSeq[RawAst.Axiom](axioms),
+                        SeqT_fromSeq[RawAst.Procedure](procedures))
+  }
+
+  /** creates a B3 RawAst Program node using the provided scala sequences + other inputs */
+  def Procedure(name: String,
+                parameters: Seq[RawAst.PParameter],
+                pre: Seq[RawAst.AExpr],
+                post: Seq[RawAst.AExpr],
+                body: Std.Wrappers.Option[RawAst.Stmt]): RawAst.Procedure = {
+
+    new RawAst.Procedure(Seq_fromString(name),
+                         SeqT_fromSeq[RawAst.PParameter](parameters),
+                         SeqT_fromSeq[RawAst.AExpr](pre),
+                         SeqT_fromSeq[RawAst.AExpr](post),
+                         body)
+  }
+
+  // Option Some/None:
+  /** creates a B3/Dafny Option->Some instance: "Some(input)" */
+  def Option_Some[T](input: T)(implicit ct: ClassTag[T]): Std.Wrappers.Option[T] = {
+    Std.Wrappers.Option.create_Some(td[T], input)
+  }
+  /** creates a B3/Dafny Option->None instance of given Type T */
+  def Option_None[T](implicit ct: ClassTag[T]): Std.Wrappers.Option[T] = {
+    Std.Wrappers.Option.create_None(td[T])
+  }
+
+  def Stmt_Block(seq: Seq[RawAst.Stmt]): RawAst.Stmt_Block = {
+    new RawAst.Stmt_Block(SeqT_fromSeq[RawAst.Stmt](seq))
+  }
 }
 
 
