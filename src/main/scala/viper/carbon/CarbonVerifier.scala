@@ -244,12 +244,10 @@ case class CarbonVerifier(override val reporter: Reporter,
         if (config == null) {
           Nil
         } else {
-          Nil ++ (config.b3Opt.toOption match {
-            case Some(l) =>
-              l.split(" ")
-            case None =>
-              Nil
-          })
+          config.b3Opt.toOption match {
+            case Some(l) => l.split(" ").toSeq
+            case None => Nil
+          }
         }
       }
       case _ => Nil

@@ -1,5 +1,5 @@
 package viper.carbon.b3
-import viper.carbon.b3.DafnyHelper
+import viper.carbon.b3.{DafnyHelper => Daf, B3Helper => B3}
 
 
 object CustomB3AST {
@@ -10,7 +10,7 @@ object CustomB3AST {
 
     // val typeDescrPParam = dafny.TypeDescriptor.reference(classOf[Ast.PParameter])
     // val noProcedureParameters = dafny.DafnySequence.empty(typeDescrPParam)
-    val noProcedureParameters = DafnyHelper.Seq_empty(classOf[Ast.PParameter])
+    val noProcedureParameters = Daf.SeqT_empty[Ast.PParameter]
 
     // Better way of creating empty DafnySequence of some type
     val typeDescrAExpr = dafny.TypeDescriptor.reference(classOf[Ast.AExpr])
@@ -25,10 +25,17 @@ object CustomB3AST {
     assertLocation.__ctor(dafny.DafnySequence.asUnicodeString("assertLoc1"))
     val var11 = new Ast.Stmt_Check(new Ast.Expr_BLiteral(true), assertLocation)
     val var12 = new Ast.Stmt_Assert(new Ast.Expr_BLiteral(true), assertLocation)
-    val javaBlockStmtList = List(var11, var12).map(x => x: Ast.Stmt).asJava
+
+    //can now replace this vvv
+    // val javaBlockStmtList = List(var11, var12).map(x => x: Ast.Stmt).asJava
     // val typeDescrBlockStmts = dafny.TypeDescriptor.reference(Ast.Stmt.class)
-    val dafnyBlockStmtArr = dafny.Array.fromList(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), javaBlockStmtList)
-    val stmtBlock = new Ast.Stmt_Block(dafny.DafnySequence.fromArray(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), dafnyBlockStmtArr))
+    // val dafnyBlockStmtArr = dafny.Array.fromList(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), javaBlockStmtList)
+    // val stmtBlock = new Ast.Stmt_Block(dafny.DafnySequence.fromArray(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), dafnyBlockStmtArr))
+    //can replace this ^^^
+    //with this vvv
+    val dafnyBlockStmtArr = Daf.SeqT_fromSeq(Seq(var11, var12).map(x => x: Ast.Stmt))
+    val stmtBlock = new Ast.Stmt_Block(dafnyBlockStmtArr)
+    //with this ^^^
     val procedureBody = Std.Wrappers.Option.create_Some(dafny.TypeDescriptor.reference(classOf[Ast.Stmt]), Ast.Stmt.create_LabeledStmt(label, stmtBlock));
 
     // PROCEDURE
@@ -49,18 +56,29 @@ object CustomB3AST {
 
 
     print("-----------------\n")
-    ResolvedPrinter.__default.Program(prog);
+    B3.printAst(prog)
     print("-----------------\n")
     Verifier.__default.Verify(prog, new dafny.DafnyMap())
     print("-----------------\n")
 
     println("Testing custom B3 AST finished!")
 
+    println("=======================")
 
 
-    // verb: Verb (Parse | Resolve | Verify)
-    // options: map<string, seq<string>>
-    // files: seq<string>
+    println("Testing custom B3 RawAST...")
+    val rawProcedure = Daf.SeqT_fromSeq[RawAst.Procedure](Seq()) 
+    val rawb3 = new RawAst.Program(Daf.SeqT_empty[dafny.DafnySequence[dafny.CodePoint]],
+                                    Daf.SeqT_empty[RawAst.Tagger],
+                                    Daf.SeqT_empty[RawAst.Function],
+                                    Daf.SeqT_empty[RawAst.Axiom],
+                                    rawProcedure)
+
+    val options = Seq("--print", "print", "test")
+
+    B3.runB3(rawb3, options)
+    println("Testing custom B3 RawAST finished!")
+    // var syntax := new B3CliSyntax();
 
 
   }

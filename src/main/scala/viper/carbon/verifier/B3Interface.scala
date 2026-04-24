@@ -6,15 +6,15 @@
 
 package viper.carbon.verifier
 
-import viper.carbon.boogie.{Assert, Program}
-import viper.silver.reporter.BackendSubProcessStages._
-import viper.silver.reporter.{BackendSubProcessReport, Reporter}
-import viper.silver.verifier.errors.Internal
-import viper.silver.verifier.reasons.InternalReason
+import viper.carbon.boogie.Program // import viper.carbon.boogie.{Assert, Program}
+import viper.carbon.b3.B3Helper.runB3
+// import viper.silver.reporter.BackendSubProcessStages._
+import viper.silver.reporter.Reporter // import viper.silver.reporter.{BackendSubProcessReport, Reporter}
+// import viper.silver.verifier.errors.Internal
+// import viper.silver.verifier.reasons.InternalReason
 import viper.silver.verifier._
 
 import java.io._
-import scala.jdk.CollectionConverters._
 
 class B3Dependency(_location: String) extends Dependency {
   def name = "B3"
@@ -47,7 +47,7 @@ trait B3Interface {
 
   def reporter: Reporter
 
-  def b3defaultOptions = Seq("--stdin") // [B3: will need to replace with Seq.empty[String] to use ASTs directly]
+  def b3defaultOptions = Seq("--print") //<-for now, to defenitely have an output; later replace with: Seq.empty[String]  // There are no default options needed for B3
 
   /** The (resolved) path where B3 is supposed to be located. */
   def verifierPath: String
@@ -55,141 +55,47 @@ trait B3Interface {
   /** The (resolved) path where Z3 is supposed to be located. */
   def z3Path: String
 
-  private var _b3Process: Option[Process] = None
-  private var _b3ProcessPid: Option[Long] = None
 
-  //[B3 todo: check in what form this is still true:]
-  // Z3 processes cannot be collected this way, perhaps because they are not created using Java 9 API (but via Boogie).
-  // Hence, for now we have to trust Boogie to manage its own sub-processes.
-  // private var _z3ProcessStream: Option[LazyList[ProcessHandle]] = None
-
-  var b3errormap: Map[Int, VerificationError] = Map()
-  var b3models : collection.mutable.ListBuffer[String] = new collection.mutable.ListBuffer[String]
   /**
-   * This will setup and run B3 on the given program using the specified options
+   * This will setup and run B3 on the given program using the specified options. 
+   * Includes transformation step to (raw) B3 AST. Timeout currently not working.
    * 
-   * 
-   * 
+   * @param program The Program (Boogie AST) we want to verify
+   * @param options Sequence containing B3 flags. These MUST be valid B3 flags in "--flagName" format.
+   * @param timeout Currently does noting.
+   * @return Currently always ("?", Success), because we dont do error parsing yet
    */
   def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {
-    // find all errors and assign everyone a unique id
-    b3errormap = Map()
-    program.visit {
-      case a@Assert(exp, error) =>
-        b3errormap += (a.id -> error)
-    }
 
-    println(b3defaultOptions ++ options)
+    // translate Boogie AST to a B3 raw AST
+    // (need to place rawB3prog = "transformation(program)")
+    // PLACEHOLDER vvv
+    import viper.carbon.b3.{DafnyHelper => Daf}
+    val rawProcedure = Daf.SeqT_fromSeq[RawAst.Procedure](Seq()) 
+    val rawB3prog = new RawAst.Program(Daf.SeqT_empty[dafny.DafnySequence[dafny.CodePoint]],
+                                    Daf.SeqT_empty[RawAst.Tagger],
+                                    Daf.SeqT_empty[RawAst.Function],
+                                    Daf.SeqT_empty[RawAst.Axiom],
+                                    rawProcedure)
+    // PLACEHOLDER ^^^
 
-    // invoke B3
-    val optOutput = run(program.toString, b3defaultOptions ++ options, timeout)
-    // print(optOutput)
-    optOutput match {
-      case None =>
-        // Timeout
-        (null, Failure(Seq(TimeoutOccurred(timeout.get, "second(s)"))))
-      case Some(output) =>
-        // parse the output
-        print(output) // [B3 base: for now we just print B3's response as-is]
-        ("unknown", Success)
-
-        // [B3 base: Better error parsing should be implemented here later (extension goal). See BoogieInterface.scala]
-    }
-  }
-
-  // [B3 base: currently we just print B3's response 1-by-1. Better error parsing is an extension goal.]
-  // (parser def would come here, see BoogieInterface.scala)
-
-
-  /**
-    * Invoke B3.
-    * Returns None if there was a timeout, otherwise the B3 output.
-    */
-  private def run(input: String, options: Seq[String], timeout: Option[Int]) = {
-    reporter report BackendSubProcessReport("carbon", verifierPath, BeforeInputSent, _b3ProcessPid)
-
-    val cmd: Seq[String] = Seq("java", "b3", "verify") ++ options
-    val pb: ProcessBuilder = new ProcessBuilder(cmd.asJava)
-    val env = pb.environment()
-    env.put("CLASSPATH", verifierPath)
-    val proc: Process = pb.start()
-    _b3Process = Some(proc)
-    _b3ProcessPid = Some(proc.pid)
-
-    //proverShutDownHook approach taken from Silicon's codebase
-    val proverShutdownHook = new Thread {
-      override def run(): Unit = {
-        destroyProcessAndItsChildren(proc, verifierPath)
-      }
-    }
-    Runtime.getRuntime.addShutdownHook(proverShutdownHook)
-
-    // _z3ProcessStream = Some(proc.descendants().toScala(LazyList))
-    reporter report BackendSubProcessReport("carbon", verifierPath, AfterInputSent, _b3ProcessPid)
-
-    val errorConsumer =
-      new InputStreamConsumer(proc.getErrorStream, () => reporter report BackendSubProcessReport("carbon", verifierPath, OnError, _b3ProcessPid))
-    val errorStreamThread = new Thread(errorConsumer)
-    val inputConsumer =
-      new InputStreamConsumer(proc.getInputStream, () => reporter report BackendSubProcessReport("carbon", verifierPath, OnOutput, _b3ProcessPid))
-    val inputStreamThread = new Thread(inputConsumer)
-
-    errorStreamThread.start()
-    inputStreamThread.start()
-
-    // Send the program to B3
-    proc.getOutputStream.write(input.getBytes);
-    proc.getOutputStream.close()
-
-    var b3Timeout = false
-
+    // invoke B3 and capture any output in outStream (-> output)
+    val outStream = new ByteArrayOutputStream()
+    val newOut = new PrintStream(outStream)
+    val oldOut = System.out
+      System.setOut(newOut)
+      runB3(rawB3prog, b3defaultOptions ++ options) // [B3 todo?: currently no timeout mechanism]
+      newOut.flush()
     try {
-      timeout match {
-        case Some(t) if t > 0 =>
-          b3Timeout = !proc.waitFor(t, java.util.concurrent.TimeUnit.SECONDS)
-        case _ =>
-          proc.waitFor()
-      }
     } finally {
-      destroyProcessAndItsChildren(proc, verifierPath)
+      System.setOut(oldOut)
     }
+    val output = outStream
 
-    // Deregister the shutdown hook, otherwise the prover process that has been stopped cannot be garbage collected.
-    // Explanation: https://blog.creekorful.org/2020/03/classloader-and-memory-leaks/
-    // Bug report: https://github.com/viperproject/silicon/issues/579
-    Runtime.getRuntime.removeShutdownHook(proverShutdownHook)
-
-    errorStreamThread.join()
-    inputStreamThread.join()
-
-    try {
-      val errorOutput = errorConsumer.result.get
-      val normalOutput = inputConsumer.result.get
-      reporter report BackendSubProcessReport("carbon", verifierPath, OnExit, _b3ProcessPid)
-
-      if (b3Timeout)
-        None
-      else
-        Some(errorOutput + normalOutput)
-    } catch {
-      case _: NoSuchElementException => sys.error("Could not retrieve output from B3")
-    }
-  }
-
-  private def destroyProcessAndItsChildren(proc: Process, processPath: String) : Unit = {
-    if(proc.isAlive) {
-      reporter report BackendSubProcessReport("carbon", processPath, BeforeTermination, _b3ProcessPid)
-      proc.children().forEach(_.destroy() : Unit)
-      proc.destroy()
-      reporter report BackendSubProcessReport("carbon", processPath, AfterTermination, _b3ProcessPid)
-    }
-  }
-
-  def stopB3(): Unit = {
-    _b3Process match {
-      case Some(proc) =>
-        destroyProcessAndItsChildren(proc, verifierPath)
-      case None =>
-    }
+    // Output B3 output
+    print(output) // [B3 base: an extension goal would be to implement error parsing here, see BoogieInterface.scala -> parse]
+    
+    // cannot get b3 version. Since we currently don't parse/handle errors we always return Success
+    ("?", Success)
   }
 }
