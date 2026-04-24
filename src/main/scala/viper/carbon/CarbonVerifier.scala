@@ -34,12 +34,12 @@ case class CarbonVerifier(override val reporter: Reporter,
 
   /** Mode/mode defines which verifier we are using */
   sealed trait Mode
-  case object B3 extends Mode
-  case object Boogie extends Mode
+  case object B3Mode extends Mode
+  case object BoogieMode extends Mode
   def mode = if (config != null) config.backendMode.toOption match {
-    case Some(backendChoice) if backendChoice == "B3" => B3
-    case _ => Boogie
-  } else Boogie
+    case Some(backendChoice) if backendChoice == "B3" => B3Mode
+    case _ => BoogieMode
+  } else BoogieMode
 
   def start(): Unit = {}
   def stop(): Unit = {
@@ -90,12 +90,12 @@ case class CarbonVerifier(override val reporter: Reporter,
 
   /** The (resolved) path where Boogie/B3 is supposed to be located. */
   def verifierPath = if (config != null) mode match {
-    case Boogie =>
+    case BoogieMode =>
       config.boogieExecutable.toOption match {
         case Some(path) => new File(path).getAbsolutePath
         case None => boogieDefault
       }
-    case B3 => 
+    case B3Mode => 
       config.b3Executable.toOption match {
         case Some(path) => {new File(path).getAbsolutePath}
         case None => b3Default
@@ -212,7 +212,7 @@ case class CarbonVerifier(override val reporter: Reporter,
 
 
     val options = mode match {
-      case Boogie => {
+      case BoogieMode => {
         if (config == null) {
           Nil
         } else {
@@ -240,7 +240,7 @@ case class CarbonVerifier(override val reporter: Reporter,
             })
         }
       }
-      case B3 => {
+      case B3Mode => {
         if (config == null) {
           Nil
         } else {
@@ -270,8 +270,8 @@ case class CarbonVerifier(override val reporter: Reporter,
     }
 
     val invokeResult = mode match {
-      case Boogie => invokeBoogie(_translated, options, timeout)
-      case B3 => invokeB3(_translated, options, timeout)
+      case BoogieMode => invokeBoogie(_translated, options, timeout)
+      case B3Mode => invokeB3(_translated, options, timeout)
     }
     invokeResult match {
       case (version,result) =>
@@ -283,7 +283,7 @@ case class CarbonVerifier(override val reporter: Reporter,
         result match {
           // [B3 base: Just dont use 'variables' counterexample mode. Later we could add a "B3ModelTransformer" here, modify BoogieModelTransformer, or not allow it at all.]
           case Failure(errors) if transformNames => {
-            if (mode == B3) throw new UnsupportedOperationException("Counterexample model 'variables' is currently not supported when using B3")
+            if (mode == B3Mode) throw new UnsupportedOperationException("Counterexample model 'variables' is currently not supported when using B3")
             errors.foreach(e =>  BoogieModelTransformer.transformCounterexample(e, translatedNames))
           }
           case _ => result
