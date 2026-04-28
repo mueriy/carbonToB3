@@ -195,7 +195,7 @@ object B3Helper {
   }
     /** Corresponds to "0" in raw AST format. Use these if a int expr is required, but you dont want to implement it yet. */
   def TODO_Expr_int(): RawAst.Expr_ILiteral = {
-    new RawAst.Expr_ILiteral(java.math.BigInteger.valueOf(1))
+    new RawAst.Expr_ILiteral(java.math.BigInteger.valueOf(666))
   }
 
   def Expr_ILiteral(x: BigInt): RawAst.Expr_ILiteral = {
@@ -206,29 +206,27 @@ object B3Helper {
     new RawAst.Expr_BLiteral(b)
   }
 
-  // def Expr_OperatorExpr(left: RawAst.Expr, binop: BinOp, right: RawAst.Expr): RawAst.Expr_OperatorExpr = {
-  // // Expr_OperatorExpr(Operator var1, DafnySequence<? extends Expr> var2) {
-  // //op: Operator, args: seq<Expr>)
+  def Expr_OperatorExpr(operator: RawAst.Operator, expressions: Seq[RawAst.Expr]): RawAst.Expr_OperatorExpr = {
+      new RawAst.Expr_OperatorExpr(operator, SeqT_fromSeq[RawAst.Expr](expressions))
+  }
 
-  //   binop match {
-  //     case Add => new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case And => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case Div => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case EqCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case Equiv => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case GeCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case GtCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case Implies => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case IntDiv => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case LeCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case LtCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case Mod => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case Mul => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case NeCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case Or => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //     case Sub => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
-  //   }
-  // }
+  /** To enable using names of Boogie operators to define B3 operators. */
+  val Add = new RawAst.Operator_Plus
+  val And = new RawAst.Operator_LogicalAnd
+  val Div = new RawAst.Operator_Div //TODO is this correct?!?! (probably not)
+  val EqCmp = new RawAst.Operator_Eq
+  val Equiv = new RawAst.Operator_Equiv
+  val Implies = new RawAst.Operator_LogicalImp
+  val IntDiv = new RawAst.Operator_Div //TODO is this correct?!?! (maybe, but must check)
+  val LeCmp = new RawAst.Operator_AtMost
+  val LtCmp = new RawAst.Operator_Less
+  val Mod = new RawAst.Operator_Mod //TODO is this correct?!?! (maybe, but must check)
+  val Mul = new RawAst.Operator_Times
+  val NeCmp = new RawAst.Operator_Neq
+  val Or = new RawAst.Operator_LogicalOr
+  val Sub = new RawAst.Operator_Minus
+  val Not = new RawAst.Operator_LogicalNot
+  val Minus = new RawAst.Operator_UnaryMinus
       // datatype Operator =
     // // ternary operators
     // | IfThenElse

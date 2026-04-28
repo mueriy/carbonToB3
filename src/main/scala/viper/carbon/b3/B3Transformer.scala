@@ -129,30 +129,32 @@ object BoogieToB3Transformer {
    // TODO: actually implement this method
   private def transformExpr(exp: Exp): RawAst.Expr = {
     println("DEBUG: +++ transformExpr(x), where x has type " + exp.getClass.getName)
+    // B3 and Boogie operators seem to have the same associativity.
+    // B3 does not have the Boogie operators ++ and <:, but both not used by Carbon. 
+    // B3 does also not support the > and >= operators, which means that we swap the left and right expr and use < and <= instead
+    // B3 does have the <== operator, but we dont use it, so we dont care about its associativity. 
     
     exp match {
       case BinExp(left, binop, right) => {
-        // (left: Exp, binop: BinOp, right: Exp)
         binop match {
-          case Add => "ok"
-          case And => "ok"
-          case Div => "ok"
-          case EqCmp => "ok"
-          case Equiv => "ok"
-          case GeCmp => "ok"
-          case GtCmp => "ok"
-          case Implies => "ok"
-          case IntDiv => "ok"
-          case LeCmp => "ok"
-          case LtCmp => "ok"
-          case Mod => "ok"
-          case Mul => "ok"
-          case NeCmp => "ok"
-          case Or => "ok"
-          case Sub => "ok"
+          case Add => B3.Expr_OperatorExpr(B3.Add, Seq(left, right) map transformExpr)
+          case And => B3.Expr_OperatorExpr(B3.And, Seq(left, right) map transformExpr)
+          case Div => B3.Expr_OperatorExpr(B3.Div, Seq(left, right) map transformExpr) // TODO: check if we can really use this
+          case EqCmp => B3.Expr_OperatorExpr(B3.EqCmp, Seq(left, right) map transformExpr)
+          case Equiv => B3.Expr_OperatorExpr(B3.Equiv, Seq(left, right) map transformExpr)
+          case GeCmp => B3.Expr_OperatorExpr(B3.LeCmp, Seq(right, left) map transformExpr) //we must use <= instead
+          case GtCmp => B3.Expr_OperatorExpr(B3.LtCmp, Seq(right, left) map transformExpr) //we must use < instead
+          case Implies => B3.Expr_OperatorExpr(B3.Implies, Seq(left, right) map transformExpr)
+          case IntDiv => B3.Expr_OperatorExpr(B3.IntDiv, Seq(left, right) map transformExpr)
+          case LeCmp => B3.Expr_OperatorExpr(B3.LeCmp, Seq(left, right) map transformExpr)
+          case LtCmp => B3.Expr_OperatorExpr(B3.LtCmp, Seq(left, right) map transformExpr)
+          case Mod => B3.Expr_OperatorExpr(B3.Mod, Seq(left, right) map transformExpr)
+          case Mul => B3.Expr_OperatorExpr(B3.Mul, Seq(left, right) map transformExpr)
+          case NeCmp => B3.Expr_OperatorExpr(B3.NeCmp, Seq(left, right) map transformExpr)
+          case Or => B3.Expr_OperatorExpr(B3.Or, Seq(left, right) map transformExpr)
+          case Sub => B3.Expr_OperatorExpr(B3.Sub, Seq(left, right) map transformExpr)
         }
-        println("TODO: BinExp"); 
-        B3.TODO_Expr_int()
+        
       }
       case CondExp(_, _, _) => println("TODO: CondExp");                            B3.TODO_Expr_int()
       case Const(_) => println("TODO: Const");                                      B3.TODO_Expr_int()
