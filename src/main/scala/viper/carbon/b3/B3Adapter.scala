@@ -158,10 +158,15 @@ object B3Helper {
   }
 
   // STATEMENT NODES
-  /** Corresponds to "check true" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
-  def TODO_Stmt(): RawAst.Stmt_Check = {
+  /** Corresponds to "{{check true}}" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
+  def TODO_Stmt(): RawAst.Stmt = {
     val expr = new RawAst.Expr_BLiteral(true)
-    new RawAst.Stmt_Check(expr)
+    Stmt_Block(Seq(new RawAst.Stmt_Check(expr)))
+  }
+  /** Corresponds to "{{check false}}" in raw AST format. Use this if a Stmt is required, but it is actually an advanced feature. */
+  def LATER_Stmt(): RawAst.Stmt = {
+    val expr = new RawAst.Expr_BLiteral(false)
+    Stmt_Block(Seq(new RawAst.Stmt_Check(expr)))
   }
 
   /** creates a B3 Block-Stmt containing the B3 statements provided by Sequence seq */

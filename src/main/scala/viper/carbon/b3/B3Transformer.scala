@@ -93,7 +93,7 @@ object BoogieToB3Transformer {
     // }
 
     // finally, creating raw B3 Procedure
-    B3.Procedure(name = proc.name,                     // TODO: Make sure that that name is valid! (proc.name contains different names, see definition of Identifier in boogie.scala)
+    B3.Procedure(name = proc.name,
                  parameters = Seq[RawAst.PParameter](),     // TODO
                  pre = Seq[RawAst.AExpr](),     // No data for these, but also empty in Boogie
                  post = Seq[RawAst.AExpr](),    // No data for these, but also empty in Boogie
@@ -134,7 +134,7 @@ object BoogieToB3Transformer {
   private def transformStatement(stmt: Stmt): RawAst.Stmt = {
     println("DEBUG: transformStatement(x), where x has type " + stmt.getClass.getName)
     stmt match {
-      case _: Goto => println("TODO: Goto");                                        B3.TODO_Stmt()
+      case _: Goto => println("LATER: Goto");                                        B3.LATER_Stmt()
       case AssertImpl(exp, error) => B3.Stmt_Assert(transformExpr(exp), error.readableMessage)
       case Assign(lhs, rhs) =>
         lhs match {
@@ -145,8 +145,8 @@ object BoogieToB3Transformer {
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
         }
       case _: Assume => println("TODO: Assume");                                    B3.TODO_Stmt()
-      case _: Comment => println("FAIL: Comment stmts should be pre-removed!!!");   B3.TODO_Stmt()
-      case _: CommentBlock => println("TODO: CommentBlock");                        B3.TODO_Stmt()
+      case _: Comment => println("FAIL: Comment stmts should be pre-removed!!! Inserted empty stmt block instead"); B3.Stmt_Block(Seq())
+      case CommentBlock(_, stmt) => transformStatement(stmt)
       case _: HavocImpl => println("TODO: HavocImpl");                              B3.TODO_Stmt()
       case If(cond, thn, els) =>
         cond match {
