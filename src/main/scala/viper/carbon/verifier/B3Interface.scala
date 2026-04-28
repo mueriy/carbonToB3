@@ -48,7 +48,7 @@ trait B3Interface {
 
   def reporter: Reporter
 
-  def b3defaultOptions = Seq("--print") //<-for now, to defenitely have an output; later replace with: Seq.empty[String]  // There are no default options needed for B3
+  def b3defaultOptions = Seq("--print") //<-for now, to definitely have an output; later replace with: Seq.empty[String]  // There are no default options needed for B3
 
   /** The (resolved) path where B3 is supposed to be located. */
   def verifierPath: String

@@ -154,8 +154,8 @@ class PrettyPrinter(n: Node) extends BracketPrettyPrinter {
         text("assume") <+> show(quantifyOverFreeTypeVars(e)) //[B3] <> char (';')
       case a@Assert(e, error) =>
         text("assert") <+>
-          // "{:msg" <+> "\"  " <> showError(error, a.id) <> "\"}" <> line <> //[[B* temp?: remove assert error msg (no B3 feature)]]
-          // space <> space <> //[[B* temp?: remove assert error msg (no B3 feature)]]
+          // "{:msg" <+> "\"  " <> showError(error, a.id) <> "\"}" <> line <> //[[B3 temp?: remove assert error msg (no B3 feature)]]
+          // space <> space <> //[[B3 temp?: remove assert error msg (no B3 feature)]]
           show(quantifyOverFreeTypeVars(e)) //[B3] <>
           //[B3] char (';')
       case HavocImpl(vars) =>

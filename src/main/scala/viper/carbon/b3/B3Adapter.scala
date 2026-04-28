@@ -71,8 +71,8 @@ object B3Helper {
     // (files are ignored by us).
 
     // Transform "options" to what the corresponding "args" of B3's Main method would be  
-    val scalaSeqOfB3args = (Seq("dotnet", "verify")++options).map(x => DafnyHelper.Seq_fromString(x))
-    val dafnySeqOfB3args = DafnyHelper.SeqT_fromSeq[DafnySequence[CodePoint]](scalaSeqOfB3args)
+    val scalaSeqOfB3args = (Seq("dotnet", "verify")++options).map(x => Seq_fromString(x))
+    val dafnySeqOfB3args = SeqT_fromSeq[DafnySequence[CodePoint]](scalaSeqOfB3args)
     // Parse args
     CommandLineOptions.__default.Parse(B3.Verb._typeDescriptor(), new B3.B3CliSyntax(), dafnySeqOfB3args)
   }
@@ -175,16 +175,24 @@ object B3Helper {
     new RawAst.Stmt_Assert(exp)
   }
 
-  /** creates a B3 Assign-Stmt '"assignToVar" = assignThisExpr' */
+  /** creates a B3 Assign-Stmt '"assignToVar" = assignThisExpr'
+   * assignToVar must be a variable in scope (= must be in body of the corresponding Stmt_VarDecl) */
   def Stmt_Assign(assignToVar: String, assignThisExpr: RawAst.Expr): RawAst.Stmt_Assign = {
     new RawAst.Stmt_Assign(Seq_fromString(assignToVar), assignThisExpr)
   }
 
-  // , typ: Type
-  def Stmt_VarDecl(name: String, body: RawAst.Stmt): RawAst.Stmt_VarDecl = {
-    val variable = new RawAst.Variable(DafnyHelper.Seq_fromString(name), true, Option_Some(Types.__default.IntTypeName()), Option_None[RawAst.Expr]) 
-    new RawAst.Stmt_VarDecl(variable, Option_None[RawAst.Expr], body) 
-    // new RawAst.Stmt_VarDecl(Variable var1, Option_None[RawAst.Expr], Stmt var3) 
+  /** create B3 VarDecl-stmt; 'typ' must either be "bool", "int", or "tag" OR a type defined at the start of the program */
+  def Stmt_VarDecl(name: String, body: RawAst.Stmt, typ: String, isMutable: Boolean = true): RawAst.Stmt_VarDecl = {
+    val variable = new RawAst.Variable(Seq_fromString(name),              // name
+                                       isMutable,                         // "isMutable" => var vs val
+                                       Option_Some(Seq_fromString(typ)),  // "optionalType" => is NOT optional here (since we dont initiate a value)!
+                                       Option_None[RawAst.Expr])          // optionalAutoInv => TODO: look if we can use this
+    new RawAst.Stmt_VarDecl(variable, Option_None[RawAst.Expr], body) // Option_None ==> do not initiate variables (which we never want to do) 
+  }
+
+  /** create a B3 If-Stmt */
+  def Stmt_If(cond: RawAst.Expr, thn: RawAst.Stmt, els: RawAst.Stmt): RawAst.Stmt_If = {
+    new RawAst.Stmt_If(cond, thn, els)
   }
 
 
@@ -215,6 +223,7 @@ object B3Helper {
   }
 
   /** To enable using names of Boogie operators to define B3 operators. */
+  val CondExp = new RawAst.Operator_IfThenElse
   val Add = new RawAst.Operator_Plus
   val And = new RawAst.Operator_LogicalAnd
   val Div = new RawAst.Operator_Div //TODO is this correct?!?! (probably not)
@@ -231,28 +240,9 @@ object B3Helper {
   val Sub = new RawAst.Operator_Minus
   val Not = new RawAst.Operator_LogicalNot
   val Minus = new RawAst.Operator_UnaryMinus
-      // datatype Operator =
-    // // ternary operators
-    // | IfThenElse
-    // // binary operators
-    // | Equiv
-    // | LogicalImp
-    // | LogicalAnd | LogicalOr
-    // | Eq | Neq
-    // | Less | AtMost
-    // | Plus | Minus | Times | Div | Mod
-    // // unary operators
-    // | LogicalNot
-    // | UnaryMinus
 
-
-
-    // datatype Expr =
-    // | BLiteral(bvalue: bool)
-    // | ILiteral(ivalue: int)
+    // datatype Expr = (remaining)
     // | CustomLiteral(s: string, typ: TypeName)
-    // | IdExpr(name: string, isOld: bool := false)
-    // | OperatorExpr(op: Operator, args: seq<Expr>)
     // | FunctionCallExpr(name: string, args: seq<Expr>)
     // | LabeledExpr(name: string, expr: Expr)
     // | LetExpr(name: string, optionalType: Option<TypeName>, rhs: Expr, body: Expr)

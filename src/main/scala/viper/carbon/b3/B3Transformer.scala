@@ -65,12 +65,24 @@ object BoogieToB3Transformer {
     }
   } 
 
+  /** Returns the type name from a Boogie Type */ 
+  private def getNameFromTyp(typ: Type): String = {
+    typ match {
+      case Bool => "bool"
+      case Int => "int"
+      case Real =>              sys.error("TODO: Real Type")
+      case MapType(_, _, _) =>  sys.error("TODO: MapType")
+      case NamedType(_, _) =>   sys.error("TODO: NamedType")
+      case TypeVar(_) =>        sys.error("TODO: TypeVar")
+    }
+  }
+
   /** Transform Boogie Procedure -> raw B3 Procedure */
   private def transformProcedure(proc: Procedure): RawAst.Procedure = {
     // Define variable declarations for all undeclared variables in the body, to be inserted at start of transformed procedure body. 
     val undecl = proc.body.undeclLocalVars.filter(v1 => (proc.ins ++ proc.outs).forall(v2 => v2.name != v1.name)) // (<- stolen from boogie.PrettyPrinter)
     // Only variables used in the body of the var decl are in scope => need to define procedure bode and each var decl as body of previous var decl
-    val varDeclarations = undecl.foldRight(transformStatement(proc.body))((l, r) => B3.Stmt_VarDecl(l.name.name, r))
+    val varDeclarations = undecl.foldRight(transformStatement(proc.body))((l, r) => B3.Stmt_VarDecl(l.name, r, getNameFromTyp(l.typ)))
     // println("DEBUG: ========> " + undecl.size)
     // Use first ("outermost") var decl as Procedure body. (TODO: check if it is ever possible to have an empty body -> B3.Option_None)
     val b3ProcBody = B3.Option_Some(varDeclarations)
@@ -101,7 +113,7 @@ object BoogieToB3Transformer {
     // println(""DEBUG: unpackStmtBranch stmt type: " + stmt.getClass.getName)
     stmt match {
       case commBlock: CommentBlock => unpackStmtBranch(commBlock.stmt) 
-      case Seqn(stmtSeq) => {
+      case Seqn(stmtSeq) =>
         val seq = stmtSeq map unpackStmtBranch filter {
           case Comment(_) => false
           case Seqn(Seq()) => false
@@ -114,7 +126,6 @@ object BoogieToB3Transformer {
         } else {
           Seqn(seq)
         }
-      }
       case anyStmt => anyStmt
     }
   }
@@ -125,26 +136,28 @@ object BoogieToB3Transformer {
     stmt match {
       case _: Goto => println("TODO: Goto");                                        B3.TODO_Stmt()
       case AssertImpl(exp, error) => B3.Stmt_Assert(transformExpr(exp), error.readableMessage)
-      case Assign(lhs, rhs) => {
-        (lhs, rhs) match {
-          case (LocalVar(identif, _), exp: Exp) => {
-          println("DEBUG: Assign lhs: name = " + identif + " type = " + lhs.getClass.getName)
+      case Assign(lhs, rhs) =>
+        lhs match {
+          case LocalVar(identif, typ) =>
+            println("DEBUG: Assign lhs: name = " + useIdent(identif) + " type = " + lhs.getClass.getName)
             B3.Stmt_Assign(identif, transformExpr(rhs))
-          }
-          case (_: GlobalVar, _) => sys.error("TODO: GlobalVar")
+          case _: GlobalVar =>                                                      sys.error("TODO: GlobalVar")
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
         }
-        // B3.TODO_Stmt()
-      }
       case _: Assume => println("TODO: Assume");                                    B3.TODO_Stmt()
       case _: Comment => println("FAIL: Comment stmts should be pre-removed!!!");   B3.TODO_Stmt()
       case _: CommentBlock => println("TODO: CommentBlock");                        B3.TODO_Stmt()
       case _: HavocImpl => println("TODO: HavocImpl");                              B3.TODO_Stmt()
-      case _: If => println("TODO: If");                                            B3.TODO_Stmt()
+      case If(cond, thn, els) =>
+        cond match {
+          case LocalVar(name, _) => println("DEBUG: ---------> " + cond.getClass.getName + " and " + useIdent(name))
+          case _ => println("DEBUG: ---------> " + cond.getClass.getName)
+        }
+        B3.Stmt_If(transformExpr(cond), transformStatement(thn), transformStatement(els))
       case _: Label => println("TODO: Label");                                      B3.TODO_Stmt()
       case _: LocalVarWhereDecl => println("TODO: LocalVarWhereDecl");              B3.TODO_Stmt()
       case _: NondetIf => println("TODO: NondetIf");                                B3.TODO_Stmt()
-      case seqn: Seqn => {
+      case seqn: Seqn => 
         // We always create a Stmt_Block here, but we first have to eliminate all unneccessairy Seqn-nestings, and ignore empty Seqn (Comment stmts dont count) 
         val unpackedStmtSeq = unpackStmtBranch(seqn) match {
           case Seqn(seq) => seq
@@ -152,7 +165,6 @@ object BoogieToB3Transformer {
           case stmt => Seq(stmt) 
         }
         B3.Stmt_Block(unpackedStmtSeq map transformStatement)
-      }
     }
   }
 
@@ -165,7 +177,7 @@ object BoogieToB3Transformer {
     // B3 does have the <== operator, but we dont use it, so we dont care about its associativity. 
     
     exp match {
-      case BinExp(left, binop, right) => {
+      case BinExp(left, binop, right) =>
         binop match {
           case Add => B3.Expr_OperatorExpr(B3.Add, Seq(left, right) map transformExpr)
           case And => B3.Expr_OperatorExpr(B3.And, Seq(left, right) map transformExpr)
@@ -184,9 +196,7 @@ object BoogieToB3Transformer {
           case Or => B3.Expr_OperatorExpr(B3.Or, Seq(left, right) map transformExpr)
           case Sub => B3.Expr_OperatorExpr(B3.Sub, Seq(left, right) map transformExpr)
         }
-        
-      }
-      case CondExp(_, _, _) => println("TODO: CondExp");                            B3.TODO_Expr_int()
+      case CondExp(cond, thn, els) => B3.Expr_OperatorExpr(B3.CondExp, Seq(cond, thn, els) map transformExpr)
       case Const(_) => println("TODO: Const");                                      B3.TODO_Expr_int()
       case Exists(_, _, _, _) => println("TODO: Exists");                           B3.TODO_Expr_int()
       case FalseLit() => B3.Expr_BLiteral(false)
@@ -201,7 +211,11 @@ object BoogieToB3Transformer {
       case RealConv(_) => println("TODO: RealConv");                                B3.TODO_Expr_int()
       case RealLit(_) => println("TODO: RealLit");                                  B3.TODO_Expr_int()
       case TrueLit() => B3.Expr_BLiteral(true)
-      case UnExp(_, _) => println("TODO: UnExp");                                   B3.TODO_Expr_int()
+      case UnExp(unop, exp) => 
+        unop match {
+          case Not => B3.Expr_OperatorExpr(B3.Not, Seq(transformExpr(exp)))
+          case Minus => B3.Expr_OperatorExpr(B3.Minus, Seq(transformExpr(exp)))
+        }
     }
   }
 
