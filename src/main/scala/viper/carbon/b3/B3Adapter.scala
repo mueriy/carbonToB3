@@ -51,6 +51,7 @@ object DafnyHelper {
 object B3Helper {
   import viper.carbon.b3.DafnyHelper._
 
+  // B3 MAIN METHOD (+ AUXILIARY METHODS)
   /** uses B3 to print the RawAst Program (= stage 1/2) */
   def printRawAst(program: RawAst.Program): Unit = {
     Printer.__default.Program(program) 
@@ -119,12 +120,8 @@ object B3Helper {
     runVerify(b3, cli)
   }
 
-  /** Corresponds to "check true" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
-  def TODO_Stmt(): RawAst.Stmt_Check = {
-    val expr = new RawAst.Expr_BLiteral(true)
-    new RawAst.Stmt_Check(expr)
-  }
 
+  // STANDALONE NODES
   /** creates a B3 RawAst Program node using the provided scala sequences */
   def Program(types: Seq[String], taggers: Seq[RawAst.Tagger], functions: Seq[RawAst.Function], 
               axioms: Seq[RawAst.Axiom], procedures: Seq[RawAst.Procedure]): RawAst.Program = {
@@ -160,12 +157,107 @@ object B3Helper {
     Std.Wrappers.Option.create_None(td[T])
   }
 
+  // STATEMENT NODES
+  /** Corresponds to "check true" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
+  def TODO_Stmt(): RawAst.Stmt_Check = {
+    val expr = new RawAst.Expr_BLiteral(true)
+    new RawAst.Stmt_Check(expr)
+  }
+
+  /** creates a B3 Block-Stmt containing the B3 statements provided by Sequence seq */
   def Stmt_Block(seq: Seq[RawAst.Stmt]): RawAst.Stmt_Block = {
     new RawAst.Stmt_Block(SeqT_fromSeq[RawAst.Stmt](seq))
   }
+
+  /** created a raw B3 Assert-Stmt node using the provided expression. 
+   * The 'error' parameter can current not be used by B3, but we require it for when that changes */
+  def Stmt_Assert(exp: RawAst.Expr, error: String): RawAst.Stmt_Assert = {
+    new RawAst.Stmt_Assert(exp)
+  }
+
+  /** creates a B3 Assign-Stmt '"assignToVar" = assignThisExpr' */
+  def Stmt_Assign(assignToVar: String, assignThisExpr: RawAst.Expr): RawAst.Stmt_Assign = {
+    new RawAst.Stmt_Assign(Seq_fromString(assignToVar), assignThisExpr)
+  }
+
+  // , typ: Type
+  def Stmt_VarDecl(name: String, body: RawAst.Stmt): RawAst.Stmt_VarDecl = {
+    val variable = new RawAst.Variable(DafnyHelper.Seq_fromString(name), true, Option_Some(Types.__default.IntTypeName()), Option_None[RawAst.Expr]) 
+    new RawAst.Stmt_VarDecl(variable, Option_None[RawAst.Expr], body) 
+    // new RawAst.Stmt_VarDecl(Variable var1, Option_None[RawAst.Expr], Stmt var3) 
+  }
+
+
+  // EXPRESSION NODES
+    /** Corresponds to "true" in raw AST format. Use these if a bool expr is required, but you dont want to implement it yet. */
+  def TODO_Expr_bool(): RawAst.Expr_BLiteral = {
+    new RawAst.Expr_BLiteral(true)
+  }
+    /** Corresponds to "0" in raw AST format. Use these if a int expr is required, but you dont want to implement it yet. */
+  def TODO_Expr_int(): RawAst.Expr_ILiteral = {
+    new RawAst.Expr_ILiteral(java.math.BigInteger.valueOf(1))
+  }
+
+  def Expr_ILiteral(x: BigInt): RawAst.Expr_ILiteral = {
+    new RawAst.Expr_ILiteral(x.bigInteger)
+  }
+
+  def Expr_BLiteral(b: Boolean): RawAst.Expr_BLiteral = {
+    new RawAst.Expr_BLiteral(b)
+  }
+
+  // def Expr_OperatorExpr(left: RawAst.Expr, binop: BinOp, right: RawAst.Expr): RawAst.Expr_OperatorExpr = {
+  // // Expr_OperatorExpr(Operator var1, DafnySequence<? extends Expr> var2) {
+  // //op: Operator, args: seq<Expr>)
+
+  //   binop match {
+  //     case Add => new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case And => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case Div => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case EqCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case Equiv => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case GeCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case GtCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case Implies => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case IntDiv => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case LeCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case LtCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case Mod => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case Mul => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case NeCmp => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case Or => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //     case Sub => println("TODO: some Expr"); new RawAst.Expr_OperatorExpr(Operator.Plus, SeqT_fromSeq[RawAst.Expr](Seq(left, right)))
+  //   }
+  // }
+      // datatype Operator =
+    // // ternary operators
+    // | IfThenElse
+    // // binary operators
+    // | Equiv
+    // | LogicalImp
+    // | LogicalAnd | LogicalOr
+    // | Eq | Neq
+    // | Less | AtMost
+    // | Plus | Minus | Times | Div | Mod
+    // // unary operators
+    // | LogicalNot
+    // | UnaryMinus
+
+
+
+    // datatype Expr =
+    // | BLiteral(bvalue: bool)
+    // | ILiteral(ivalue: int)
+    // | CustomLiteral(s: string, typ: TypeName)
+    // | IdExpr(name: string, isOld: bool := false)
+    // | OperatorExpr(op: Operator, args: seq<Expr>)
+    // | FunctionCallExpr(name: string, args: seq<Expr>)
+    // | LabeledExpr(name: string, expr: Expr)
+    // | LetExpr(name: string, optionalType: Option<TypeName>, rhs: Expr, body: Expr)
+    // | QuantifierExpr(univ: bool, bindings: seq<Binding>, patterns: seq<Pattern>, body: Expr)
+    // | ClosureExpr(closureBindings: seq<ClosureBinding>, resultVar: string, resultType: TypeName, properties: seq<ClosureProperty>)
+
 }
-
-
 
 
 // B3 note: possible sequences, sorted by wether they have subtypes or not...
