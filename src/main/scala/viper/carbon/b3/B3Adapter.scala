@@ -210,6 +210,10 @@ object B3Helper {
       new RawAst.Expr_OperatorExpr(operator, SeqT_fromSeq[RawAst.Expr](expressions))
   }
 
+  def Expr_IdExpr(name: String, isOld: Boolean = false): RawAst.Expr_IdExpr = {//(DafnySequence<? extends CodePoint> var1, boolean var2)
+    new RawAst.Expr_IdExpr(Seq_fromString(name), isOld)
+  }
+
   /** To enable using names of Boogie operators to define B3 operators. */
   val Add = new RawAst.Operator_Plus
   val And = new RawAst.Operator_LogicalAnd

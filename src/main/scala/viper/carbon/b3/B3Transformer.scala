@@ -1,13 +1,43 @@
 package viper.carbon.b3
 import viper.carbon.b3.{B3Helper => B3}
 import viper.carbon.boogie._
-
+import language.implicitConversions
 
 /**
  * An implementation for transformers to transform Boogie AST -> B3 AST (RawAst).
  * Cannot reuse the boogie-Transformer used by Carbon, because B3 AST-nodes don't have a shared ancestor like "Node".
  */
 object BoogieToB3Transformer {
+
+  // IDENTIFIER UNIQUENESS  (stolen from PrettyPrinter; useIdent <-> ident2doc)
+  /** The current mapping from identifier to names. */
+  private val idnMap = collection.mutable.HashMap[Identifier, String]()
+
+  /** BoogieNameGenerator instance. */ 
+  private val names = new BoogieNameGenerator() // TODO: Check if we need a B3NameGenerator
+
+  /**
+    * The current mapping from unique Boogie names to the original identifiers (inverse mapping of idnMap,
+    * where the names of the identifiers are used directly).
+    */
+  val backMap = collection.mutable.HashMap[String, String]()
+
+  /** Map an identifier to a string, making it unique first if necessary. */
+  implicit def useIdent(i: Identifier): String = {
+    idnMap.get(i) match {
+      case Some(s) => s
+      case None =>
+        val s = names.createUniqueIdentifier(i.preferredName)
+        idnMap.put(i, s)
+        backMap.update(s, i.name)
+        s
+    }
+  }
+
+
+
+
+  // TRANSFORM AST NODES
   /**
    * Transforms a Boogie AST into the corresponding raw B3 AST.
    * 
@@ -51,7 +81,7 @@ object BoogieToB3Transformer {
     // }
 
     // finally, creating raw B3 Procedure
-    B3.Procedure(name = proc.name.name,                     // TODO: Make sure that that name is valid! (proc.name contains different names, see definition of Identifier in boogie.scala)
+    B3.Procedure(name = proc.name,                     // TODO: Make sure that that name is valid! (proc.name contains different names, see definition of Identifier in boogie.scala)
                  parameters = Seq[RawAst.PParameter](),     // TODO
                  pre = Seq[RawAst.AExpr](),     // No data for these, but also empty in Boogie
                  post = Seq[RawAst.AExpr](),    // No data for these, but also empty in Boogie
@@ -98,8 +128,8 @@ object BoogieToB3Transformer {
       case Assign(lhs, rhs) => {
         (lhs, rhs) match {
           case (LocalVar(identif, _), exp: Exp) => {
-          println("DEBUG: Assign lhs: name = " + identif.name + " type = " + lhs.getClass.getName)
-            B3.Stmt_Assign(identif.name, transformExpr(rhs))
+          println("DEBUG: Assign lhs: name = " + identif + " type = " + lhs.getClass.getName)
+            B3.Stmt_Assign(identif, transformExpr(rhs))
           }
           case (_: GlobalVar, _) => sys.error("TODO: GlobalVar")
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
@@ -142,8 +172,8 @@ object BoogieToB3Transformer {
           case Div => B3.Expr_OperatorExpr(B3.Div, Seq(left, right) map transformExpr) // TODO: check if we can really use this
           case EqCmp => B3.Expr_OperatorExpr(B3.EqCmp, Seq(left, right) map transformExpr)
           case Equiv => B3.Expr_OperatorExpr(B3.Equiv, Seq(left, right) map transformExpr)
-          case GeCmp => B3.Expr_OperatorExpr(B3.LeCmp, Seq(right, left) map transformExpr) //we must use <= instead
-          case GtCmp => B3.Expr_OperatorExpr(B3.LtCmp, Seq(right, left) map transformExpr) //we must use < instead
+          case GeCmp => B3.Expr_OperatorExpr(B3.LeCmp, Seq(right, left) map transformExpr) //we must use right <= left instead of left >= right
+          case GtCmp => B3.Expr_OperatorExpr(B3.LtCmp, Seq(right, left) map transformExpr) //we must use right < left instead of left > right
           case Implies => B3.Expr_OperatorExpr(B3.Implies, Seq(left, right) map transformExpr)
           case IntDiv => B3.Expr_OperatorExpr(B3.IntDiv, Seq(left, right) map transformExpr)
           case LeCmp => B3.Expr_OperatorExpr(B3.LeCmp, Seq(left, right) map transformExpr)
@@ -164,7 +194,7 @@ object BoogieToB3Transformer {
       case FuncApp(_, _, _) => println("TODO: FuncApp");                            B3.TODO_Expr_int()
       case GlobalVar(_, _) => println("TODO: GlobalVar");                           B3.TODO_Expr_int()
       case IntLit(i) => B3.Expr_ILiteral(i)
-      case LocalVar(_, _) => println("TODO: LocalVar");                             B3.TODO_Expr_int()
+      case LocalVar(name, _) => B3.Expr_IdExpr(name)  // TODO: check whats up with the second field (typ: Type)!
       case MapSelect(_, _) => println("TODO: MapSelect");                           B3.TODO_Expr_int()
       case MapUpdate(_, _, _) => println("TODO: MapUpdate");                        B3.TODO_Expr_int()
       case Old(_) => println("TODO: Old");                                          B3.TODO_Expr_int()
