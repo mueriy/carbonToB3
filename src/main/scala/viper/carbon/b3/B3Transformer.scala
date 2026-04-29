@@ -104,11 +104,20 @@ object BoogieToB3Transformer {
 
     // finally, creating raw B3 Procedure
     B3.Procedure(name = proc.name,
-                 parameters = Seq[RawAst.PParameter](),     // TODO
+                 parameters = transformPParameters(proc.ins, proc.outs),
                  pre = Seq[RawAst.AExpr](),     // No data for these, but also empty in Boogie
                  post = Seq[RawAst.AExpr](),    // No data for these, but also empty in Boogie
                                                 // TODO-later: Boogie additionally has "modifies", which is used there for Heap stuff. Need to find workaround
                  body = b3ProcBody)
+  }
+
+  /** get B3 Procedure parameters from Boogie in & out parameters */
+  private def transformPParameters(ins: Seq[LocalVarDecl], outs: Seq[LocalVarDecl]): Seq[RawAst.PParameter] = {
+    // Since ins/outs are LocalVarDecl, which is neither LocalVarWhereDecl nor does it extend it, 
+    // we dont have to worry about the boogies "where" functionality here
+    val inPPar  = ins  map {par => B3.PParameter(par.name, getNameFromTyp(par.typ), B3.IN)}
+    val outPPar = outs map {par => B3.PParameter(par.name, getNameFromTyp(par.typ), B3.OUT)}
+    inPPar ++ outPPar
   }
 
   /** 

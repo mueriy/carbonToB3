@@ -147,6 +147,28 @@ object B3Helper {
                          body)
   }
 
+  /**
+    * Creates a (raw) B3 Procedure Parameter with given name, type, and mode.
+    * Cannot make not make use of B3's (not fully documented) autoinv feature.
+    *
+    * @param name Parameter name
+    * @param typ Type of the parameter. This must be either a type defined in the current Program, or one of the built-in types ("bool", "int", and "tag")
+    * @param mode Is it a input (IN), output (OUT), or inout (INOUT) parameter? (All defined by the current object)
+    * @return The corresponding (raw) PParameter
+    */
+  def PParameter(name: String, typ: String, mode: RawAst.ParameterMode = IN): RawAst.PParameter = {
+    // val b3Mode = mode match {
+    //   case IN => RawAst.ParameterMode_In
+    //   case INOUT => RawAst.ParameterMode_InOut
+    //   case OUT => RawAst.ParameterMode_Out
+    // }
+    new RawAst.PParameter(Seq_fromString(name), mode, Seq_fromString(typ), Option_None)
+  }
+  val IN = new RawAst.ParameterMode_In
+  val INOUT = new RawAst.ParameterMode_InOut
+  val OUT = new RawAst.ParameterMode_Out
+  
+
   // Option Some/None:
   /** creates a B3/Dafny Option->Some instance: "Some(input)" */
   def Option_Some[T](input: T)(implicit ct: ClassTag[T]): Std.Wrappers.Option[T] = {
@@ -156,6 +178,9 @@ object B3Helper {
   def Option_None[T](implicit ct: ClassTag[T]): Std.Wrappers.Option[T] = {
     Std.Wrappers.Option.create_None(td[T])
   }
+
+
+
 
   // STATEMENT NODES
   /** Corresponds to "{{check true}}" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
