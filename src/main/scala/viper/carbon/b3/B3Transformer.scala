@@ -207,22 +207,9 @@ object BoogieToB3Transformer {
     exp match {
       case BinExp(left, binop, right) =>
         binop match {
-          case Add => B3.Expr_OperatorExpr(B3.Add, Seq(left, right) map transformExpr)
-          case And => B3.Expr_OperatorExpr(B3.And, Seq(left, right) map transformExpr)
-          case Div => B3.Expr_OperatorExpr(B3.Div, Seq(left, right) map transformExpr) // TODO: check if we can really use this
-          case EqCmp => B3.Expr_OperatorExpr(B3.EqCmp, Seq(left, right) map transformExpr)
-          case Equiv => B3.Expr_OperatorExpr(B3.Equiv, Seq(left, right) map transformExpr)
-          case GeCmp => B3.Expr_OperatorExpr(B3.LeCmp, Seq(right, left) map transformExpr) //we must use right <= left instead of left >= right
-          case GtCmp => B3.Expr_OperatorExpr(B3.LtCmp, Seq(right, left) map transformExpr) //we must use right < left instead of left > right
-          case Implies => B3.Expr_OperatorExpr(B3.Implies, Seq(left, right) map transformExpr)
-          case IntDiv => B3.Expr_OperatorExpr(B3.IntDiv, Seq(left, right) map transformExpr)
-          case LeCmp => B3.Expr_OperatorExpr(B3.LeCmp, Seq(left, right) map transformExpr)
-          case LtCmp => B3.Expr_OperatorExpr(B3.LtCmp, Seq(left, right) map transformExpr)
-          case Mod => B3.Expr_OperatorExpr(B3.Mod, Seq(left, right) map transformExpr)
-          case Mul => B3.Expr_OperatorExpr(B3.Mul, Seq(left, right) map transformExpr)
-          case NeCmp => B3.Expr_OperatorExpr(B3.NeCmp, Seq(left, right) map transformExpr)
-          case Or => B3.Expr_OperatorExpr(B3.Or, Seq(left, right) map transformExpr)
-          case Sub => B3.Expr_OperatorExpr(B3.Sub, Seq(left, right) map transformExpr)
+          case Div         => sys.error("TODO: (Real) Div")
+          case GeCmp|GtCmp => B3.Expr_OperatorExpr(transformBinOp(binop), Seq(right, left) map transformExpr) // we must use right </<= left instead of left >/>= right
+          case _           => B3.Expr_OperatorExpr(transformBinOp(binop), Seq(left, right) map transformExpr) 
         }
       case CondExp(cond, thn, els) => B3.Expr_OperatorExpr(B3.CondExp, Seq(cond, thn, els) map transformExpr)
       case Const(_) => println("TODO: Const");                                      B3.TODO_Expr_int()
@@ -244,6 +231,28 @@ object BoogieToB3Transformer {
           case Not => B3.Expr_OperatorExpr(B3.Not, Seq(transformExpr(exp)))
           case Minus => B3.Expr_OperatorExpr(B3.Minus, Seq(transformExpr(exp)))
         }
+    }
+  }
+
+  /** returns the equivalend (raw) B3 Operator for Boogie's BinOp Operators */
+  def transformBinOp(op: BinOp): RawAst.Operator = {
+    op match {
+      case Add => B3.Add
+      case And => B3.And
+      case Div => B3.Div
+      case EqCmp => B3.EqCmp
+      case Equiv => B3.Equiv
+      case GeCmp => B3.LeCmp
+      case GtCmp => B3.LtCmp
+      case Implies => B3.Implies
+      case IntDiv => B3.IntDiv
+      case LeCmp => B3.LeCmp
+      case LtCmp => B3.LtCmp
+      case Mod => B3.Mod
+      case Mul => B3.Mul
+      case NeCmp => B3.NeCmp
+      case Or => B3.Or
+      case Sub => B3.Sub
     }
   }
 

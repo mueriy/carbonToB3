@@ -274,14 +274,14 @@ object B3Helper {
   val CondExp = new RawAst.Operator_IfThenElse
   val Add = new RawAst.Operator_Plus
   val And = new RawAst.Operator_LogicalAnd
-  val Div = new RawAst.Operator_Div //TODO is this correct?!?! (probably not)
+  val Div = new RawAst.Operator_Div //TODO: This is WRONG! Div is for "RealLit"s, which we need to handle in a special way.
   val EqCmp = new RawAst.Operator_Eq
   val Equiv = new RawAst.Operator_Equiv
   val Implies = new RawAst.Operator_LogicalImp
-  val IntDiv = new RawAst.Operator_Div //TODO is this correct?!?! (maybe, but must check)
+  val IntDiv = new RawAst.Operator_Div // B3 uses the same div and mod that boogie uses (according to the B3 manual), so this works
   val LeCmp = new RawAst.Operator_AtMost
   val LtCmp = new RawAst.Operator_Less
-  val Mod = new RawAst.Operator_Mod //TODO is this correct?!?! (maybe, but must check)
+  val Mod = new RawAst.Operator_Mod // B3 uses the same div and mod that boogie uses (according to the B3 manual), so this works
   val Mul = new RawAst.Operator_Times
   val NeCmp = new RawAst.Operator_Neq
   val Or = new RawAst.Operator_LogicalOr
