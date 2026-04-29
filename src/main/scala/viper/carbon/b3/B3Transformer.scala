@@ -8,8 +8,9 @@ import language.implicitConversions
  * Cannot reuse the boogie-Transformer used by Carbon, because B3 AST-nodes don't have a shared ancestor like "Node".
  */
 object BoogieToB3Transformer {
+  // Uses the following implicits: useIdent (Identifier -> String)
 
-  // IDENTIFIER UNIQUENESS  (stolen from PrettyPrinter; useIdent <-> ident2doc)
+  // IDENTIFIER UNIQUENESS (and other properties; stolen from PrettyPrinter; useIdent <-> ident2doc)
   /** The current mapping from identifier to names. */
   private val idnMap = collection.mutable.HashMap[Identifier, String]()
 
@@ -33,6 +34,9 @@ object BoogieToB3Transformer {
         s
     }
   }
+
+  /** The current store for where clauses of identifiers. */
+  private val whereMap = collection.mutable.HashMap[Identifier, Exp]()
 
 
 
@@ -79,10 +83,16 @@ object BoogieToB3Transformer {
 
   /** Transform Boogie Procedure -> raw B3 Procedure */
   private def transformProcedure(proc: Procedure): RawAst.Procedure = {
+    // collect all where clauses (important for declaring and havoc-ing these variables)
+    whereMap.clear()
+    proc.body visit {
+      case LocalVarWhereDecl(idn, where) =>
+        whereMap.put(idn, where)
+    }
     // Define variable declarations for all undeclared variables in the body, to be inserted at start of transformed procedure body. 
     val undecl = proc.body.undeclLocalVars.filter(v1 => (proc.ins ++ proc.outs).forall(v2 => v2.name != v1.name)) // (<- stolen from boogie.PrettyPrinter)
     // Only variables used in the body of the var decl are in scope => need to define procedure bode and each var decl as body of previous var decl
-    val varDeclarations = undecl.foldRight(transformStatement(proc.body))((l, r) => B3.Stmt_VarDecl(l.name, r, getNameFromTyp(l.typ)))
+    val varDeclarations = undecl.foldRight(transformStatement(proc.body))((l, r) => B3.Stmt_VarDecl(l.name, r, getNameFromTyp(l.typ))) //TODO: add assume [expr] for where [expr] VarDecls (i.e. for all in whereMap)
     // println("DEBUG: ========> " + undecl.size)
     // Use first ("outermost") var decl as Procedure body. (TODO: check if it is ever possible to have an empty body -> B3.Option_None)
     val b3ProcBody = B3.Option_Some(varDeclarations)
@@ -139,24 +149,33 @@ object BoogieToB3Transformer {
       case Assign(lhs, rhs) =>
         lhs match {
           case LocalVar(identif, typ) =>
-            println("DEBUG: Assign lhs: name = " + useIdent(identif) + " type = " + lhs.getClass.getName)
+            // println("DEBUG: Assign lhs: name = " + useIdent(identif) + " type = " + lhs.getClass.getName)
             B3.Stmt_Assign(identif, transformExpr(rhs))
           case _: GlobalVar =>                                                      sys.error("TODO: GlobalVar")
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
         }
-      case _: Assume => println("TODO: Assume");                                    B3.TODO_Stmt()
+      case Assume(exp) => B3.Stmt_Assume(transformExpr(exp))
       case _: Comment => println("FAIL: Comment stmts should be pre-removed!!! Inserted empty stmt block instead"); B3.Stmt_Block(Seq())
       case CommentBlock(_, stmt) => transformStatement(stmt)
-      case _: HavocImpl => println("TODO: HavocImpl");                              B3.TODO_Stmt()
-      case If(cond, thn, els) =>
-        cond match {
-          case LocalVar(name, _) => println("DEBUG: ---------> " + cond.getClass.getName + " and " + useIdent(name))
-          case _ => println("DEBUG: ---------> " + cond.getClass.getName)
+      case HavocImpl(vars) => 
+        // Boogie can define variables with an added "where [expr]", which means that whenever this variable is assigned a random value
+        // that this value fulfills [expr]. Since B3 does NOT have this, we need to add an assume after havoc-ing (= reinit-ing)
+        // (see also LocalVarWhereDecl or the whereMap)
+        val exprsToAssume = (vars map {v => whereMap.get(v.name)}).flatten 
+        exprsToAssume match {
+          case Seq() => B3.Stmt_Reinit(vars map {v => v.name})
+          case _ => B3.Stmt_Block(Seq(B3.Stmt_Reinit(vars map {v => v.name})) ++
+                                  exprsToAssume.map(exp => B3.Stmt_Assume(transformExpr(exp))))
         }
-        B3.Stmt_If(transformExpr(cond), transformStatement(thn), transformStatement(els))
-      case _: Label => println("TODO: Label");                                      B3.TODO_Stmt()
+      case If(cond, thn, els) =>
+        // cond match {
+        //   case LocalVar(name, _) => println("DEBUG: ---------> " + cond.getClass.getName + " and " + useIdent(name))
+        //   case _ => println("DEBUG: ---------> " + cond.getClass.getName)
+        // }
+        B3.Stmt_If(transformExpr(cond), transformStatement(thn), transformStatement(els)) //QUEST: for directly nested if's we could try whether If-case is more efficient
+      case _: Label => println("TODO: Label");                                      B3.LATER_Stmt() //Carbon does not generate label: ... return, so this is only needed for goto
       case _: LocalVarWhereDecl => println("TODO: LocalVarWhereDecl");              B3.TODO_Stmt()
-      case _: NondetIf => println("TODO: NondetIf");                                B3.TODO_Stmt()
+      case NondetIf(thn, els) => B3.Stmt_Choose(Seq(thn, els) map transformStatement) //QUEST: we could check if thn or els is another NondetIf and then add all substatements into a single Stmt_Choose
       case seqn: Seqn => 
         // We always create a Stmt_Block here, but we first have to eliminate all unneccessairy Seqn-nestings, and ignore empty Seqn (Comment stmts dont count) 
         val unpackedStmtSeq = unpackStmtBranch(seqn) match {

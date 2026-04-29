@@ -180,6 +180,11 @@ object B3Helper {
     new RawAst.Stmt_Assert(exp)
   }
 
+  /** created a raw B3 Assume-Stmt node using the provided expression. */
+  def Stmt_Assume(exp: RawAst.Expr): RawAst.Stmt_Assume = {
+    new RawAst.Stmt_Assume(exp)
+  }
+
   /** creates a B3 Assign-Stmt '"assignToVar" = assignThisExpr'
    * assignToVar must be a variable in scope (= must be in body of the corresponding Stmt_VarDecl) */
   def Stmt_Assign(assignToVar: String, assignThisExpr: RawAst.Expr): RawAst.Stmt_Assign = {
@@ -199,6 +204,19 @@ object B3Helper {
   def Stmt_If(cond: RawAst.Expr, thn: RawAst.Stmt, els: RawAst.Stmt): RawAst.Stmt_If = {
     new RawAst.Stmt_If(cond, thn, els)
   }
+
+  /** create a B3 Choose stmt. This is basically a "If(*) {} else if (*) {} ... " stmt */
+  def Stmt_Choose(stmts: Seq[RawAst.Stmt]): RawAst.Stmt_Choose = {
+    new RawAst.Stmt_Choose(SeqT_fromSeq[RawAst.Stmt](stmts))
+  }
+
+  /** create a B3 Reinit-Stmt, which is equivalent to havoc */
+  def Stmt_Reinit(vars: Seq[String]): RawAst.Stmt_Reinit = {
+    new RawAst.Stmt_Reinit(SeqT_fromSeq[DafnySequence[CodePoint]](vars.map(x => Seq_fromString(x))))
+  }
+
+
+
 
 
   // EXPRESSION NODES
