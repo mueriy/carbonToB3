@@ -1,5 +1,5 @@
 package viper.carbon.b3
-import viper.carbon.b3.{DafnyHelper => Daf, B3Helper => B3}
+import viper.carbon.b3.{DafnyHelper => Daf, B3Adapter => B3}
 
 
 object CustomB3AST {

@@ -7,12 +7,12 @@
 package viper.carbon.verifier
 
 import viper.carbon.boogie.Program // import viper.carbon.boogie.{Assert, Program}
-import viper.carbon.b3.B3Helper.runB3
+import viper.carbon.b3.B3Adapter.runB3
 import viper.carbon.b3.BoogieToB3Transformer.transformProgram
 // import viper.silver.reporter.BackendSubProcessStages._
 import viper.silver.reporter.Reporter // import viper.silver.reporter.{BackendSubProcessReport, Reporter}
 // import viper.silver.verifier.errors.Internal
-// import viper.silver.verifier.reasons.InternalReason
+// import viper.silver.verifier.reasons.InternalReason                //TODO/LATER? reimplement the error reporting system in the same way as done for Boogie
 import viper.silver.verifier._
 
 import java.io._
@@ -76,10 +76,10 @@ trait B3Interface {
     val outStream = new ByteArrayOutputStream()
     val newOut = new PrintStream(outStream)
     val oldOut = System.out
+    try {
       System.setOut(newOut)
       runB3(rawB3prog, b3defaultOptions ++ options) // [B3 todo?: currently no timeout mechanism]
       newOut.flush()
-    try {
     } finally {
       System.setOut(oldOut)
     }

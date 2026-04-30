@@ -48,7 +48,7 @@ object DafnyHelper {
 }
 
 /** Helper methods to work with B3 */
-object B3Helper {
+object B3Adapter {
   import viper.carbon.b3.DafnyHelper._
 
   // B3 MAIN METHOD (+ AUXILIARY METHODS)
@@ -112,7 +112,8 @@ object B3Helper {
     // Transform RawAst -> Ast
     val resultResolver = resolveAndTypeCheck(rawB3Ast, cli)
     if (resultResolver.is_Failure()) {
-      sys.error("Resolving B3 RawAST to B3 AST or type check failed: " + resultResolver.dtor_error().toString)
+      println("ERROR: (runB3 -> resolveAndTypeCheck) Resolving B3 RawAST to B3 AST or type check failed: " + resultResolver.dtor_error().toString)
+      return
     }
     val b3 = resultResolver.dtor_value()
 
@@ -186,12 +187,12 @@ object B3Helper {
   /** Corresponds to "{{check true}}" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
   def TODO_Stmt(): RawAst.Stmt = {
     val expr = new RawAst.Expr_BLiteral(true)
-    Stmt_Block(Seq(new RawAst.Stmt_Check(expr)))
+    new RawAst.Stmt_Check(Expr_OperatorExpr(And, Seq(expr, expr, expr)))
   }
   /** Corresponds to "{{check false}}" in raw AST format. Use this if a Stmt is required, but it is actually an advanced feature. */
   def LATER_Stmt(): RawAst.Stmt = {
     val expr = new RawAst.Expr_BLiteral(false)
-    Stmt_Block(Seq(new RawAst.Stmt_Check(expr)))
+    new RawAst.Stmt_Check(Expr_OperatorExpr(And, Seq(expr, expr, expr)))
   }
 
   /** creates a B3 Block-Stmt containing the B3 statements provided by Sequence seq */

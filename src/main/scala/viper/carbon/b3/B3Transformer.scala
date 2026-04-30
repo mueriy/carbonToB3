@@ -1,5 +1,5 @@
 package viper.carbon.b3
-import viper.carbon.b3.{B3Helper => B3}
+import viper.carbon.b3.{B3Adapter => B3}
 import viper.carbon.boogie._
 import language.implicitConversions
 
@@ -53,6 +53,28 @@ object BoogieToB3Transformer {
     // Eliminate all CommentedDecl-s
     val flatDeclSeq = flattenedDecl(prog.decls)
 
+    // DEVELOPMENT vvv
+    val usedMapping = collection.mutable.Set[String]()
+    flatDeclSeq map { x => x match {
+      case Axiom(exp) => usedMapping += "Axiom"
+      case CommentedDecl(s, d, size, nLines) => usedMapping += "CommentedDecl"
+      case ConstDecl(name, typ, unique) => 
+        println(name.name)
+        usedMapping += "ConstDecl"
+      case DeclComment(s) => usedMapping += "DeclComment"
+      case Func(name, args, typ, attributes) => usedMapping += "Func"
+      case GlobalVarDecl(name, typ) => usedMapping += "GlobalVarDecl"
+      case LiteralDecl(boogieString) => usedMapping += "LiteralDecl"
+      case Procedure(name, ins, outs, body) => usedMapping += "Procedure"
+      case TypeAlias(name, definition) => usedMapping += "TypeAlias"
+      case TypeDecl(t) => usedMapping += "TypeDecl"
+    }}
+    println(usedMapping)
+
+
+    val alwaysIncludeFct = Seq()
+    // DEVELOPMENT ^^^
+
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
     B3.Program(types = Seq(),       //TODO
                taggers = Seq(),     //TODO
@@ -76,7 +98,7 @@ object BoogieToB3Transformer {
       case Int => "int"
       case Real =>              sys.error("TODO: Real Type")
       case MapType(_, _, _) =>  sys.error("TODO: MapType")
-      case NamedType(_, _) =>   sys.error("TODO: NamedType")
+      case NamedType(name, typVars) =>   println("TODO: NamedType (this has name: " + name +")"); name
       case TypeVar(_) =>        sys.error("TODO: TypeVar")
     }
   }
@@ -160,7 +182,8 @@ object BoogieToB3Transformer {
           case LocalVar(identif, typ) =>
             // println("DEBUG: Assign lhs: name = " + useIdent(identif) + " type = " + lhs.getClass.getName)
             B3.Stmt_Assign(identif, transformExpr(rhs))
-          case _: GlobalVar =>                                                      sys.error("TODO: GlobalVar")
+          case GlobalVar(_, typ) => println("TODO: (assign) GlobalVar of type: " + getNameFromTyp(typ));      
+                                                                                     B3.TODO_Stmt()
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
         }
       case Assume(exp) => B3.Stmt_Assume(transformExpr(exp))
@@ -182,7 +205,7 @@ object BoogieToB3Transformer {
         //   case _ => println("DEBUG: ---------> " + cond.getClass.getName)
         // }
         B3.Stmt_If(transformExpr(cond), transformStatement(thn), transformStatement(els)) //QUEST: for directly nested if's we could try whether If-case is more efficient
-      case _: Label => println("TODO: Label");                                      B3.LATER_Stmt() //Carbon does not generate label: ... return, so this is only needed for goto
+      case _: Label => println("LATER: Label");                                     B3.LATER_Stmt() //Carbon does not generate label: ... return, so this is only needed for goto
       case _: LocalVarWhereDecl => println("TODO: LocalVarWhereDecl");              B3.TODO_Stmt()
       case NondetIf(thn, els) => B3.Stmt_Choose(Seq(thn, els) map transformStatement) //QUEST: we could check if thn or els is another NondetIf and then add all substatements into a single Stmt_Choose
       case seqn: Seqn => 
@@ -217,7 +240,7 @@ object BoogieToB3Transformer {
       case FalseLit() => B3.Expr_BLiteral(false)
       case Forall(_, _, _, _, _) => println("TODO: Forall");                        B3.TODO_Expr_int()
       case FuncApp(_, _, _) => println("TODO: FuncApp");                            B3.TODO_Expr_int()
-      case GlobalVar(_, _) => println("TODO: GlobalVar");                           B3.TODO_Expr_int()
+      case GlobalVar(_, typ) => println("TODO: GlobalVar of type: " + getNameFromTyp(typ));                           B3.TODO_Expr_int()
       case IntLit(i) => B3.Expr_ILiteral(i)
       case LocalVar(name, _) => B3.Expr_IdExpr(name)  // TODO: check whats up with the second field (typ: Type)!
       case MapSelect(_, _) => println("TODO: MapSelect");                           B3.TODO_Expr_int()
