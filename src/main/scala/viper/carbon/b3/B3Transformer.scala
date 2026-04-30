@@ -53,7 +53,7 @@ object BoogieToB3Transformer {
     // Eliminate all CommentedDecl-s
     val flatDeclSeq = flattenedDecl(prog.decls)
 
-    // DEVELOPMENT vvv
+    {// DEVELOPMENT vvv
     val usedMapping = collection.mutable.Set[String]()
     flatDeclSeq map { x => x match {
       case Axiom(exp) => usedMapping += "Axiom"
@@ -71,15 +71,19 @@ object BoogieToB3Transformer {
     }}
     println(usedMapping)
 
-
-    val alwaysIncludeFct = Seq()
+    }
+    // We should define these somewhere else LATER and then "import" from there 
+    val alwaysIncludeFcts = Seq(B3.Function("AssumeFunctionsAbove", Seq(), "int"),
+                                B3.Function("AssumePermUpperBound", Seq(), "bool"),
+                                B3.Function("state", Seq(B3.FParameter("heap", "HeapType"), B3.FParameter("mask", "MaskType")), "bool"))
+    val alwaysIncludeTyps = Seq("HeapType", "MaskType")
     // DEVELOPMENT ^^^
 
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
-    B3.Program(types = Seq(),       //TODO
-               taggers = Seq(),     //TODO
-               functions = Seq(),   //TODO
-               axioms = Seq(),      //TODO
+    B3.Program(types = alwaysIncludeTyps ++ Seq(),        //TODO
+               taggers = Seq(),                           //TODO
+               functions = alwaysIncludeFcts ++ Seq(),    //TODO
+               axioms = Seq(),                            //TODO
                procedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)}))
   }
 
@@ -215,13 +219,13 @@ object BoogieToB3Transformer {
           case Comment(_) => Seq()
           case stmt => Seq(stmt) 
         }
-        B3.Stmt_Block(unpackedStmtSeq map transformStatement)
+        B3.Stmt_Block(unpackedStmtSeq map transformStatement) // TODO: improve block-removal even more. I think mainly flatten Seqn stmts in CommentBlock stmts
     }
   }
 
    // TODO: actually implement this method
   private def transformExpr(exp: Exp): RawAst.Expr = {
-    println("DEBUG: +++ transformExpr(x), where x has type " + exp.getClass.getName)
+    // println("DEBUG: +++ transformExpr(x), where x has type " + exp.getClass.getName)
     // B3 and Boogie operators seem to have the same associativity.
     // B3 does not have the Boogie operators ++ and <:, but both not used by Carbon. 
     // B3 does also not support the > and >= operators, which means that we swap the left and right expr and use < and <= instead
@@ -235,14 +239,16 @@ object BoogieToB3Transformer {
           case _           => B3.Expr_OperatorExpr(transformBinOp(binop), Seq(left, right) map transformExpr) 
         }
       case CondExp(cond, thn, els) => B3.Expr_OperatorExpr(B3.CondExp, Seq(cond, thn, els) map transformExpr)
-      case Const(_) => println("TODO: Const");                                      B3.TODO_Expr_int()
+      case Const(name) => B3.FunctionCallExpr(name, Seq()) //we can simulate Boogie-constants using a nullary function (we can keep the name)
       case Exists(_, _, _, _) => println("TODO: Exists");                           B3.TODO_Expr_int()
       case FalseLit() => B3.Expr_BLiteral(false)
       case Forall(_, _, _, _, _) => println("TODO: Forall");                        B3.TODO_Expr_int()
-      case FuncApp(_, _, _) => println("TODO: FuncApp");                            B3.TODO_Expr_int()
+      case FuncApp(name, args, _) => 
+        println(args.map(x => x.toString))
+        B3.FunctionCallExpr(name, args map transformExpr)
       case GlobalVar(_, typ) => println("TODO: GlobalVar of type: " + getNameFromTyp(typ));                           B3.TODO_Expr_int()
       case IntLit(i) => B3.Expr_ILiteral(i)
-      case LocalVar(name, _) => B3.Expr_IdExpr(name)  // TODO: check whats up with the second field (typ: Type)!
+      case LocalVar(name, _) => B3.Expr_IdExpr(name)
       case MapSelect(_, _) => println("TODO: MapSelect");                           B3.TODO_Expr_int()
       case MapUpdate(_, _, _) => println("TODO: MapUpdate");                        B3.TODO_Expr_int()
       case Old(_) => println("TODO: Old");                                          B3.TODO_Expr_int()

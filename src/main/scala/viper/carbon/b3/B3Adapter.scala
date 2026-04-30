@@ -181,18 +181,43 @@ object B3Adapter {
   }
 
 
+  /**
+    * Creates a (raw) B3 Function node.
+    *
+    * @param name The function name.
+    * @param parameters A Seq of the function's parameters (in B3's FParameter format)
+    * @param resultType
+    * @return A (raw) B3 function node according to the used parameters.
+    */
+  def Function(name: String, parameters: Seq[RawAst.FParameter], resultType: String): RawAst.Function = {
+    new RawAst.Function(Seq_fromString(name), 
+                        SeqT_fromSeq[RawAst.FParameter](parameters),
+                        Seq_fromString(resultType),
+                        Option_None,  // optional: tag
+                        Option_None)  // optional: fct definition
+  }
+  /** Creates a (raw) B3 FParameter node, which defines a Function parameter. */
+  def FParameter(name: String, typ: String): RawAst.FParameter = {
+    // We currently do not support defining this parameter as injective (= 2nd arg)
+    new RawAst.FParameter(Seq_fromString(name), false, Seq_fromString(typ))
+  }
+
+  /** Creates a (raw) B3 node that defines a Function call. The function must be defined in the current Program with matching number of args. */
+  def FunctionCallExpr(name: String, args: Seq[RawAst.Expr]): RawAst.Expr_FunctionCallExpr = {
+    new RawAst.Expr_FunctionCallExpr(Seq_fromString(name), SeqT_fromSeq[RawAst.Expr](args))
+  }
 
 
   // STATEMENT NODES
   /** Corresponds to "{{check true}}" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
   def TODO_Stmt(): RawAst.Stmt = {
     val expr = new RawAst.Expr_BLiteral(true)
-    new RawAst.Stmt_Check(Expr_OperatorExpr(And, Seq(expr, expr, expr)))
+    new RawAst.Stmt_Check(Expr_OperatorExpr(And, Seq(expr, Expr_OperatorExpr(And, Seq(expr, expr)))))
   }
   /** Corresponds to "{{check false}}" in raw AST format. Use this if a Stmt is required, but it is actually an advanced feature. */
   def LATER_Stmt(): RawAst.Stmt = {
     val expr = new RawAst.Expr_BLiteral(false)
-    new RawAst.Stmt_Check(Expr_OperatorExpr(And, Seq(expr, expr, expr)))
+    new RawAst.Stmt_Check(Expr_OperatorExpr(And, Seq(expr, Expr_OperatorExpr(And, Seq(expr, expr)))))
   }
 
   /** creates a B3 Block-Stmt containing the B3 statements provided by Sequence seq */
