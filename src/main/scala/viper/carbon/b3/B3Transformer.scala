@@ -40,9 +40,13 @@ object BoogieToB3Transformer {
 
 
   // DEVELOPMENT & DEBUGGING
-  val DEBUG_MODE = 1 // 0 = ignore, 1 = collect (+ print later), 2 = collect & print (+ print later)
-  val debug_infoPlus = collection.mutable.Map[String, Seq[String]]()
-  val debug_info = collection.mutable.Set[String]()
+  // settings
+  private val UNPACK_SEQN = true // true = easier to ready code, false = easier to compare to PrettyPrinted code (see method: uncomment)
+  private val DEBUG_MODE = 1 // 0 = ignore, 1 = collect (+ print later), 2 = collect & print (+ print later)
+
+  // other
+  private val debug_infoPlus = collection.mutable.Map[String, Seq[String]]()
+  private val debug_info = collection.mutable.Set[String]()
   private def info(baseMsg: String, moreInfo: String = ""): Unit = {
     if (DEBUG_MODE == 0) {
       return
@@ -67,6 +71,7 @@ object BoogieToB3Transformer {
     debug_info.foreach{v => println(v)}
     println("======= COLLECTED INFOS END =======")
   }
+
 
 
 
@@ -106,7 +111,7 @@ object BoogieToB3Transformer {
     val alwaysIncludeFcts = Seq(B3.Function("AssumeFunctionsAbove", Seq(), "int"),
                                 B3.Function("AssumePermUpperBound", Seq(), "bool"),
                                 B3.Function("state", Seq(B3.FParameter("heap", "HeapType"), B3.FParameter("mask", "MaskType")), "bool"))
-    val alwaysIncludeTyps = Seq("HeapType", "MaskType")
+    val alwaysIncludeTyps = Seq("HeapType", "MaskType", "Ref", "Seq")
     // DEVELOPMENT ^^^
 
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
@@ -141,6 +146,47 @@ object BoogieToB3Transformer {
     }
   } 
 
+  /** 
+   * Removes Comment nodes from Seqn nodes and all CommentBlock nodes (recursively). 
+   * Returns Seqn(Seq()) if there is no useful Stmt in the given Node-branch. 
+   * If there is only one useful statement it returns that, otherwise it returns a Seqn.
+   * Statement order remains the same.
+   * All Seqn in the returned branch contain multiple useful statements (otherwise they
+   *  would be replaced by the single useful statement they contain, or removed). 
+   * If UNPACK_SEQN is set, nested Seqn are also un-nested in a single Seqn.
+   * Not useful are comments, and any Seqn that are empty or contain no useful statement.
+   * 
+   * CommentBlock is replaced with the statement it contains. If CommentBlock is inside a
+   * Seqn (A) and also contains a Seqn (B), then the elements of (B) are inserted into (A), 
+   * keeping the order of statements. (i.e.. Seqn(a, b, CommentBlock(Seqn(x, y)), d) => Seqn(a, b, x, y, d)). 
+   * 
+   * TODO: PrettyPrinter also ignores LocalVarWhereDecl stmts; check what's up with that!
+   */
+  private def uncomment(stmt: Stmt): Stmt = {
+    stmt match {
+      case CommentBlock(_, cstmt) => uncomment(cstmt)
+      case Seqn(stmts) =>
+        // remove comments
+        val uncommStmtSeq = stmts map uncomment filter {
+          case Seqn(Seq()) => false
+          case _: Comment => false
+          case _ => true
+        }
+        // unpack seqn in seqn (if UNPACK_SEQN -> less fluff -> makes looking at code easier; however, fluff helps to compare with PrettyPrinted code, so we might not always want that)
+        val unpackedStmtSeq = uncommStmtSeq flatMap {
+          case Seqn(subStmts) if UNPACK_SEQN => subStmts
+          case other => Seq(other)
+        }
+        // avoid unnecessairy Seqn
+        unpackedStmtSeq match {
+          case Seq() => Seqn(Seq())
+          case Seq(oneStmt) => oneStmt
+          case _ => Seqn(unpackedStmtSeq)
+        }
+      case _ => stmt
+    }
+  } 
+
   /** Returns the type name from a Boogie Type */ 
   private def getNameFromTyp(typ: Type): String = {
     typ match {
@@ -161,13 +207,26 @@ object BoogieToB3Transformer {
       case LocalVarWhereDecl(idn, where) =>
         whereMap.put(idn, where)
     }
-    // Define variable declarations for all undeclared variables in the body, to be inserted at start of transformed procedure body. 
-    val undecl = proc.body.undeclLocalVars.filter(v1 => (proc.ins ++ proc.outs).forall(v2 => v2.name != v1.name)) // (<- stolen from boogie.PrettyPrinter)
-    // Only variables used in the body of the var decl are in scope => need to define procedure bode and each var decl as body of previous var decl
-    val varDeclarations = undecl.foldRight(transformStatement(proc.body))((l, r) => B3.Stmt_VarDecl(l.name, r, getNameFromTyp(l.typ))) //TODO: add assume [expr] for where [expr] VarDecls (i.e. for all in whereMap)
-    // info("DEBUG: ========> ", undecl.size)
-    // Use first ("outermost") var decl as Procedure body. (TODO: check if it is ever possible to have an empty body -> B3.Option_None)
-    val b3ProcBody = B3.Option_Some(varDeclarations)
+
+    // define procedure body
+    val body = uncomment(proc.body)
+    val b3ProcBody = body match {
+      case Comment(_) => 
+        B3.Option_None[RawAst.Stmt]
+      case Seqn(stmts) => 
+        // Most variables are not declared in the body, so we add var-declarations at the start of the transformed procedure body. 
+        // Collect undeclared variables (stolen from boogie.PrettyPrinter)
+        val undecl = proc.body.undeclLocalVars.filter(v1 => (proc.ins ++ proc.outs).forall(v2 => v2.name != v1.name))
+        // In B3, variables can only be used in the body of the corresponding VarDecl node (otherwise they are "out of scope")
+        // This means we need to nest all VarDecls and define the (transformed) procedure body as the innermost body. 
+        val transBody = transformStatement(body, false)
+        val varDeclarations = undecl.foldRight(transBody)((l, r) => B3.Stmt_VarDecl(l.name, r, getNameFromTyp(l.typ))) 
+        //TODO: add assume [expr] for all variable declarations with "[declare variableX] where [expr]" (so for all VarDecls in whereMap)
+        B3.Option_Some(varDeclarations)
+      case _ => 
+        info("ERROR: Procedure body should be Seqn (or Comment as placeholder), but is: ", body.getClass.getSimpleName);
+        B3.Option_None[RawAst.Stmt]
+    }
     
     // proc.body match {
     //   case Seqn(seq) => println("DEBUG: " + seq.foreach(d => println(d.getClass.getName)))
@@ -192,37 +251,17 @@ object BoogieToB3Transformer {
     inPPar ++ outPPar
   }
 
-  /** 
-   * Unpacks CommentBlock stmts and nested Seqs, but output is functionally the same as input.
-   * Returns Comment("Useless!") if no useful stmts. It is the caller's reponsibility to handle this correctly. 
-   */
-  private def unpackStmtBranch(stmt: Stmt): Stmt = {
-    // We cannot use comments, so we try to remove Comment stmts and (iteratively) take the Stmt contained in CommentBlock stmts
-    // Seqn stmts are only useful if they contain multiple elements (not counting any non-useful elements)
 
-    // TODO: PrettyPrinter also ignores LocalVarWhereDecl stmts; check what's up with that!
-    // println(""DEBUG: unpackStmtBranch stmt type: " + stmt.getClass.getName)
-    stmt match {
-      case commBlock: CommentBlock => unpackStmtBranch(commBlock.stmt) 
-      case Seqn(stmtSeq) =>
-        val seq = stmtSeq map unpackStmtBranch filter {
-          case Comment(_) => false
-          case Seqn(Seq()) => false
-          case _ => true
-        }
-        if (seq.size == 0) {
-          Comment("Useless!")
-        } else if (seq.size == 1) {
-          seq.head
-        } else {
-          Seqn(seq)
-        }
-      case anyStmt => anyStmt
-    }
-  }
-
-
-  private def transformStatement(stmt: Stmt): RawAst.Stmt = {
+  /**
+    * Transforms Boogie Stmt node -> (raw) B3 Stmt node. It also first simplifies the statement by
+    * removing comments and maybe unnesting Seqn blocks (depends on DEBUG_MODE configuration) 
+    *
+    * @param stmt A Boogie Stmt node. 
+    * @param removeComments set to false if the statement branch is already uncomment(...)-ed (default: true)
+    * @return The corresponding (raw) B3 Stmt node.
+    */
+  private def transformStatement(stmtIn: Stmt, removeComments: Boolean = true): RawAst.Stmt = {
+    val stmt = if (removeComments) uncomment(stmtIn) else stmtIn
     info("DEBUG: transformStatement(x), where x has type ", stmt.getClass.getName)
     stmt match {
       case _: Goto => info("LATER: Goto");                                          B3.LATER_Stmt()
@@ -238,7 +277,7 @@ object BoogieToB3Transformer {
         }
       case Assume(exp) => B3.Stmt_Assume(transformExpr(exp))
       case _: Comment => info("FAIL: Comment stmts should be pre-removed!!! Inserted empty stmt block instead"); B3.Stmt_Block(Seq())
-      case CommentBlock(_, stmt) => transformStatement(stmt)
+      case CommentBlock(_, stmt) => info("ERROR: transformStatement(CommentBlock)"); transformStatement(stmt, false)
       case HavocImpl(vars) => 
         // Boogie can define variables with an added "where [expr]", which means that whenever this variable is assigned a random value
         // that this value fulfills [expr]. Since B3 does NOT have this, we need to add an assume after havoc-ing (= reinit-ing)
@@ -257,15 +296,9 @@ object BoogieToB3Transformer {
         B3.Stmt_If(transformExpr(cond), transformStatement(thn), transformStatement(els)) //QUEST: for directly nested if's we could try whether If-case is more efficient
       case _: Label => info("LATER: Label");                                     B3.LATER_Stmt() //Carbon does not generate label: ... return, so this is only needed for goto
       case _: LocalVarWhereDecl => info("TODO: LocalVarWhereDecl");              B3.TODO_Stmt()
-      case NondetIf(thn, els) => B3.Stmt_Choose(Seq(thn, els) map transformStatement) //QUEST: we could check if thn or els is another NondetIf and then add all substatements into a single Stmt_Choose
-      case seqn: Seqn => 
-        // We always create a Stmt_Block here, but we first have to eliminate all unneccessairy Seqn-nestings, and ignore empty Seqn (Comment stmts dont count) 
-        val unpackedStmtSeq = unpackStmtBranch(seqn) match {
-          case Seqn(seq) => seq
-          case Comment(_) => Seq()
-          case stmt => Seq(stmt) 
-        }
-        B3.Stmt_Block(unpackedStmtSeq map transformStatement) // TODO: improve block-removal even more. I think mainly flatten Seqn stmts in CommentBlock stmts
+      case NondetIf(thn, els) => B3.Stmt_Choose(Seq(thn, els).map(transformStatement(_))) //QUEST: we could check if thn or els is another NondetIf and then add all substatements into a single Stmt_Choose
+      case Seqn(stmts) =>
+        B3.Stmt_Block(stmts.map(s => transformStatement(s, false))) // TODO: improve block-removal even more. I think mainly flatten Seqn stmts in CommentBlock stmts
     }
   }
 
@@ -289,9 +322,7 @@ object BoogieToB3Transformer {
       case Exists(_, _, _, _) => info("TODO: Exists");                              B3.TODO_Expr_int()
       case FalseLit() => B3.Expr_BLiteral(false)
       case Forall(_, _, _, _, _) => info("TODO: Forall");                           B3.TODO_Expr_int()
-      case FuncApp(name, args, _) => 
-        args.map(x => info("FuncApp args: ", x.toString))
-        B3.FunctionCallExpr(name, args map transformExpr)
+      case FuncApp(name, args, _) => B3.FunctionCallExpr(name, args map transformExpr)
       case GlobalVar(_, typ) => info("TODO: GlobalVar of type: ", getNameFromTyp(typ)); B3.TODO_Expr_int()
       case IntLit(i) => B3.Expr_ILiteral(i)
       case LocalVar(name, _) => B3.Expr_IdExpr(name)
