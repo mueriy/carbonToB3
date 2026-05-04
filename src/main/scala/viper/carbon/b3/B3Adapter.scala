@@ -186,7 +186,7 @@ object B3Adapter {
     *
     * @param name The function name.
     * @param parameters A Seq of the function's parameters (in B3's FParameter format)
-    * @param resultType
+    * @param resultType The function's return type 
     * @return A (raw) B3 function node according to the used parameters.
     */
   def Function(name: String, parameters: Seq[RawAst.FParameter], resultType: String): RawAst.Function = {
@@ -194,9 +194,9 @@ object B3Adapter {
                         SeqT_fromSeq[RawAst.FParameter](parameters),
                         Seq_fromString(resultType),
                         Option_None,  // optional: tag
-                        Option_None)  // optional: fct definition
+                        Option_None)  // <- Carbon does not use function bodies/definitions, it defines them using axioms.
   }
-  /** Creates a (raw) B3 FParameter node, which defines a Function parameter. */
+  /** Creates a (raw) B3 FParameter node, which defines a function parameter. */
   def FParameter(name: String, typ: String): RawAst.FParameter = {
     // We currently do not support defining this parameter as injective (= 2nd arg)
     new RawAst.FParameter(Seq_fromString(name), false, Seq_fromString(typ))
