@@ -110,12 +110,11 @@ object BoogieToB3Transformer {
     // DEVELOPMENT ^^^
 
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
-    val b3prog = B3.Program(types = alwaysIncludeTyps ++ Seq(),        //TODO
-                            taggers = Seq(),                           //TODO
-                            functions = alwaysIncludeFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
-                            axioms = Seq(),                            //TODO
-                            procedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)}))
-    b3prog
+    B3.Program(types = alwaysIncludeTyps ++ Seq(),        //TODO
+               taggers = Seq(),                           //TODO
+               functions = alwaysIncludeFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
+               axioms = Seq(),                            //TODO
+               procedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)}))
   }
 
   /**
@@ -234,7 +233,7 @@ object BoogieToB3Transformer {
             // info("DEBUG: Assign lhs: (name, type) = ", "(" + useIdent(identif) + ", " + lhs.getClass.getName + ")")
             B3.Stmt_Assign(identif, transformExpr(rhs))
           case GlobalVar(_, typ) => info("TODO: (assign) GlobalVar of type: ", getNameFromTyp(typ));      
-                                                                                     B3.TODO_Stmt()
+                                                                                    B3.TODO_Stmt()
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
         }
       case Assume(exp) => B3.Stmt_Assume(transformExpr(exp))

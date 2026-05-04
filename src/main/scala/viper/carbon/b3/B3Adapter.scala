@@ -112,7 +112,8 @@ object B3Adapter {
     // Transform RawAst -> Ast
     val resultResolver = resolveAndTypeCheck(rawB3Ast, cli)
     if (resultResolver.is_Failure()) {
-      println("ERROR: (runB3 -> resolveAndTypeCheck) Resolving B3 RawAST to B3 AST or type check failed: " + resultResolver.dtor_error().toString)
+      System.out.println("-------------------------")
+      System.out.println("ERROR: (runB3 -> resolveAndTypeCheck) Resolving B3 RawAST to B3 AST or type check failed: " + resultResolver.dtor_error().toString)
       return
     }
     val b3 = resultResolver.dtor_value()
