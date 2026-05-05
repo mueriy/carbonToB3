@@ -110,8 +110,10 @@ object BoogieToB3Transformer {
     // We should define these somewhere else LATER and then "import" from there 
     val alwaysIncludeFcts = Seq(B3.Function("AssumeFunctionsAbove", Seq(), "int"),
                                 B3.Function("AssumePermUpperBound", Seq(), "bool"),
+                                B3.Function("Heap", Seq(), "HeapType"),
+                                B3.Function("Mask", Seq(), "MaskType"),
                                 B3.Function("state", Seq(B3.FParameter("heap", "HeapType"), B3.FParameter("mask", "MaskType")), "bool"))
-    val alwaysIncludeTyps = Seq("HeapType", "MaskType", "Ref", "Seq")
+    val alwaysIncludeTyps = Seq("MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType", "FrameType", "Ref")
     // DEVELOPMENT ^^^
 
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
@@ -323,7 +325,9 @@ object BoogieToB3Transformer {
       case FalseLit() => B3.Expr_BLiteral(false)
       case Forall(_, _, _, _, _) => info("TODO: Forall");                           B3.TODO_Expr_int()
       case FuncApp(name, args, _) => B3.FunctionCallExpr(name, args map transformExpr)
-      case GlobalVar(_, typ) => info("TODO: GlobalVar of type: ", getNameFromTyp(typ)); B3.TODO_Expr_int()
+      case GlobalVar(name, typ) => 
+        info("(TODO): GlobalVar (name, type): ", "("+name.name+", "+getNameFromTyp(typ)+")")
+        TODO_GlobalVar(name)
       case IntLit(i) => B3.Expr_ILiteral(i)
       case LocalVar(name, _) => B3.Expr_IdExpr(name)
       case MapSelect(_, _) => info("TODO: MapSelect");                              B3.TODO_Expr_int()
