@@ -40,6 +40,17 @@ object DafnyHelper {
     }
   } 
 
+  /** 
+   * Translates a Seq[String] to its dafny counterpart.
+   * 
+   * @param strSeq A Scala String Seq
+   * @return DafnySequence<DafnySequence<CodePoint>>: a sequence containing the Strings in the input Seq converted to
+   * DafnySequence<CodePoint> (in same order).
+   */
+  def Seq_fromStringSeq(strSeq: Seq[String]): DafnySequence[DafnySequence[CodePoint]] = {
+    SeqT_fromSeq[DafnySequence[CodePoint]](strSeq.map(str => Seq_fromString(str)))
+  }
+
   /** returns DafnySequence<CodePoint> containing the provided (Scala) String str */
   def Seq_fromString(str: String): DafnySequence[CodePoint] = {
     DafnySequence.asUnicodeString(str)
@@ -208,6 +219,14 @@ object B3Adapter {
     new RawAst.Expr_FunctionCallExpr(Seq_fromString(name), SeqT_fromSeq[RawAst.Expr](args))
   }
 
+  /**
+    * Creates a (raw) B3 Axiom node.
+    */
+  def Axiom(explains: Seq[String], expr: RawAst.Expr): RawAst.Axiom = {
+    new RawAst.Axiom(Seq_fromStringSeq(explains), expr)
+  }
+  
+
 
   // STATEMENT NODES
   /** Corresponds to "{{check true}}" in raw AST format. Use this if a Stmt is required, but you dont want to implement it yet. */
@@ -322,12 +341,45 @@ object B3Adapter {
   val Not = new RawAst.Operator_LogicalNot
   val Minus = new RawAst.Operator_UnaryMinus
 
+  /**
+    * Create a B3 Quantifier Expr, which is equivalent to Boogie's Forall or Exists (depending on 'univ') expressions.
+    *
+    * @param univ true = "forall", false = "exists"
+    * @param bindings Seq of B3 Bindings (defines all "var_i: type_i")
+    * @param patterns Seq of patterns for pattern-matching. Each variable defined by 'bindings' must be mentioned at 
+    *                 least once in any of the given patterns. Each pattern is defined as Seq of B3 Expr nodes (instead
+    *                 of B3's Pattern node, which would contain such a sequence but are more difficult to handle)
+    * @param body The body. Can use any variables in scope, including the ones defined by 'bindings'
+    * @return The (raw) B3 Quantifier Expr defined by the parameters
+    */
+  def Expr_QuantifierExpr(univ: Boolean, bindings: Seq[RawAst.Binding], patterns: Seq[Seq[RawAst.Expr]], body: RawAst.Expr): RawAst.Expr_QuantifierExpr = {
+    // TODO: somehow find out whether separate patterns in B3 are really the same as in Boogie (i.e. only one pattern must match). 
+    // (This is probably true, but not mentioned in any manual so we cannot say for sure)
+
+    val seqDafseqExpr = patterns.map(seqExpr => SeqT_fromSeq[RawAst.Expr](seqExpr))
+    val dafseqDafseqExpr = SeqT_fromSeq[DafnySequence[RawAst.Expr]](seqDafseqExpr)
+    new RawAst.Expr_QuantifierExpr(univ, SeqT_fromSeq[RawAst.Binding](bindings), dafseqDafseqExpr, body)
+  } 
+
+  /**
+    * Create a B3 Binding, which is a "VarDecl" for a bound variable in an exist/forall expression.
+    *
+    * @param name Name of bound variable
+    * @param typ Type of bound variable
+    * @return A (raw) B3 Binding node
+    */
+  def Binding(name: String, typ: String): RawAst.Binding = {
+    new RawAst.Binding(Seq_fromString(name),  Seq_fromString(typ))
+  }
+  
+  // Binding(name: string, typ: TypeName)
+  // Binding(DafnySequence<? extends CodePoint> var1, DafnySequence<? extends CodePoint> var2) {
+  
+
     // datatype Expr = (remaining)
     // | CustomLiteral(s: string, typ: TypeName)
-    // | FunctionCallExpr(name: string, args: seq<Expr>)
     // | LabeledExpr(name: string, expr: Expr)
     // | LetExpr(name: string, optionalType: Option<TypeName>, rhs: Expr, body: Expr)
-    // | QuantifierExpr(univ: bool, bindings: seq<Binding>, patterns: seq<Pattern>, body: Expr)
     // | ClosureExpr(closureBindings: seq<ClosureBinding>, resultVar: string, resultType: TypeName, properties: seq<ClosureProperty>)
 
 }

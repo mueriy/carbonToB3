@@ -17,6 +17,20 @@ object BoogieToB3Transformer {
   /** BoogieNameGenerator instance. */ 
   private val names = new BoogieNameGenerator() // TODO: Check if we need a B3NameGenerator
 
+  /** allowed characters for B3 Identifiers */
+  // const canStartIdentifierChar := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ%"
+  // const identifierChar := canStartIdentifierChar + "0123456789_$."
+  /** allowed characters for CustomLiteral in:   "|" CustomLiteral ":" Type "|"   */
+  // const customLiteralChar := identifierChar + "+-*/@#!^" 
+
+  // BoogieNameGenerator allows: "_.$#'`~^\?a-zA-Z" and "0-9" (<- not as first)
+  // => B3:     startWith = "a-zA-Z" + "%"            afterwards also: "0-9" + "_$."
+  // => Boogie: startWith = "a-zA-Z" + "_.$#'`~^\?"   afterwards also: "0-9"
+
+  // => Compared to Boogie: B3 cannot start with any of "_$." and cannot use any of "#'`~^\?", but it can use "%" (and even start with it)
+  
+
+
   /**
     * The current mapping from unique Boogie names to the original identifiers (inverse mapping of idnMap,
     * where the names of the identifiers are used directly).
@@ -28,7 +42,7 @@ object BoogieToB3Transformer {
     idnMap.get(i) match {
       case Some(s) => s
       case None =>
-        val s = names.createUniqueIdentifier(i.preferredName)
+        val s = names.createUniqueIdentifier(i.preferredName).replace("'", "2").replace("#", ".")
         idnMap.put(i, s)
         backMap.update(s, i.name)
         s
@@ -72,6 +86,11 @@ object BoogieToB3Transformer {
     println("======= COLLECTED INFOS END =======")
   }
 
+  /** returns the name of the input's class as a string */ 
+  def printClass[T](x: T): String = {
+    x.getClass.getSimpleName
+  }
+
 
 
 
@@ -91,7 +110,9 @@ object BoogieToB3Transformer {
     {// DEVELOPMENT vvv
     val usedMapping = collection.mutable.Set[String]()
     flatDeclSeq map { x => x match {
-      case Axiom(exp) => usedMapping += "Axiom"
+      case Axiom(exp) => 
+        info("Existing Axiom with exp type: ", printClass(exp))
+        usedMapping += "Axiom"
       case CommentedDecl(s, d, size, nLines) => usedMapping += "CommentedDecl"
       case ConstDecl(name, typ, unique) => 
         info("Existing ConstDecl: ", name.name)
@@ -115,7 +136,9 @@ object BoogieToB3Transformer {
     val alwaysIncludeFcts = Seq(B3.Function("AssumeFunctionsAbove", Seq(), "int"),
                                 B3.Function("AssumePermUpperBound", Seq(), "bool"),
                                 B3.Function("Heap", Seq(), "HeapType"),
+                                B3.Function("EmptyFrame", Seq(), "FrameType"),
                                 B3.Function("Mask", Seq(), "MaskType"),
+                                B3.Function("dummyFunction", Seq(B3.FParameter("x", "int")), "bool"),
                                 B3.Function("state", Seq(B3.FParameter("heap", "HeapType"), B3.FParameter("mask", "MaskType")), "bool"))
     val alwaysIncludeTyps = Seq("MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType", "FrameType", "Ref")
     // DEVELOPMENT ^^^
@@ -124,7 +147,7 @@ object BoogieToB3Transformer {
     B3.Program(types = alwaysIncludeTyps ++ Seq(),        //TODO
                taggers = Seq(),                           //TODO
                functions = alwaysIncludeFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
-               axioms = Seq(),                            //TODO
+               axioms = flatDeclSeq.collect({case ax: Axiom => transformAxiom(ax)}),
                procedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)}))
   }
 
@@ -142,6 +165,29 @@ object BoogieToB3Transformer {
       sys.error("TODO: function attributes not supported (probably tried to use 'builtin: ...')")
     }
     B3.Function(fct.name, fct.args map {p => B3.FParameter(p.name, getNameFromTyp(p.typ))}, getNameFromTyp(fct.typ))
+  }
+
+  /** Transforms a Boogie Axiom AST node into the corresponding raw B3 node. */ 
+  private def transformAxiom(axiom: Axiom): RawAst.Axiom = {
+    /* According to https://b3-lang.org/krml301.html#sec-dependencies:
+    "experience has shown that extraneous axioms, however irrelevant to the proof at hand, 
+     can severely slow down solver performance." */
+    /* This means we should restrict the use of axioms only to where it could actually be helpful.
+    We can do that by defining "explains Identifier"s, which we can do by providing a Seq of the 
+    Identifier's names as the first parameter of B3.Axiom. Only function identifiers! This means 
+    (according to https://b3-lang.org/top-level-decls.html#axioms) that the axiom is only used 
+    in proof obligations where all stated functions appear - either directly in the proof 
+    obligation or in another active axiom. */
+    /* At the same time, Carbon does not support this for Boogie, so we might have to come up with
+    our own rules on how to infer this. */
+
+    // Possible Axiom Expressions currently generated by Carbon:
+    // Forall, MaybeForall, (DefaultStateModule->) FuncApp(Identifier(isGoodState), stateExps, Bool), (DefaultHeapModule->) UnExp(Not, FuncApp) (DefaultDomainModule->) any Exp
+    // Axiom(noPerm === RealLit(0))
+    // Axiom(fullPerm === RealLit(1))
+
+    // For now we do NOT use "explains", so all axioms are always used in the proof. TODO: infer "explains"-identifiers to increase efficiency. 
+    B3.Axiom(Seq(), transformExpr(axiom.exp))
   }
 
   /** flattens the sequence by removing all CommentedDecl, but keeping all Decl it contains */
@@ -330,9 +376,14 @@ object BoogieToB3Transformer {
         }
       case CondExp(cond, thn, els) => B3.Expr_OperatorExpr(B3.CondExp, Seq(cond, thn, els) map transformExpr)
       case Const(name) => B3.FunctionCallExpr(name, Seq()) //we can simulate Boogie-constants using a nullary function (we can keep the name)
-      case Exists(_, _, _, _) => info("TODO: Exists");                              B3.TODO_Expr_int()
+      case Exists(_, _, _, _) => info("TODO: Exists");                              B3.TODO_Expr_bool()
       case FalseLit() => B3.Expr_BLiteral(false)
-      case Forall(_, _, _, _, _) => info("TODO: Forall");                           B3.TODO_Expr_int()
+      case Forall(vars, triggers, exp, typeVars, weight) => 
+        if (weight != None) info("TODO: Forall with weight != None") // TODO: what is weight?
+
+        val boundVars = vars map {vardecl => B3.Binding(vardecl.name, getNameFromTyp(vardecl.typ))}
+        val patterns = triggers map {trigger => trigger.exps map {exp => transformExpr(exp)}}
+        B3.Expr_QuantifierExpr(true, boundVars, patterns, transformExpr(exp))
       case FuncApp(name, args, _) => B3.FunctionCallExpr(name, args map transformExpr)
       case GlobalVar(name, typ) => 
         info("(TODO): GlobalVar (name, type): ", "("+name.name+": "+getNameFromTyp(typ)+")")
