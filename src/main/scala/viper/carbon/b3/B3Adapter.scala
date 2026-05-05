@@ -232,6 +232,12 @@ object B3Adapter {
     new RawAst.Stmt_Assert(exp)
   }
 
+  /** created a raw B3 Check-Stmt node using the provided expression. 
+   * The 'error' parameter can current not be used by B3, but we require it for when that changes */
+  def Stmt_Check(exp: RawAst.Expr, error: String): RawAst.Stmt_Check = {
+    new RawAst.Stmt_Check(exp)
+  }
+
   /** created a raw B3 Assume-Stmt node using the provided expression. */
   def Stmt_Assume(exp: RawAst.Expr): RawAst.Stmt_Assume = {
     new RawAst.Stmt_Assume(exp)

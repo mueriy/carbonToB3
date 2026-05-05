@@ -267,7 +267,7 @@ object BoogieToB3Transformer {
     info("DEBUG: transformStatement(x), where x has type ", stmt.getClass.getName)
     stmt match {
       case _: Goto => info("LATER: Goto");                                          B3.LATER_Stmt()
-      case AssertImpl(exp, error) => B3.Stmt_Assert(transformExpr(exp), error.readableMessage)
+      case AssertImpl(exp, error) => B3.Stmt_Check(transformExpr(exp), error.readableMessage) // TODO: check vs assert (for now we use check to receive the result of each "assertion")
       case Assign(lhs, rhs) =>
         lhs match {
           case LocalVar(identif, typ) =>
@@ -303,8 +303,12 @@ object BoogieToB3Transformer {
         B3.Stmt_Block(stmts.map(s => transformStatement(s, false))) // TODO: improve block-removal even more. I think mainly flatten Seqn stmts in CommentBlock stmts
     }
   }
+  /** temporary dummy to use instead of actually implementing global variables (= only needed for impure features) */
+  private def TODO_GlobalVar(name: Identifier): RawAst.Expr_FunctionCallExpr = {
+    B3.FunctionCallExpr(name, Seq())
+  }
 
-   // TODO: actually implement this method
+  /** TODO: description */
   private def transformExpr(exp: Exp): RawAst.Expr = {
     // info("DEBUG: +++ transformExpr(x), where x has type ", exp.getClass.getName)
     // B3 and Boogie operators seem to have the same associativity.
