@@ -104,8 +104,12 @@ object BoogieToB3Transformer {
       case TypeAlias(name, definition) => usedMapping += "TypeAlias"
       case TypeDecl(t) => usedMapping += "TypeDecl"
     }}
-    println(usedMapping)
-
+    usedMapping.map(_ match {
+      case "Func" => None
+      case "CommentedDecl" => None
+      case "DeclComment" => None
+      case "Procedure" => None
+      case notImplementedDecl => info("TODO: Decl ", notImplementedDecl)})
     }
     // We should define these somewhere else LATER and then "import" from there 
     val alwaysIncludeFcts = Seq(B3.Function("AssumeFunctionsAbove", Seq(), "int"),
@@ -144,6 +148,7 @@ object BoogieToB3Transformer {
   private def flattenedDecl(decls: Seq[Decl]): Seq[Decl] = {
     decls flatMap {
       case commDecl: CommentedDecl => flattenedDecl(commDecl.d)
+      case _: DeclComment => Seq()
       case decl => Seq(decl)
     }
   } 
@@ -330,7 +335,7 @@ object BoogieToB3Transformer {
       case Forall(_, _, _, _, _) => info("TODO: Forall");                           B3.TODO_Expr_int()
       case FuncApp(name, args, _) => B3.FunctionCallExpr(name, args map transformExpr)
       case GlobalVar(name, typ) => 
-        info("(TODO): GlobalVar (name, type): ", "("+name.name+", "+getNameFromTyp(typ)+")")
+        info("(TODO): GlobalVar (name, type): ", "("+name.name+": "+getNameFromTyp(typ)+")")
         TODO_GlobalVar(name)
       case IntLit(i) => B3.Expr_ILiteral(i)
       case LocalVar(name, _) => B3.Expr_IdExpr(name)
