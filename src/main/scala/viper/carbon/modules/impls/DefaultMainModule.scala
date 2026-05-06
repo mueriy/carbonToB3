@@ -152,7 +152,7 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
             val body: Stmt = translateStmt(method.bodyOrAssumeFalse)
               /* TODO: Might be worth special-casing on methods with empty bodies */
             val proc = Procedure(Identifier(name), ins, outs,
-              Seq(Statements.EmptyStmt, //init,  [[B3 temp: Replace heap state initialization with EmptyStmt]]
+              Seq(init,
                 MaybeCommentBlock("Assumptions about method arguments", paramAssumptions),
                 inhalePre,
                 Statements.EmptyStmt, // MaybeCommentBlock(initOldStateComment, initOld), [[B3 temp: Replace heap state initialization with EmptyStmt]]

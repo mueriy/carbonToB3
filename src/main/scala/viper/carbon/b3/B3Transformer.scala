@@ -42,7 +42,7 @@ object BoogieToB3Transformer {
     idnMap.get(i) match {
       case Some(s) => s
       case None =>
-        val s = names.createUniqueIdentifier(i.preferredName).replace("'", "2").replace("#", ".")
+        val s = names.createUniqueIdentifier(i.preferredName).replace("'", ".").replace("#", "%")
         idnMap.put(i, s)
         backMap.update(s, i.name)
         s
