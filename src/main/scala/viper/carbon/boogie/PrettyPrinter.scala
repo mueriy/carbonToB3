@@ -6,7 +6,8 @@
 
 package viper.carbon.boogie
 
-
+import viper.carbon.Mode
+import viper.carbon.b3.B3NameGenerator
 import viper.silver.ast.pretty._
 import viper.silver.verifier.VerificationError
 
@@ -22,6 +23,8 @@ object PrettyPrinter {
 
   /** BoogieNameGenerator instance. */
   private val names = new BoogieNameGenerator()
+  /** B3NameGenerator instance. */
+  private val b3names = new B3NameGenerator()
 
   /**
     * The current mapping from unique Boogie names to the original identifiers (inverse mapping of idnMap,
@@ -29,8 +32,8 @@ object PrettyPrinter {
     */
   val backMap = collection.mutable.HashMap[String, String]()
 
-  def pretty(n: Node): String = {
-    new PrettyPrinter(n).pretty
+  def pretty(n: Node, mode: Mode.Mode = Mode.Boogie): String = {
+    new PrettyPrinter(n, mode).pretty
   }
 
   def quantifyOverFreeTypeVars(exp: Exp): Exp = {
@@ -67,7 +70,7 @@ object PrettyPrinter {
 **
  * The class that implements most of the pretty-printing functionality.
  */
-class PrettyPrinter(n: Node) extends BracketPrettyPrinter {
+class PrettyPrinter(n: Node, mode: Mode.Mode = Mode.Boogie) extends BracketPrettyPrinter {
 
   lazy val pretty: String = {
     pretty(n)
@@ -98,7 +101,8 @@ class PrettyPrinter(n: Node) extends BracketPrettyPrinter {
     PrettyPrinter.idnMap.get(i) match {
       case Some(s) => s
       case None =>
-        val s = PrettyPrinter.names.createUniqueIdentifier(i.preferredName)
+        val s = if (mode == Mode.B3) PrettyPrinter.b3names.createUniqueIdentifier(i.preferredName)
+                                else PrettyPrinter.names.createUniqueIdentifier(i.preferredName)
         PrettyPrinter.idnMap.put(i, s)
         PrettyPrinter.backMap.update(s, i.name)
         s

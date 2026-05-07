@@ -19,6 +19,15 @@ import viper.silver.frontend.{MissingDependencyException, NativeModel, Variables
 import viper.silver.reporter.Reporter
 
 /**
+ * To define the mode (i.e. which verifier we use: Boogie/B3)
+ */
+object Mode {
+  sealed trait Mode
+  case object B3 extends Mode
+  case object Boogie extends Mode
+}
+
+/**
  * The main class to perform verification of Viper programs.  Deals with command-line arguments, configuration
  * of modules and choosing which module implementations to use.
  *
@@ -33,13 +42,10 @@ case class CarbonVerifier(override val reporter: Reporter,
   def config = _config
 
   /** Mode/mode defines which verifier we are using */
-  sealed trait Mode
-  case object B3Mode extends Mode
-  case object BoogieMode extends Mode
   def mode = if (config != null) config.backendMode.toOption match {
-    case Some(backendChoice) if backendChoice == "B3" => B3Mode
-    case _ => BoogieMode
-  } else BoogieMode
+    case Some(backendChoice) if backendChoice == "B3" => Mode.B3
+    case _ => Mode.Boogie
+  } else Mode.Boogie
 
   def start(): Unit = {}
   def stop(): Unit = {
@@ -90,12 +96,12 @@ case class CarbonVerifier(override val reporter: Reporter,
 
   /** The (resolved) path where Boogie/B3 is supposed to be located. */
   def verifierPath = if (config != null) mode match {
-    case BoogieMode =>
+    case Mode.Boogie =>
       config.boogieExecutable.toOption match {
         case Some(path) => new File(path).getAbsolutePath
         case None => boogieDefault
       }
-    case B3Mode => 
+    case Mode.B3 => 
       config.b3Executable.toOption match {
         case Some(path) => {new File(path).getAbsolutePath}
         case None => b3Default
@@ -212,7 +218,7 @@ case class CarbonVerifier(override val reporter: Reporter,
 
 
     val options = mode match {
-      case BoogieMode => {
+      case Mode.Boogie => {
         if (config == null) {
           Nil
         } else {
@@ -240,7 +246,7 @@ case class CarbonVerifier(override val reporter: Reporter,
             })
         }
       }
-      case B3Mode => {
+      case Mode.B3 => {
         if (config == null) {
           Nil
         } else {
@@ -262,7 +268,7 @@ case class CarbonVerifier(override val reporter: Reporter,
           // write Boogie program to the specified file
           val f = new File(filename)
           val stream = new BufferedOutputStream(new FileOutputStream(f))
-          stream.write(_translated.toString.getBytes)
+          stream.write(_translated.toStringOfMode(mode).getBytes)
           stream.close()
         case None =>
       }
@@ -270,8 +276,8 @@ case class CarbonVerifier(override val reporter: Reporter,
     }
 
     val invokeResult = mode match {
-      case BoogieMode => invokeBoogie(_translated, options, timeout)
-      case B3Mode => invokeB3(_translated, options, timeout)
+      case Mode.Boogie => invokeBoogie(_translated, options, timeout)
+      case Mode.B3 => invokeB3(_translated, options, timeout)
     }
     invokeResult match {
       case (version,result) =>
@@ -283,7 +289,7 @@ case class CarbonVerifier(override val reporter: Reporter,
         result match {
           // [B3 base: Just dont use 'variables' counterexample mode. Later we could add a "B3ModelTransformer" here, modify BoogieModelTransformer, or not allow it at all.]
           case Failure(errors) if transformNames => {
-            if (mode == B3Mode) throw new UnsupportedOperationException("Counterexample model 'variables' is currently not supported when using B3")
+            if (mode == Mode.B3) throw new UnsupportedOperationException("Counterexample model 'variables' is currently not supported when using B3")
             errors.foreach(e =>  BoogieModelTransformer.transformCounterexample(e, translatedNames))
           }
           case _ => result

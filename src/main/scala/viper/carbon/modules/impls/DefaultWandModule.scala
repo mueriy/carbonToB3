@@ -16,6 +16,8 @@ import viper.silver.ast.utility.Expressions
 import viper.silver.ast.{MagicWand, MagicWandStructure}
 import viper.silver.verifier.{PartialVerificationError, reasons}
 import viper.silver.{ast => sil}
+import viper.carbon.b3.B3NameGenerator
+import viper.carbon.Mode
 
 class
 DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent with DefinednessComponent{
@@ -67,7 +69,7 @@ DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent 
   var activeWandsStack: List[Int] = Nil // stack of active package statements being translated
 
   //use this to generate unique names for states
-  private val names = new BoogieNameGenerator()
+  private val names = if (verifier.mode == Mode.B3) new B3NameGenerator() else new BoogieNameGenerator()
 
 
   // states variables

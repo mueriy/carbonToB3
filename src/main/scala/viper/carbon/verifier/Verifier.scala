@@ -9,6 +9,7 @@ package viper.carbon.verifier
 import viper.silver.{ast => sil}
 import viper.carbon.modules._
 import viper.carbon.boogie.Namespace
+import viper.carbon.Mode
 
 /**
  * A verifier for Viper in Carbon (defines what modules need to be available).
@@ -81,5 +82,10 @@ trait Verifier {
   def usePolyMapsInEncoding: Boolean
 
   def respectFunctionPrecPermAmounts: Boolean
+
+  /**
+   * Which verifier we are using (B3/Boogie).
+   */
+  def mode: Mode.Mode
 
 }

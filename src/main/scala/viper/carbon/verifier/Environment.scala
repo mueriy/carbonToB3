@@ -8,6 +8,8 @@ package viper.carbon.verifier
 
 import viper.silver.{ast => sil}
 import viper.carbon.boogie.{BoogieNameGenerator, Identifier, LocalVar}
+import viper.carbon.b3.B3NameGenerator
+import viper.carbon.Mode
 
 /**
  * An environment that assigns unique names to Viper variables;  in SIL, loops can have
@@ -17,7 +19,7 @@ import viper.carbon.boogie.{BoogieNameGenerator, Identifier, LocalVar}
  */
 case class Environment(verifier: Verifier, member: sil.Node) {
 
-  private val names = new BoogieNameGenerator()
+  private val names = if (verifier.mode == Mode.B3) new B3NameGenerator() else new BoogieNameGenerator()
 
   /** The current mapping of variables. */
   private val currentMapping = collection.mutable.HashMap[sil.LocalVar, LocalVar]()

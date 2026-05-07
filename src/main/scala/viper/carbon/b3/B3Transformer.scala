@@ -14,21 +14,9 @@ object BoogieToB3Transformer {
   /** The current mapping from identifier to names. */
   private val idnMap = collection.mutable.HashMap[Identifier, String]()
 
-  /** BoogieNameGenerator instance. */ 
-  private val names = new BoogieNameGenerator() // TODO: Check if we need a B3NameGenerator
+  /** B3NameGenerator instance. */ 
+  private val names = new B3NameGenerator()
 
-  /** allowed characters for B3 Identifiers */
-  // const canStartIdentifierChar := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ%"
-  // const identifierChar := canStartIdentifierChar + "0123456789_$."
-  /** allowed characters for CustomLiteral in:   "|" CustomLiteral ":" Type "|"   */
-  // const customLiteralChar := identifierChar + "+-*/@#!^" 
-
-  // BoogieNameGenerator allows: "_.$#'`~^\?a-zA-Z" and "0-9" (<- not as first)
-  // => B3:     startWith = "a-zA-Z" + "%"            afterwards also: "0-9" + "_$."
-  // => Boogie: startWith = "a-zA-Z" + "_.$#'`~^\?"   afterwards also: "0-9"
-
-  // => Compared to Boogie: B3 cannot start with any of "_$." and cannot use any of "#'`~^\?", but it can use "%" (and even start with it)
-  
 
 
   /**
@@ -42,7 +30,7 @@ object BoogieToB3Transformer {
     idnMap.get(i) match {
       case Some(s) => s
       case None =>
-        val s = names.createUniqueIdentifier(i.preferredName).replace("'", ".").replace("#", "%")
+        val s = names.createUniqueIdentifier(i.preferredName)
         idnMap.put(i, s)
         backMap.update(s, i.name)
         s

@@ -12,6 +12,7 @@ import viper.silver.ast.pretty._
 import viper.silver.verifier.VerificationError
 
 import scala.collection.mutable
+import viper.carbon.Mode
 
 /** The root of the Boogie AST. */
 sealed trait Node {
@@ -90,7 +91,10 @@ sealed trait Node {
   : this.type =
     Transformer.transform[this.type](this, pre)(recursive, post)
 
-  override def toString = PrettyPrinter.pretty(this)
+  /** This is Boogie only! For other modes (B3) you should use 'toStringOfMode' instead! */
+  override def toString = PrettyPrinter.pretty(this, Mode.Boogie)
+  /** 'toString'-variant where the mode can be chosen, i.e. which verifier to use: Boogie/B3 */
+  def toStringOfMode(mode: Mode.Mode) = PrettyPrinter.pretty(this, mode)
 }
 
 /**
