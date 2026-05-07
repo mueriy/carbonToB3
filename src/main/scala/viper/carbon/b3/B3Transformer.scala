@@ -57,6 +57,7 @@ object BoogieToB3Transformer {
   // settings
   private val UNPACK_SEQN = true // true = easier to ready code, false = easier to compare to PrettyPrinted code (see method: uncomment)
   private val DEBUG_MODE = 1 // 0 = ignore, 1 = collect (+ print later), 2 = collect & print (+ print later)
+  private val USE_CHECK = true
 
   // other
   private val debug_infoPlus = collection.mutable.Map[String, Seq[String]]()
@@ -123,13 +124,16 @@ object BoogieToB3Transformer {
       case LiteralDecl(boogieString) => usedMapping += "LiteralDecl"
       case Procedure(name, ins, outs, body) => usedMapping += "Procedure"
       case TypeAlias(name, definition) => usedMapping += "TypeAlias"
-      case TypeDecl(t) => usedMapping += "TypeDecl"
+      case TypeDecl(NamedType(_, Seq())) => usedMapping += "TypeDecl simple"
+      case TypeDecl(t) => usedMapping += "TypeDecl complex"
     }}
     usedMapping.map(_ match {
       case "Func" => None
       case "CommentedDecl" => None
       case "DeclComment" => None
       case "Procedure" => None
+      case "Axiom" => None
+      case "TypeDecl simple" => None
       case notImplementedDecl => info("TODO: Decl ", notImplementedDecl)})
     }
     // We should define these somewhere else LATER and then "import" from there 
@@ -143,8 +147,10 @@ object BoogieToB3Transformer {
     val alwaysIncludeTyps = Seq("MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType", "FrameType", "Ref")
     // DEVELOPMENT ^^^
 
+    val typs = flatDeclSeq.collect({case TypeDecl(NamedType(name, Seq())) => name})
+
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
-    B3.Program(types = alwaysIncludeTyps ++ Seq(),        //TODO
+    B3.Program(types = alwaysIncludeTyps ++ typs,        //TODO
                taggers = Seq(),                           //TODO
                functions = alwaysIncludeFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
                axioms = flatDeclSeq.collect({case ax: Axiom => transformAxiom(ax)}),
@@ -247,7 +253,7 @@ object BoogieToB3Transformer {
       case Int => "int"
       case Real =>              sys.error("TODO: Real Type")
       case MapType(_, _, _) =>  sys.error("TODO: MapType")
-      case NamedType(name, typVars) =>   info("TODO: NamedType; this has name = ", name); name
+      case NamedType(name, typVars) =>   info("TODO: NamedType with name = ", name); name
       case TypeVar(_) =>        sys.error("TODO: TypeVar")
     }
   }
@@ -315,16 +321,21 @@ object BoogieToB3Transformer {
     */
   private def transformStatement(stmtIn: Stmt, removeComments: Boolean = true): RawAst.Stmt = {
     val stmt = if (removeComments) uncomment(stmtIn) else stmtIn
-    info("DEBUG: transformStatement(x), where x has type ", stmt.getClass.getName)
+    // info("DEBUG: transformStatement(x), where x has type ", stmt.getClass.getName)
     stmt match {
       case _: Goto => info("LATER: Goto");                                          B3.LATER_Stmt()
-      case AssertImpl(exp, error) => B3.Stmt_Check(transformExpr(exp), error.readableMessage) // TODO: check vs assert (for now we use check to receive the result of each "assertion")
+      case AssertImpl(exp, error) => 
+        if (USE_CHECK) {
+          B3.Stmt_Check(transformExpr(exp), error.readableMessage) // TODO: check vs assert (for now we use check to receive the result of each "assertion")
+        } else {
+          B3.Stmt_Assert(transformExpr(exp), error.readableMessage)
+        }
       case Assign(lhs, rhs) =>
         lhs match {
           case LocalVar(identif, typ) =>
             // info("DEBUG: Assign lhs: (name, type) = ", "(" + useIdent(identif) + ", " + lhs.getClass.getName + ")")
             B3.Stmt_Assign(identif, transformExpr(rhs))
-          case GlobalVar(_, typ) => info("TODO: (assign) GlobalVar of type: ", getNameFromTyp(typ));      
+          case GlobalVar(_, typ) => info("TODO: Assign to GlobalVar of type: ", getNameFromTyp(typ));      
                                                                                     B3.TODO_Stmt()
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
         }
