@@ -5,6 +5,11 @@ import scala.reflect.ClassTag
 
 /** Helper methods to make it easier to work with dafny classes. */
 object DafnyHelper {
+  /** 
+   * = DafnySequence[_ <: CodePoint]
+   * (the slightly easier to write 'DafnySequence[CodePoint]' cannot be used for Option, so just use this everywhere) 
+   */
+  type DString = DafnySequence[_ <: CodePoint]
 
   /** returns TypeDescriptor<T> of given type T (for td[T]) */
   private[b3] def td[T](implicit ct: ClassTag[T]): TypeDescriptor[T] = {
@@ -47,12 +52,12 @@ object DafnyHelper {
    * @return DafnySequence<DafnySequence<CodePoint>>: a sequence containing the Strings in the input Seq converted to
    * DafnySequence<CodePoint> (in same order).
    */
-  def Seq_fromStringSeq(strSeq: Seq[String]): DafnySequence[DafnySequence[CodePoint]] = {
-    SeqT_fromSeq[DafnySequence[CodePoint]](strSeq.map(str => Seq_fromString(str)))
+  def Seq_fromStringSeq(strSeq: Seq[String]): DafnySequence[DString] = {
+    SeqT_fromSeq[DString](strSeq.map(str => Seq_fromString(str)))
   }
 
   /** returns DafnySequence<CodePoint> containing the provided (Scala) String str */
-  def Seq_fromString(str: String): DafnySequence[CodePoint] = {
+  def Seq_fromString(str: String): DString = {
     DafnySequence.asUnicodeString(str)
   }
 
@@ -74,7 +79,7 @@ object B3Adapter {
   }
 
   /** Transforms options into what B3 expects the command line information (cli) to look like. Can be used as input for B3 methods that require this. */
-  def parseOptions(options: Seq[String]): Std.Wrappers.Result[CommandLineOptions.CliResult[B3.Verb], DafnySequence[_ <: CodePoint]] = {
+  def parseOptions(options: Seq[String]): Std.Wrappers.Result[CommandLineOptions.CliResult[B3.Verb], DString] = {
     // CliResult[B3.Verb] has the fields: verb, options, and files.
     // The first argument (in seqOfB3args) is ignored.
     // The second argument could be "parse", "resolve", or "verify", but in our case we require "verify"
@@ -83,13 +88,13 @@ object B3Adapter {
 
     // Transform "options" to what the corresponding "args" of B3's Main method would be  
     val scalaSeqOfB3args = (Seq("dotnet", "verify")++options).map(x => Seq_fromString(x))
-    val dafnySeqOfB3args = SeqT_fromSeq[DafnySequence[CodePoint]](scalaSeqOfB3args)
+    val dafnySeqOfB3args = SeqT_fromSeq[DString](scalaSeqOfB3args)
     // Parse args
     CommandLineOptions.__default.Parse(B3.Verb._typeDescriptor(), new B3.B3CliSyntax(), dafnySeqOfB3args)
   }
 
   /** Run B3's ResolveAndTypeCheck (transforms RawAST -> AST and does type checks) */
-  def resolveAndTypeCheck(rawB3Ast: RawAst.Program, cli: CommandLineOptions.CliResult[B3.Verb]): Std.Wrappers.Result[Ast.Program, DafnySequence[_ <: CodePoint]] = {
+  def resolveAndTypeCheck(rawB3Ast: RawAst.Program, cli: CommandLineOptions.CliResult[B3.Verb]): Std.Wrappers.Result[Ast.Program, DString] = {
     B3.__default.ResolveAndTypeCheck(td[B3.Verb], rawB3Ast, cli)
   }
 
@@ -139,7 +144,7 @@ object B3Adapter {
   def Program(types: Seq[String], taggers: Seq[RawAst.Tagger], functions: Seq[RawAst.Function], 
               axioms: Seq[RawAst.Axiom], procedures: Seq[RawAst.Procedure]): RawAst.Program = {
 
-    new RawAst.Program(SeqT_fromSeq[DafnySequence[CodePoint]](types.map(x => Seq_fromString(x))),
+    new RawAst.Program(SeqT_fromSeq[DString](types.map(x => Seq_fromString(x))),
                         SeqT_fromSeq[RawAst.Tagger](taggers),
                         SeqT_fromSeq[RawAst.Function](functions),
                         SeqT_fromSeq[RawAst.Axiom](axioms),
@@ -199,13 +204,15 @@ object B3Adapter {
     * @param name The function name.
     * @param parameters A Seq of the function's parameters (in B3's FParameter format)
     * @param resultType The function's return type 
+    * @param tag The name of a tag. The values returned by different functions with the same tag are disjoint. 
     * @return A (raw) B3 function node according to the used parameters.
     */
-  def Function(name: String, parameters: Seq[RawAst.FParameter], resultType: String): RawAst.Function = {
+  def Function(name: String, parameters: Seq[RawAst.FParameter], resultType: String, tag: String = ""): RawAst.Function = {
+    val b3tag = if (tag == "") Option_None[DString] else Option_Some[DString](Seq_fromString(tag))
     new RawAst.Function(Seq_fromString(name), 
                         SeqT_fromSeq[RawAst.FParameter](parameters),
                         Seq_fromString(resultType),
-                        Option_None,  // optional: tag
+                        b3tag,
                         Option_None)  // <- Carbon does not use function bodies/definitions, it defines them using axioms.
   }
   /** Creates a (raw) B3 FParameter node, which defines a function parameter. */
@@ -217,6 +224,11 @@ object B3Adapter {
   /** Creates a (raw) B3 node that defines a Function call. The function must be defined in the current Program with matching number of args. */
   def FunctionCallExpr(name: String, args: Seq[RawAst.Expr]): RawAst.Expr_FunctionCallExpr = {
     new RawAst.Expr_FunctionCallExpr(Seq_fromString(name), SeqT_fromSeq[RawAst.Expr](args))
+  }
+
+  /** Create a (raw) B3 Tagger node, which defines a new tagger with identifier 'tag' for type 'typ' */
+  def Tagger(name: String, typ: String): RawAst.Tagger = {
+    new RawAst.Tagger(Seq_fromString(name), Seq_fromString(typ))
   }
 
   /**
@@ -289,7 +301,7 @@ object B3Adapter {
 
   /** create a B3 Reinit-Stmt, which is equivalent to havoc */
   def Stmt_Reinit(vars: Seq[String]): RawAst.Stmt_Reinit = {
-    new RawAst.Stmt_Reinit(SeqT_fromSeq[DafnySequence[CodePoint]](vars.map(x => Seq_fromString(x))))
+    new RawAst.Stmt_Reinit(SeqT_fromSeq[DString](vars.map(x => Seq_fromString(x))))
   }
 
 

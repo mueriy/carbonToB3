@@ -124,26 +124,46 @@ object BoogieToB3Transformer {
       case "TypeDecl simple" => None
       case notImplementedDecl => info("TODO: Decl ", notImplementedDecl)})
     }
-    // We should define these somewhere else LATER and then "import" from there 
+    // TODO: remove these after (re-)adding the preludes 
     val alwaysIncludeFcts = Seq(B3.Function("AssumeFunctionsAbove", Seq(), "int"),
                                 B3.Function("AssumePermUpperBound", Seq(), "bool"),
                                 B3.Function("Heap", Seq(), "HeapType"),
                                 B3.Function("EmptyFrame", Seq(), "FrameType"),
                                 B3.Function("Mask", Seq(), "MaskType"),
+                                B3.Function("ZeroMask", Seq(), "MaskType"),
                                 B3.Function("dummyFunction", Seq(B3.FParameter("x", "int")), "bool"),
                                 B3.Function("state", Seq(B3.FParameter("heap", "HeapType"), B3.FParameter("mask", "MaskType")), "bool"))
     val alwaysIncludeTyps = Seq("MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType", "FrameType", "Ref")
     // DEVELOPMENT ^^^
 
-    val typs = flatDeclSeq.collect({case TypeDecl(NamedType(name, Seq())) => name})
+    // Type declaration
+    // TODO: NamedType with typVars (= Parametric types)
+    val typs = flatDeclSeq.collect({
+      case TypeDecl(NamedType(name, Seq())) => name})
+
+    // Boogie constants
+    // We use uninterpreted nullary functions instead of constants, but these always return the same value (= have constant value)
+    // For constants with the unique tag we can use B3 tags, as all functions tagged with the same tag return pairwise distinct values (same as 'unique' const)
+    val const_tags = collection.mutable.Set[(String, String)]()
+    val constFcts = flatDeclSeq.collect({
+      case ConstDecl(name, typ, false) => B3.Function(name, Seq(), getNameFromTyp(typ))
+      case ConstDecl(name, typ, true) => 
+        val typName = getNameFromTyp(typ)
+        val tagName = "Const_Tag_"+typName
+        const_tags += ((tagName, typName))
+        B3.Function(name, Seq(), typName, tagName)
+    })
+    val constTaggers = const_tags.map({case ((tag, typ)) => B3.Tagger(tag, typ)}).toSeq
+
 
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
-    B3.Program(types = alwaysIncludeTyps ++ typs,        //TODO
-               taggers = Seq(),                           //TODO
-               functions = alwaysIncludeFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
+    B3.Program(types = alwaysIncludeTyps ++ typs,
+               taggers = constTaggers,
+               functions = alwaysIncludeFcts ++ constFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
                axioms = flatDeclSeq.collect({case ax: Axiom => transformAxiom(ax)}),
                procedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)}))
   }
+
 
   /**
     * Transforms a Boogie function (Func) AST node into the corresponding raw B3 node.
@@ -241,14 +261,16 @@ object BoogieToB3Transformer {
       case Int => "int"
       case Real =>              sys.error("TODO: Real Type")
       case MapType(_, _, _) =>  sys.error("TODO: MapType")
-      case NamedType(name, typVars) =>   info("TODO: NamedType with name = ", name); name
+      case NamedType(name, Seq()) => name
+      case NamedType(name, typVars) => info("TODO: NamedType: ", name + " " + typVars.map(getNameFromTyp(_)).mkString(" ")); name
       case TypeVar(_) =>        sys.error("TODO: TypeVar")
     }
   }
 
   /** Transform Boogie Procedure -> raw B3 Procedure */
   private def transformProcedure(proc: Procedure): RawAst.Procedure = {
-    // collect all where clauses (important for declaring and havoc-ing these variables)
+    // LATER: implement LocalVarWhereDecl-functionality; this is only used for the permission value "wildcard"; 
+    //        LocalVarWhereDecl means restricting the possible variable values when initiating/havocing to a random value 
     whereMap.clear()
     proc.body visit {
       case LocalVarWhereDecl(idn, where) =>
@@ -258,7 +280,7 @@ object BoogieToB3Transformer {
     // define procedure body
     val body = uncomment(proc.body)
     val b3ProcBody = body match {
-      case Comment(_) => 
+      case Seqn(Seq()) => 
         B3.Option_None[RawAst.Stmt]
       case Seqn(stmts) => 
         // Most variables are not declared in the body, so we add var-declarations at the start of the transformed procedure body. 
@@ -268,10 +290,10 @@ object BoogieToB3Transformer {
         // This means we need to nest all VarDecls and define the (transformed) procedure body as the innermost body. 
         val transBody = transformStatement(body, false)
         val varDeclarations = undecl.foldRight(transBody)((l, r) => B3.Stmt_VarDecl(l.name, r, getNameFromTyp(l.typ))) 
-        //TODO: add assume [expr] for all variable declarations with "[declare variableX] where [expr]" (so for all VarDecls in whereMap)
+        //LATER: support LocalVarWhereDecl-functionality
         B3.Option_Some(varDeclarations)
       case _ => 
-        info("ERROR: Procedure body should be Seqn (or Comment as placeholder), but is: ", body.getClass.getSimpleName);
+        info("ERROR: Procedure body should be Seqn (or Seqn(Seq()) as placeholder), but is: ", body.getClass.getSimpleName);
         B3.Option_None[RawAst.Stmt]
     }
     
