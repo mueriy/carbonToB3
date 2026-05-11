@@ -372,7 +372,7 @@ object BoogieToB3Transformer {
       case _: LocalVarWhereDecl => info("TODO: LocalVarWhereDecl");              B3.TODO_Stmt()
       case NondetIf(thn, els) => B3.Stmt_Choose(Seq(thn, els).map(transformStatement(_))) //QUEST: we could check if thn or els is another NondetIf and then add all substatements into a single Stmt_Choose
       case Seqn(stmts) =>
-        B3.Stmt_Block(stmts.map(s => transformStatement(s, false))) // TODO: improve block-removal even more. I think mainly flatten Seqn stmts in CommentBlock stmts
+        B3.Stmt_Block(stmts.map(s => transformStatement(s, false)))
     }
   }
   /** temporary dummy to use instead of actually implementing global variables (= only needed for impure features) */
@@ -380,7 +380,12 @@ object BoogieToB3Transformer {
     B3.FunctionCallExpr(name, Seq())
   }
 
-  /** TODO: description */
+  /**
+    * Transforms a Boogie Exp node (sub-tree) into the corresponding B3 Expr sub-tree.   
+    *
+    * @param exp
+    * @return
+    */
   private def transformExpr(exp: Exp): RawAst.Expr = {
     // info("DEBUG: +++ transformExpr(x), where x has type ", exp.getClass.getName)
     // B3 and Boogie operators seem to have the same associativity.
@@ -397,9 +402,14 @@ object BoogieToB3Transformer {
         }
       case CondExp(cond, thn, els) => B3.Expr_OperatorExpr(B3.CondExp, Seq(cond, thn, els) map transformExpr)
       case Const(name) => B3.FunctionCallExpr(name, Seq()) //we can simulate Boogie-constants using a nullary function (we can keep the name)
-      case Exists(_, _, _, _) => info("TODO: Exists");                              B3.TODO_Expr_bool()
+      case Exists(vars, triggers, exp, weight) =>                    // TODO: find out why Exists does not have typeVars. Forall uses that for parametric types; can we not use parametric types in Exists stmts?
+        if (weight != None) info("TODO: Exists with weight != None") // TODO: what is weight?
+
+        val boundVars = vars map {vardecl => B3.Binding(vardecl.name, getNameFromTyp(vardecl.typ))}
+        val patterns = triggers map {trigger => trigger.exps map {exp => transformExpr(exp)}}
+        B3.Expr_QuantifierExpr(false, boundVars, patterns, transformExpr(exp))
       case FalseLit() => B3.Expr_BLiteral(false)
-      case Forall(vars, triggers, exp, typeVars, weight) => 
+      case Forall(vars, triggers, exp, typeVars, weight) =>          // TODO: [typeVars show parametric types (e.g. A & B for Map<A, B>(...))] -> Check here again when implementing parametric types
         if (weight != None) info("TODO: Forall with weight != None") // TODO: what is weight?
 
         val boundVars = vars map {vardecl => B3.Binding(vardecl.name, getNameFromTyp(vardecl.typ))}
