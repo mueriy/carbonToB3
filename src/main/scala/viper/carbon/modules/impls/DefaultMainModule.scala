@@ -121,8 +121,7 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
           Seq("Dependencies:") ++
           deps ++
           Seq("")
-        // Program(header, preambles ++ members) [[B3 temp: remove preambles]]
-        Program(header, members)
+        Program(header, preambles ++ members)
     }
 
     (output.optimized.asInstanceOf[Program], nameMaps.map(e => e._1 -> e._2.toMap))

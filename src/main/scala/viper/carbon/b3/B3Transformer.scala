@@ -39,6 +39,10 @@ object BoogieToB3Transformer {
 
   /** The current store for where clauses of identifiers. */
   private val whereMap = collection.mutable.HashMap[Identifier, Exp]()
+  /** All global variables of the Program (as 'GlobalVarDecl's) */
+  private var globalVars = Seq[GlobalVarDecl]()
+  /** All global variables of the Program (as B3 'PParameter's) */
+  private var globalInOutPPar = Seq[RawAst.PParameter]()
 
 
   // DEVELOPMENT & DEBUGGING
@@ -125,16 +129,24 @@ object BoogieToB3Transformer {
       case notImplementedDecl => info("TODO: Decl ", notImplementedDecl)})
     }
     // TODO: remove these after (re-)adding the preludes 
-    val alwaysIncludeFcts = Seq(B3.Function("AssumeFunctionsAbove", Seq(), "int"),
-                                B3.Function("AssumePermUpperBound", Seq(), "bool"),
-                                B3.Function("Heap", Seq(), "HeapType"),
-                                B3.Function("EmptyFrame", Seq(), "FrameType"),
-                                B3.Function("Mask", Seq(), "MaskType"),
-                                B3.Function("ZeroMask", Seq(), "MaskType"),
-                                B3.Function("dummyFunction", Seq(B3.FParameter("x", "int")), "bool"),
-                                B3.Function("state", Seq(B3.FParameter("heap", "HeapType"), B3.FParameter("mask", "MaskType")), "bool"))
-    val alwaysIncludeTyps = Seq("MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType", "FrameType", "Ref")
+    val alwaysIncludeFcts = Seq(B3.Function("dummyFunction", Seq(B3.FParameter("x", "int")), "bool"),
+                                // for now we only support integer maps
+                                B3.Function("MapSelect", Seq(B3.FParameter("x", "int")), "int"),
+                                B3.Function("MapUpdate", Seq(B3.FParameter("x", "int")), "int")
+                                
+                                
+                                )
+    val alwaysIncludeTyps = Seq("real", "MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType").map(x => B3.TypeDecl(x))
+
+    prog.decls.collect({case LiteralDecl(boogieString) => info("DEBUG: LiteralDecl", boogieString.take(20))})
     // DEVELOPMENT ^^^
+
+    // Pre-prepare inout PParameters from global variables 
+    // (Carbon declares all GlobalVars as being modified in every Procedure in Boogie 
+    //  => we will always define all of them as inout parameters in B3) 
+    globalVars = flatDeclSeq.collect({case gvar: GlobalVarDecl => gvar})
+    globalInOutPPar = globalVars map {gvar => B3.PParameter(gvar.name, getNameFromTyp(gvar.typ), B3.INOUT)}
+    // TODO: WhereMap for global variables
 
     // Type declaration
     // TODO: NamedType with typVars (= Parametric types)
@@ -155,15 +167,18 @@ object BoogieToB3Transformer {
     })
     val constTaggers = const_tags.map({case ((tag, typ)) => B3.Tagger(tag, typ)}).toSeq
 
-
+    // translate remaining nodes
+    val tProcedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)})
+    val tAxioms = flatDeclSeq.collect({case ax: Axiom => transformAxiom(ax)})
+    val tFunc = flatDeclSeq.collect({case func: Func => transformFunction(func)})
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
     B3.Program(signatureTypes = Seq[String](), 
                domains = Seq[RawAst.Domain](),
                types = alwaysIncludeTyps ++ normalTyps,
                taggers = constTaggers,
-               functions = alwaysIncludeFcts ++ constFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
-               axioms = flatDeclSeq.collect({case ax: Axiom => transformAxiom(ax)}),
-               procedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)}))
+               functions = alwaysIncludeFcts ++ constFcts ++ tFunc,
+               axioms = tAxioms,
+               procedures = tProcedures)
   }
 
 
@@ -261,11 +276,11 @@ object BoogieToB3Transformer {
     typ match {
       case Bool => "bool"
       case Int => "int"
-      case Real =>              sys.error("TODO: Real Type")
-      case MapType(_, _, _) =>  sys.error("TODO: MapType")
+      case Real =>                     info("TODO: Real Type"); "int"
+      case MapType(_, _, _) =>         sys.error("ERROR: cannot get name from MapType. This should be part of a TypeAlias, whose name you probably want!")
       case NamedType(name, Seq()) => name
-      case NamedType(name, typVars) => info("TODO: NamedType: ", name + " " + typVars.map(getNameFromTyp(_)).mkString(" ")); name
-      case TypeVar(_) =>        sys.error("TODO: TypeVar")
+      case NamedType(name, typVars) => info("TODO: NamedType: ", name + " " + typVars.map(getNameFromTyp(_)).mkString(" ")); name //+ "_._" + typVars.map(getNameFromTyp(_)).mkString("_._")
+      case TypeVar(name) =>            info("TODO: TypeVar: ", name); name
     }
   }
 
@@ -306,7 +321,7 @@ object BoogieToB3Transformer {
 
     // finally, creating raw B3 Procedure
     B3.Procedure(name = proc.name,
-                 parameters = transformPParameters(proc.ins, proc.outs),
+                 parameters = transformPParameters(proc.ins, proc.outs), // (Global vars are handled by transformPParameters directly)
                  pre = Seq[RawAst.AExpr](),     // No data for these, but also empty in Boogie
                  post = Seq[RawAst.AExpr](),    // No data for these, but also empty in Boogie
                                                 // TODO-later: Boogie additionally has "modifies", which is used there for Heap stuff. Need to find workaround
@@ -319,7 +334,7 @@ object BoogieToB3Transformer {
     // we dont have to worry about the boogies "where" functionality here
     val inPPar  = ins  map {par => B3.PParameter(par.name, getNameFromTyp(par.typ), B3.IN)}
     val outPPar = outs map {par => B3.PParameter(par.name, getNameFromTyp(par.typ), B3.OUT)}
-    inPPar ++ outPPar
+    inPPar ++ outPPar ++ globalInOutPPar
   }
 
 
@@ -344,11 +359,8 @@ object BoogieToB3Transformer {
         }
       case Assign(lhs, rhs) =>
         lhs match {
-          case LocalVar(identif, typ) =>
-            // info("DEBUG: Assign lhs: (name, type) = ", "(" + useIdent(identif) + ", " + lhs.getClass.getName + ")")
-            B3.Stmt_Assign(identif, transformExpr(rhs))
-          case GlobalVar(_, typ) => info("TODO: Assign to GlobalVar of type: ", getNameFromTyp(typ));      
-                                                                                    B3.TODO_Stmt()
+          case LocalVar(name, typ)  => B3.Stmt_Assign(name, transformExpr(rhs))
+          case GlobalVar(name, typ) => B3.Stmt_Assign(name, transformExpr(rhs))            
           case _ => sys.error("FAIL: Expected lhs of Assign stmt to be LocalVar (or GlobalVar), but it was " + lhs.getClass.getName)
         }
       case Assume(exp) => B3.Stmt_Assume(transformExpr(exp))
@@ -365,10 +377,6 @@ object BoogieToB3Transformer {
                                   exprsToAssume.map(exp => B3.Stmt_Assume(transformExpr(exp))))
         }
       case If(cond, thn, els) =>
-        // cond match {
-        //   case LocalVar(name, _) => println("DEBUG: ---------> " + cond.getClass.getName + " and " + useIdent(name))
-        //   case _ => println("DEBUG: ---------> " + cond.getClass.getName)
-        // }
         B3.Stmt_If(transformExpr(cond), transformStatement(thn), transformStatement(els)) //QUEST: for directly nested if's we could try whether If-case is more efficient
       case _: Label => info("LATER: Label");                                     B3.LATER_Stmt() //Carbon does not generate label: ... return, so this is only needed for goto
       case _: LocalVarWhereDecl => info("TODO: LocalVarWhereDecl");              B3.TODO_Stmt()
@@ -376,10 +384,6 @@ object BoogieToB3Transformer {
       case Seqn(stmts) =>
         B3.Stmt_Block(stmts.map(s => transformStatement(s, false)))
     }
-  }
-  /** temporary dummy to use instead of actually implementing global variables (= only needed for impure features) */
-  private def TODO_GlobalVar(name: Identifier): RawAst.Expr_FunctionCallExpr = {
-    B3.FunctionCallExpr(name, Seq())
   }
 
   /**
@@ -418,9 +422,7 @@ object BoogieToB3Transformer {
         val patterns = triggers map {trigger => trigger.exps map {exp => transformExpr(exp)}}
         B3.Expr_QuantifierExpr(true, boundVars, patterns, transformExpr(exp))
       case FuncApp(name, args, _) => B3.FunctionCallExpr(name, args map transformExpr)
-      case GlobalVar(name, typ) => 
-        info("(TODO): GlobalVar (name, type): ", "("+name.name+": "+getNameFromTyp(typ)+")")
-        TODO_GlobalVar(name)
+      case GlobalVar(name, _) => B3.Expr_IdExpr(name)
       case IntLit(i) => B3.Expr_ILiteral(i)
       case LocalVar(name, _) => B3.Expr_IdExpr(name)
       case MapSelect(_, _) => info("TODO: MapSelect");                              B3.TODO_Expr_int()
@@ -437,7 +439,11 @@ object BoogieToB3Transformer {
     }
   }
 
-  /** returns the equivalend (raw) B3 Operator for Boogie's BinOp Operators */
+  /** 
+   * returns the equivalend (raw) B3 Operator for Boogie's BinOp Operators. 
+   * Note that > and >= are converted to < and <=, respectively. Therefore, the compared 
+   * expressions must be switched for the translation to be correct!
+  */
   def transformBinOp(op: BinOp): RawAst.Operator = {
     op match {
       case Add => B3.Add
@@ -445,8 +451,8 @@ object BoogieToB3Transformer {
       case Div => B3.Div
       case EqCmp => B3.EqCmp
       case Equiv => B3.Equiv
-      case GeCmp => B3.LeCmp
-      case GtCmp => B3.LtCmp
+      case GeCmp => B3.LeCmp // (B3 has no GeCmp)
+      case GtCmp => B3.LtCmp // (B3 has no GtCmp)
       case Implies => B3.Implies
       case IntDiv => B3.IntDiv
       case LeCmp => B3.LeCmp
