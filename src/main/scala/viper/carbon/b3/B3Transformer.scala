@@ -138,9 +138,9 @@ object BoogieToB3Transformer {
 
     // Type declaration
     // TODO: NamedType with typVars (= Parametric types)
-    val typs = flatDeclSeq.collect({
-      case TypeDecl(NamedType(name, Seq())) => name})
-
+    val normalTyps = flatDeclSeq.collect({case TypeDecl(NamedType(name, Seq())) => B3.TypeDecl(name)})
+    val paramTyps = flatDeclSeq.collect({case TypeDecl(NamedType(name, seq)) if seq != Seq() => (Seq(name) ++ seq.map{getNameFromTyp(_)}).flatten})
+    // val typeAliases = :TODO && TODO: use paramTyps
     // Boogie constants
     // We use uninterpreted nullary functions instead of constants, but these always return the same value (= have constant value)
     // For constants with the unique tag we can use B3 tags, as all functions tagged with the same tag return pairwise distinct values (same as 'unique' const)
@@ -157,7 +157,9 @@ object BoogieToB3Transformer {
 
 
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
-    B3.Program(types = alwaysIncludeTyps ++ typs,
+    B3.Program(signatureTypes = Seq[String](), 
+               domains = Seq[RawAst.Domain](),
+               types = alwaysIncludeTyps ++ normalTyps,
                taggers = constTaggers,
                functions = alwaysIncludeFcts ++ constFcts ++ flatDeclSeq.collect({case func: Func => transformFunction(func)}),
                axioms = flatDeclSeq.collect({case ax: Axiom => transformAxiom(ax)}),

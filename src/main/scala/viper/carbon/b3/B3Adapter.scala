@@ -55,6 +55,18 @@ object DafnyHelper {
   def Seq_fromStringSeq(strSeq: Seq[String]): DafnySequence[DString] = {
     SeqT_fromSeq[DString](strSeq.map(str => Seq_fromString(str)))
   }
+  /** 
+   * Translates a Seq[String] to its dafny !Set! counterpart.
+   * 
+   * @param strSeq A Scala String Seq
+   * @return DafnySet<DafnySequence<CodePoint>>: a set containing the Strings in the input Seq converted to
+   * DafnySet<CodePoint>.
+   */
+  def Set_fromStringSeq(strSeq: Seq[String]): DafnySet[DString] = {
+    val DstrSeq: Seq[DString] = strSeq.map(x => Seq_fromString(x))
+    new DafnySet[DString](DstrSeq.asJava)
+    // SeqT_fromSeq[DString](strSeq.map(str => Seq_fromString(str)))
+  }
 
   /** returns DafnySequence<CodePoint> containing the provided (Scala) String str */
   def Seq_fromString(str: String): DString = {
@@ -141,14 +153,28 @@ object B3Adapter {
 
   // STANDALONE NODES
   /** creates a B3 RawAst Program node using the provided scala sequences */
-  def Program(types: Seq[String], taggers: Seq[RawAst.Tagger], functions: Seq[RawAst.Function], 
+  def Program(signatureTypes: Seq[String], domains: Seq[RawAst.Domain],
+              types: Seq[RawAst.TypeDecl], taggers: Seq[RawAst.Tagger], functions: Seq[RawAst.Function], 
               axioms: Seq[RawAst.Axiom], procedures: Seq[RawAst.Procedure]): RawAst.Program = {
 
-    new RawAst.Program(SeqT_fromSeq[DString](types.map(x => Seq_fromString(x))),
+    new RawAst.Program( Set_fromStringSeq(signatureTypes), // TODO: Find out what "signatureTypes" is
+                        SeqT_fromSeq[RawAst.Domain](domains),
+                        SeqT_fromSeq[RawAst.TypeDecl](types),
                         SeqT_fromSeq[RawAst.Tagger](taggers),
                         SeqT_fromSeq[RawAst.Function](functions),
                         SeqT_fromSeq[RawAst.Axiom](axioms),
                         SeqT_fromSeq[RawAst.Procedure](procedures))
+  }
+
+  /**
+   *  Creates a B3 RawAst TypeDecl node.
+   * 
+   * @param name Name of the type
+   * @param domain Optional domain instantiation. 
+   * @return a B3 RawAst TypeDecl node (If domain is used, this corresponds to "type [name] = [domain(parameters)]". Otherwise simply "type [name]")
+   */
+  def TypeDecl(name: String, domain: Std.Wrappers.Option[RawAst.DomainInstantiation] = Option_None[RawAst.DomainInstantiation]): RawAst.TypeDecl = {
+    new RawAst.TypeDecl(Seq_fromString(name), domain)
   }
 
   /** creates a B3 RawAst Program node using the provided scala sequences + other inputs */
