@@ -1,7 +1,7 @@
 package viper.carbon.b3
 import dafny._
-import scala.jdk.CollectionConverters._
-import scala.reflect.ClassTag
+import _root_.scala.jdk.CollectionConverters._  // would also run without the "_root_.", but Metals doesnt like that 
+import _root_.scala.reflect.ClassTag            // same
 
 /** Helper methods to make it easier to work with dafny classes. */
 object DafnyHelper {

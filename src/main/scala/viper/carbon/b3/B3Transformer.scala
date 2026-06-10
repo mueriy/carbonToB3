@@ -44,12 +44,37 @@ object BoogieToB3Transformer {
   /** All global variables of the Program (as B3 'PParameter's) */
   private var globalInOutPPar = Seq[RawAst.PParameter]()
 
+  /** Map of (Const) Identifier -> corresponding Type name. Used to know the type of constants when they are used somewhere. */
+  private val constIdentifierTypeMap = collection.mutable.HashMap[Identifier, String]()
+
+
+  // FUNCTION NAMING (special because of parametrized functions)
+  /** stores for each parametric function how to name it given concrete input and output types 
+   * It maps Identifiers to an Int sequence. Each value x in the sequence says: "the x'th parameter's type should be used 
+   * for naming". Here, the output type counts as the "last parameter", so if x == |in-parameters| then the output type is also
+   * included in the name.  
+  */
+  private val paramFuctionMap = collection.mutable.HashMap[Identifier, Seq[Int]]() //TODO: change Any to something useful & instantiate
+  /** returns the correct name to use for the given identifier. For parametric functions, the name depends on
+   * the given parameter and output types, according to what is defined in paramFuctionMap */
+  private def fctName(name: Identifier, parameterTypeNames: Seq[String], outputTypeName: String): String = {
+    paramFuctionMap.get(name) match {
+      case Some(paramFuctionHandler) => sys.error("imp-p-p-possible....") 
+        name+"%F"+paramFuctionHandler.collect(parameterTypeNames ++ Seq(outputTypeName)).mkString("%%")
+      case None => name
+    } 
+  }
+
+  // ALL TYPES
+  /** Helper class to declare all needed types and for use by triggers to generate for all combinations */
+  private val allTypeDecls = new AllTypesInB3()
+
 
   // DEVELOPMENT & DEBUGGING
   // settings
   private val UNPACK_SEQN = true // true = easier to ready code, false = easier to compare to PrettyPrinted code (see method: uncomment)
   private val DEBUG_MODE = 1 // 0 = ignore, 1 = collect (+ print later), 2 = collect & print (+ print later)
-  private val USE_CHECK = true
+  private val USE_CHECK = false
 
   // other
   private val debug_infoPlus = collection.mutable.Map[String, Seq[String]]()
@@ -91,6 +116,8 @@ object BoogieToB3Transformer {
   // TRANSFORM AST NODES
   /**
    * Transforms a Boogie AST into the corresponding raw B3 AST.
+   * Currently only ONE usage per run of carbon is supported! (To allow conversion of multiple programs
+   *  with one run of carbon, some vals/vars of the BoogieToB3Transformer object would need to be reset)
    * 
    * @param prog An (extended) boogie AST (Program)
    * @return A raw B3 AST
@@ -99,6 +126,88 @@ object BoogieToB3Transformer {
     // (Ignore header field - we cannot convert comments)
     // Eliminate all CommentedDecl-s
     val flatDeclSeq = flattenedDecl(prog.decls)
+
+    // return B3.Program(Seq(), Seq(), Seq(), Seq(), Seq(), Seq(), Seq())
+    
+    // TODO: eliminate LiteralDecl [written boogie code], as that is not convertible
+
+    // 1) collect all types, create type hooks
+    //TypeDecl
+    val boogieTypeDecls = flatDeclSeq collect {case typDecl: TypeDecl => typDecl}
+    boogieTypeDecls map {allTypeDecls.addType(_)}
+    // TODO: (not here) add updates to allTypeDecls everywhere where new parameter combos can be found
+
+    // 2) create hooks for functions & axioms (can include numbers to keep order)
+    //Function
+    // a) collect all functions (in order)
+    // b) analyze naming pattern (i.e. naming parameters) and (system for) trigger types
+    // c) instantiation for each type (combo)
+    //Creating functions can 
+
+
+    // 3) transform ConstDecl, TypeAlias (only 4 type aliases), and GlobalVars
+    //ConstDecl
+    // Instead of constants we use uninterpreted nullary functions, which always return the same value (= have constant value)
+    // For unique constants we can use B3 tags, as all functions tagged with the same tag return pairwise distinct values.
+    val const_tags = collection.mutable.Set[(String, String)]()
+    val constFcts = flatDeclSeq.collect({
+      case ConstDecl(name, typ, false) => //not unique
+        val typName = getNameFromTyp(typ)
+        constIdentifierTypeMap.put(name, typName)
+        B3.Function(name, Seq(), typName)
+      case ConstDecl(name, typ, true) => //unique
+        val typName = getNameFromTyp(typ)
+        constIdentifierTypeMap.put(name, typName)
+        val tagName = "%ConstTag_"+typName
+        const_tags += ((tagName, typName))
+        B3.Function(name, Seq(), typName, tagName)
+    })
+    val constTaggers = const_tags.map({case ((tag, typ)) => B3.Tagger(tag, typ)}).toSeq
+
+    //TypeAlias
+    val boogieTypeAliases = flatDeclSeq collect {case typAlias: TypeAlias => typAlias}
+    boogieTypeAliases map {ta => info("INFO: has following type aliases: ", getNameFromTyp(ta.name))}
+    boogieTypeAliases map { _ match {
+      case ta: TypeAlias if getNameFromTyp(ta.name) == "Perm" => null //type "aliasing" is done by replacing "Perm" with "real" (or "int" until B3 supports "real")
+      case ta: TypeAlias if getNameFromTyp(ta.name) == "HeapType" =>  "TODO"
+        // type HeapType = <A, B> [Ref, Field A B]B;
+        // TypeAlias(heapTyp, MapType(Seq(refType, fieldType), TypeVar("B"), Seq(TypeVar("A"), TypeVar("B"))))
+
+        // TODO: double Map approach
+
+      case ta: TypeAlias if Seq("MaskType", "PMaskType").contains(getNameFromTyp(ta.name)) =>  "TODO"
+        // type MaskType = <A, B> [Ref, Field A B]Perm;
+        // TypeAlias(maskType, MapType(Seq(refType, fieldType), permType, fieldType.freeTypeVars))
+        // type PMaskType = <A, B> [Ref, Field A B]bool;
+        // TypeAlias(pmaskType, MapType(Seq(refType, fieldType), Bool, fieldType.freeTypeVars))
+
+        // TODO: Single Map approach
+
+      case ta@_ => info("ERROR: unknown type alias: ", getNameFromTyp(ta.name))
+      // TypeAlias(name: NamedType, definition: Type)
+    }}
+    // (only permType (Perm = Real), pmaskType (PMaskType), maskType (MaskType), heapTyp (HeapType) (3x boogie map))
+
+    // TODO: normal map (types linked to Map/Set/Seq instantiations)
+
+
+
+
+    // 4) GlobalVars & Procedures (can easily keep order)
+    //GlobalVars
+    // Pre-prepare inout PParameters from global variables 
+    // (Carbon declares all GlobalVars as being modified in every Procedure in Boogie 
+    //  => we will always define all of them as inout parameters in B3) 
+    globalVars = flatDeclSeq.collect({case gvar: GlobalVarDecl => gvar})
+    globalInOutPPar = globalVars map {gvar => B3.PParameter(gvar.name, getNameFromTyp(gvar.typ), B3.INOUT)}
+    //TODO: Remove globalInOutPPar-update in DEVELOPMENT part
+
+
+    // TODO: WhereMap for global variables (e.g.: "var globalVarName: Int where globalVarName > 0")
+    //Procedures
+
+
+    // 5) activate triggers (sort result according to the numbers) 
 
     {// DEVELOPMENT vvv
     val usedMapping = collection.mutable.Set[String]()
@@ -113,7 +222,7 @@ object BoogieToB3Transformer {
       case DeclComment(s) => usedMapping += "DeclComment"
       case Func(name, args, typ, attributes) => usedMapping += "Func"
       case GlobalVarDecl(name, typ) => usedMapping += "GlobalVarDecl"
-      case LiteralDecl(boogieString) => usedMapping += "LiteralDecl"
+      case LiteralDecl(boogieString) => usedMapping += "LiteralDecl" // (<-- inserts boogie code as string; not translate-able)
       case Procedure(name, ins, outs, body) => usedMapping += "Procedure"
       case TypeAlias(name, definition) => usedMapping += "TypeAlias"
       case TypeDecl(NamedType(_, Seq())) => usedMapping += "TypeDecl simple"
@@ -132,40 +241,18 @@ object BoogieToB3Transformer {
     val alwaysIncludeFcts = Seq(B3.Function("dummyFunction", Seq(B3.FParameter("x", "int")), "bool"),
                                 // for now we only support integer maps
                                 B3.Function("MapSelect", Seq(B3.FParameter("x", "int")), "int"),
-                                B3.Function("MapUpdate", Seq(B3.FParameter("x", "int")), "int")
-                                
-                                
+                                B3.Function("MapUpdate", Seq(B3.FParameter("x", "int")), "int"),
+                                B3.Function("ZeroMask", Seq(), "MaskType"),
+                                B3.Function("AssumePermUpperBound", Seq(), "bool"),
+                                B3.Function("state", Seq(B3.FParameter("x", "HeapType"), B3.FParameter("y", "MaskType")), "bool"),
                                 )
+    globalInOutPPar = globalInOutPPar ++ Seq(B3.PParameter("Mask", "MaskType", B3.INOUT), B3.PParameter("Heap", "HeapType", B3.INOUT))
     val alwaysIncludeTyps = Seq("real", "MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType").map(x => B3.TypeDecl(x))
 
     prog.decls.collect({case LiteralDecl(boogieString) => info("DEBUG: LiteralDecl", boogieString.take(20))})
     // DEVELOPMENT ^^^
 
-    // Pre-prepare inout PParameters from global variables 
-    // (Carbon declares all GlobalVars as being modified in every Procedure in Boogie 
-    //  => we will always define all of them as inout parameters in B3) 
-    globalVars = flatDeclSeq.collect({case gvar: GlobalVarDecl => gvar})
-    globalInOutPPar = globalVars map {gvar => B3.PParameter(gvar.name, getNameFromTyp(gvar.typ), B3.INOUT)}
-    // TODO: WhereMap for global variables
 
-    // Type declaration
-    // TODO: NamedType with typVars (= Parametric types)
-    val normalTyps = flatDeclSeq.collect({case TypeDecl(NamedType(name, Seq())) => B3.TypeDecl(name)})
-    val paramTyps = flatDeclSeq.collect({case TypeDecl(NamedType(name, seq)) if seq != Seq() => (Seq(name) ++ seq.map{getNameFromTyp(_)}).flatten})
-    // val typeAliases = :TODO && TODO: use paramTyps
-    // Boogie constants
-    // We use uninterpreted nullary functions instead of constants, but these always return the same value (= have constant value)
-    // For constants with the unique tag we can use B3 tags, as all functions tagged with the same tag return pairwise distinct values (same as 'unique' const)
-    val const_tags = collection.mutable.Set[(String, String)]()
-    val constFcts = flatDeclSeq.collect({
-      case ConstDecl(name, typ, false) => B3.Function(name, Seq(), getNameFromTyp(typ))
-      case ConstDecl(name, typ, true) => 
-        val typName = getNameFromTyp(typ)
-        val tagName = "Const_Tag_"+typName
-        const_tags += ((tagName, typName))
-        B3.Function(name, Seq(), typName, tagName)
-    })
-    val constTaggers = const_tags.map({case ((tag, typ)) => B3.Tagger(tag, typ)}).toSeq
 
     // translate remaining nodes
     val tProcedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)})
@@ -174,7 +261,7 @@ object BoogieToB3Transformer {
     // Create B3 Program using the B3 version of the correct (Boogie) Decl nodes
     B3.Program(signatureTypes = Seq[String](), 
                domains = Seq[RawAst.Domain](),
-               types = alwaysIncludeTyps ++ normalTyps,
+               types = alwaysIncludeTyps ++ allTypeDecls.declareAllB3Types(),
                taggers = constTaggers,
                functions = alwaysIncludeFcts ++ constFcts ++ tFunc,
                axioms = tAxioms,
@@ -272,16 +359,33 @@ object BoogieToB3Transformer {
   } 
 
   /** Returns the type name from a Boogie Type */ 
-  private def getNameFromTyp(typ: Type): String = {
+  def getNameFromTyp(typ: Type): String = {
     typ match {
       case Bool => "bool"
       case Int => "int"
-      case Real =>                     info("TODO: Real Type"); "int"
+      case Real =>                     info("TODO: Perm/real Type; Currently replaced with 'int'"); "int"
       case MapType(_, _, _) =>         sys.error("ERROR: cannot get name from MapType. This should be part of a TypeAlias, whose name you probably want!")
-      case NamedType(name, Seq()) => name
-      case NamedType(name, typVars) => info("TODO: NamedType: ", name + " " + typVars.map(getNameFromTyp(_)).mkString(" ")); name //+ "_._" + typVars.map(getNameFromTyp(_)).mkString("_._")
-      case TypeVar(name) =>            info("TODO: TypeVar: ", name); name
+      case NamedType(name, Seq()) => if (name == "Perm") { getNameFromTyp(Real) } else { name }
+      case NamedType(name, typVars) => 
+        val typNames = typVars map getNameFromTyp
+        getNameFromParamTypeConstel(name, typNames)
+      case TypeVar(name) =>            info("TODO: TypeVar: ", name); name // Probably use a "current replacement map" and replace with whatever is given there. That map would be set when triggering the axiom/function creation.
     }
+  }
+
+  /** 
+   * Returns the B3-transformed type name for a parametrized type given its name and the names of (concrete) parameters.
+   * E.g. for "Field Int Bool":
+   * 
+   * @param name name of the type (without parameters) (e.g. "Field")
+   * @param typVarNames parameter names as Seq of Strings. (e.g. ["Int", "Bool"])
+   * @return The same name as would be used in boogie, but spaces are replaced by %% (=> e.g. "Field%%Int%%Bool")
+   */
+  def getNameFromParamTypeConstel(name: String, typVarNames: Seq[String]): String = {
+    info("TODO: NamedType: ", name + " " + typVarNames.mkString(" "))
+    // TODO: check that e.g. "Field (Field Int Int) Bool" -> "Field%%Field%%Int%%Int%%Bool" will really always 
+    // be unique or if we need some %-code for ( and ). (I think it is, but need to get proof.)
+    name + "%%" + typVarNames.mkString("%%")
   }
 
   /** Transform Boogie Procedure -> raw B3 Procedure */
@@ -421,12 +525,22 @@ object BoogieToB3Transformer {
         val boundVars = vars map {vardecl => B3.Binding(vardecl.name, getNameFromTyp(vardecl.typ))}
         val patterns = triggers map {trigger => trigger.exps map {exp => transformExpr(exp)}}
         B3.Expr_QuantifierExpr(true, boundVars, patterns, transformExpr(exp))
-      case FuncApp(name, args, _) => B3.FunctionCallExpr(name, args map transformExpr)
+      case FuncApp(name, args, typ) => 
+        B3.FunctionCallExpr(fctName(name, args map getTypeOfExpr, getNameFromTyp(typ)), args map transformExpr)
       case GlobalVar(name, _) => B3.Expr_IdExpr(name)
       case IntLit(i) => B3.Expr_ILiteral(i)
       case LocalVar(name, _) => B3.Expr_IdExpr(name)
       case MapSelect(_, _) => info("TODO: MapSelect");                              B3.TODO_Expr_int()
-      case MapUpdate(_, _, _) => info("TODO: MapUpdate");                           B3.TODO_Expr_int()
+      case MapUpdate(map, idxs, value) => 
+        // The following checks are just there to see if there is ever a special case.
+        idxs map {idx => if (!(idx.isInstanceOf[LocalVar] || idx.isInstanceOf[Const] || idx.isInstanceOf[FuncApp]))
+                            info("INFO: MapUpdate with special idx type: ", idx.getClass.getName)
+        }
+        if (!map.isInstanceOf[LocalVar]) {
+          info("INFO: MapUpdate of non-LocalVar-map. Instead of: ", map.getClass.getName)
+        }
+        // info("INFO: MapUpdate 'map[idxs] := x', where 'x.class' = ", value.getClass.getName)
+        B3.FunctionCallExpr("MapUpdate", idxs.map(transformExpr) ++ Seq(transformExpr(value)))
       case Old(_) => info("TODO: Old");                                             B3.TODO_Expr_int()
       case RealConv(_) => info("TODO: RealConv");                                   B3.TODO_Expr_int()
       case RealLit(_) => info("TODO: RealLit");                                     B3.TODO_Expr_int()
@@ -436,6 +550,41 @@ object BoogieToB3Transformer {
           case Not => B3.Expr_OperatorExpr(B3.Not, Seq(transformExpr(exp)))
           case Minus => B3.Expr_OperatorExpr(B3.Minus, Seq(transformExpr(exp)))
         }
+    }
+  }
+
+  /** returns the name of the type of the expression (as String) */
+  private def getTypeOfExpr(exp: Exp): String = {
+    exp match {
+      case BinExp(left, binop, right) =>
+        binop match {
+          case LtCmp|LeCmp|GtCmp|GeCmp|EqCmp|NeCmp => getNameFromTyp(Bool)
+          case And|Equiv|Implies|Or => getNameFromTyp(Bool)
+          case Div => getNameFromTyp(Real)
+          case IntDiv => getNameFromTyp(Int)
+          case Add|Sub|Mul|Mod => getNameFromTyp(Int) //TODO: could also be Real, I think?
+        }
+      case CondExp(cond, thn, els) => getTypeOfExpr(thn)
+      case Const(name) => 
+        constIdentifierTypeMap.get(name) match {
+          case Some(typeName) => typeName
+          case None => info(f"ERROR: Using default type 'int' because couldn't find type name of constant: ", name); getNameFromTyp(Int)
+        }        
+      case Exists(_, _, _, _) => getNameFromTyp(Bool)
+      case FalseLit() => getNameFromTyp(Bool)
+      case Forall(_, _, _, _, _) => getNameFromTyp(Bool)
+      case FuncApp(_, _, typ) => getNameFromTyp(typ)
+      case GlobalVar(_, typ) => getNameFromTyp(typ)
+      case IntLit(_) => getNameFromTyp(Int)
+      case LocalVar(_, typ) => getNameFromTyp(typ)
+      case MapSelect(map, idxs) =>                  "TODO" // Name of this and MapUpdate depend on actual implementation of map. 'map' is an Expr, and it 
+      case MapUpdate(map, idxs, value) =>           "TODO" // might be slightly tricky to get the name for that, but that is a problem for future self. 
+      case Old(oldexp) => getTypeOfExpr(oldexp)
+      case RealConv(_) => getNameFromTyp(Real)
+      case RealLit(_) => getNameFromTyp(Real)
+      case TrueLit() => getNameFromTyp(Bool)
+      case UnExp(Not, _) => getNameFromTyp(Bool)
+      case UnExp(Minus, expr) => getTypeOfExpr(expr)
     }
   }
 
@@ -469,4 +618,242 @@ object BoogieToB3Transformer {
 
   // }
 
+}
+
+
+// Parametric types:
+//  type name, type parameters
+//  Set to add all combinations of type parameters
+//  functions to access subcombinations (e.g. all "Field A Bool"s) => can use Seq of Strings, placing null at positions where we want to use type parameters
+private class AllTypesInB3() {
+  /**
+   * Stores all type parameter combinations that where found in the program.
+   * Format is: map[typeName, (entryNr, nrOfTypeParameters, (SetOfSeq'sOf)TypeParameterCombinations)] (typeName is w/o parameters)
+   */
+  private val typeCollection = collection.mutable.Map[String, (Int, Int, collection.mutable.Set[Seq[String]])]()
+  /** used to keep order in which types are declared */
+  private var entryNr = 0
+  /** The program (to get type combos from it) */
+  private var program: Program = null
+
+  /** Add new Type defined by a boogie node to the collection */
+  def addType(typ: TypeDecl) = {
+    val typName = typ.t.name
+    val nrOfParams = typ.t.typVars.length
+    val noCombosYet = collection.mutable.Set[Seq[String]]()
+    typeCollection.put(typName, (entryNr, nrOfParams, noCombosYet))
+    entryNr += 1
+  }
+
+  /** returns string to use in B3 for the type representing the given type and parameter combination */
+  private def concreteName(name: String, combo: Seq[String]): String = {
+    BoogieToB3Transformer.getNameFromParamTypeConstel(name, combo)
+  }
+
+  /** Returns a Seq of all type names of all existing type combos for parametric types and all non-parametric types.
+   * They are in the same order as in the Boogie AST.
+   */
+  def declareAllTypes(): Seq[String] = {
+    val unsortedResult = (typeCollection map {typEntry => typEntry match {
+      case (name, (nr, 0, _)) => Seq((nr, name)) // <- non-parametric type
+      case (name, (nr, _, set)) => set.toSeq map {combo => (nr, concreteName(name, combo))}
+    }}).toSeq.flatten
+    //sort by (entry)nr and remove it afterwards
+    unsortedResult.sortBy(_._1) map {_._2}
+  }
+
+  /** Returns a Seq of B3 TypeDecl nodes for all existing type combos for parametric types and all non-parametric types.
+   * The TypeDecls are in the same order as in the Boogie AST.
+   */
+  def declareAllB3Types(): Seq[RawAst.TypeDecl] = {
+    declareAllTypes() map {x => B3.TypeDecl(x)}
+  }
+
+
+  /**
+    * Adds the parameter combination as an existing combination. 
+    *
+    * @param combo The parameter combination to add. The type must exist in the collection, with matching nr of parameters, 
+    *  and all entries must correspond to an existing type (includes other parametrized types with a corresponding entry). 
+    */
+  def addCombo(name: String, combo: Seq[String]): Unit = {
+    val typeInfo = typeCollection(name)
+    if (combo.length != typeInfo._2) {
+      sys.error(f"Tried to add $combo (length=${combo.length}) to $name (paramNr=${typeInfo._2}). Length doesn't match!")
+    }
+    typeInfo._3 += combo
+  }
+
+  /**
+    * Adds the parameter combination of given typ if and only if it is a parametric type and all parameters are concrete
+    * (i.e. no free type variables). If the given type parameters are also parametric types, they are also added.
+    *
+    * @param typ The typ whose combination to (possibly) add. The type must exist in the collection, with matching
+    * nr of parameters, and all entries must correspond to an existing type (includes other parametrized types with
+    * a corresponding entry). 
+    */
+  def possiblyAddCombos(typ: Type): Unit = {
+    typ match {
+      case Bool | Int | Real | MapType(_,_,_) | NamedType(_, Seq()) | TypeVar(_) => None // types without parameters don't matter
+      case NamedType(name, typVars) => 
+        if (typ.freeTypeVars.length == 0) { // types with freeTypeVars don't matter
+          val typNames = typVars map {BoogieToB3Transformer.getNameFromTyp(_)}
+          addCombo(name, typNames)
+          concreteName(name, typNames)
+        }
+        typVars map {possiblyAddCombos(_)} // but single type parameters may still consist of valid combos!
+        // (the reason for that is that e.g. T1 Int doesnt exist, but T1 T1 Int does and there is an axiom with 
+        // "forall <A> x: T1 A, y: A :: ..." => T1 Int is also needed, otherwise other T1 A axioms that would cover 
+        // properties for y there might be missing)
+    }
+  }
+
+  /**
+    * Returns all combos for the given type.
+    *
+    * @param name base-name of type (without type parameters)
+    * @return Seq of all existing combos
+    */
+  def getAllCombos(name: String): Seq[Seq[String]] = {
+    val typeInfo = typeCollection(name)    
+    typeInfo._3.toSeq
+  }
+
+  /**
+    * Returns type names of all combos for the given type that match the given pattern.
+    *
+    * @param name base-name of type (without type parameters)
+    * @param paramPattern Seq of parameters, where specific names are them as string, but parameters are null.
+    *   E.g. for "Field A Bool" (assuming A is a parameter and not a type) you must use paramPattern = [null, "Bool"]
+    * @return Seq of existing combos that match the given pattern
+    */
+  def getCombosOfPattern(name: String, paramPattern: Seq[String]): Seq[Seq[String]] = {
+    val typeInfo = typeCollection(name)
+    if (paramPattern.length != typeInfo._2) {
+      sys.error(f"Tried to match pattern $paramPattern (length=${paramPattern.length}) to $name (paramNr=${typeInfo._2}). Length doesn't match!")
+    }
+
+    typeInfo._3.toSeq filter {x => x.zip(paramPattern).forall{
+      case (null, _) => true
+      case (_, null) => true
+      case (a, b) => a == b
+    }}
+  }
+
+
+  /** Give access to the Program for type collection */
+  def setProgram(prog: Program): Unit = {
+    program = prog
+  }
+
+  /** Collects and adds all combos in the program. Must first use setProgram! This only includes types existing
+   * in the Boogie AST. Any "combos" added by BoogieToB3Transformer (e.g. the type for the "Field Int Int"-Heap-submap) 
+   * must be added through use of addCombo/possiblyAddCombos.
+   */
+  def collectTypeCombos(): Unit = {
+    program.decls map {decl => collectTypeCombosFromDecl(decl)}
+  }
+
+  /** Handles 'Decl's for collectTypeCombos (see there) */
+  private def collectTypeCombosFromDecl(decl: Decl): Unit = {
+    decl match {
+      case Axiom(exp) => collectTypeCombosFromExp(exp)
+      case CommentedDecl(s, d, size, nLines) => d map {decl => collectTypeCombosFromDecl(decl)}
+      case ConstDecl(name, typ, unique) => possiblyAddCombos(typ)
+      case DeclComment(s) => None
+      case Func(name, args, typ, attributes) =>
+        possiblyAddCombos(typ)
+        args map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
+        // TODO: attributes
+      case GlobalVarDecl(name, typ) => possiblyAddCombos(typ)
+      case LiteralDecl(boogieString) => None
+      case Procedure(name, ins, outs, body) => 
+        ins map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
+        outs map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
+        collectTypeCombosFromStmt(body)
+      case TypeAlias(name, definition) => None
+      case TypeDecl(_) => None // (if parametric it always has free type vars)
+    }
+  }
+
+  /** Handles 'LocalVarDecl's for collectTypeCombos (see there) */
+  private def collectTypeCombosFromLocalVarDecl(lvdef: LocalVarDecl): Unit = {
+    possiblyAddCombos(lvdef.typ)
+    // TODO: lvdef.where
+  }
+
+  /** Handles 'Stmt's for collectTypeCombos (see there) */
+  private def collectTypeCombosFromStmt(stmt: Stmt): Unit = {
+    stmt match {
+      case Goto(dests) => None
+      case AssertImpl(exp, error) => 
+        collectTypeCombosFromExp(exp)
+      case Assign(lhs, rhs) =>
+        collectTypeCombosFromExp(lhs)
+        collectTypeCombosFromExp(rhs)
+      case Assume(exp) => 
+        collectTypeCombosFromExp(exp)
+      case Comment(s) => None 
+      case CommentBlock(_, stmt) => 
+        collectTypeCombosFromStmt(stmt)
+      case HavocImpl(vars) => 
+        vars map {vr => collectTypeCombosFromExp(vr)}
+      case If(cond, thn, els) =>
+        collectTypeCombosFromExp(cond)
+        collectTypeCombosFromStmt(thn)
+        collectTypeCombosFromStmt(els)
+      case Label(lbl) => None
+      case LocalVarWhereDecl(name, where) => None //types of local vars are given by the args of e.g. procedure 
+      case NondetIf(thn, els) => 
+        collectTypeCombosFromStmt(thn)
+        collectTypeCombosFromStmt(els)
+      case Seqn(stmts) =>
+        stmts map {stm => collectTypeCombosFromStmt(stm)}
+    }
+  }
+
+  /** Handles 'Exp's for collectTypeCombos (see there) */
+  private def collectTypeCombosFromExp(expr: Exp): Unit = {
+    expr match {
+      case BinExp(left, binop, right) =>
+        collectTypeCombosFromExp(left)
+        collectTypeCombosFromExp(right)
+      case CondExp(cond, thn, els) => 
+        collectTypeCombosFromExp(cond)
+        collectTypeCombosFromExp(thn)
+        collectTypeCombosFromExp(els)
+      case Const(name) => None // type is defined on instantiation
+      case Exists(vars, triggers, exp, weight) => 
+        vars map {lvar => collectTypeCombosFromLocalVarDecl(lvar)}
+        triggers map {trigger => trigger.exps map {exp => collectTypeCombosFromExp(exp)}}
+        collectTypeCombosFromExp(exp)
+      case FalseLit() => None
+      case Forall(vars, triggers, exp, typeVars, weight) => 
+        vars map {lvar => collectTypeCombosFromLocalVarDecl(lvar)}
+        triggers map {trigger => trigger.exps map {exp => collectTypeCombosFromExp(exp)}}
+        collectTypeCombosFromExp(exp)
+      case FuncApp(name, args, typ) => 
+        args map {exp => collectTypeCombosFromExp(exp)}
+        possiblyAddCombos(typ)
+      case GlobalVar(name, typ) => 
+        possiblyAddCombos(typ)
+      case IntLit(_) => None
+      case LocalVar(name, typ) => 
+        possiblyAddCombos(typ)
+      case MapSelect(map, idxs) => 
+        collectTypeCombosFromExp(map)
+        idxs map {exp => collectTypeCombosFromExp(exp)}
+      case MapUpdate(map, idxs, value) => 
+        collectTypeCombosFromExp(map)
+        idxs map {exp => collectTypeCombosFromExp(exp)}
+        collectTypeCombosFromExp(value)
+      case Old(oldexp) => 
+        collectTypeCombosFromExp(oldexp)
+      case RealConv(_) => None
+      case RealLit(_) => None
+      case TrueLit() => None
+      case UnExp(unop, exp) => 
+        collectTypeCombosFromExp(exp)
+    }
+  }
 }

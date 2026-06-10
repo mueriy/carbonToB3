@@ -9,17 +9,32 @@ package viper.carbon.b3
 import viper.silver.utility.DefaultNameGenerator
 
 class B3NameGenerator extends DefaultNameGenerator {
+  /*
+  To ensure unique names we use %, which is a B3-only character. 
+  We always follow % with at least one character that depends on the current use of %, so the name is 
+  automatically unique for different areas and only each area has to take care. We jsut have to make sure
+  that we never use a form that is a substring of another form. E.g. using both %okey and %ok would not work.
+  The following keeps track of used pairs (please update when making changes anywhere):
+  %. to replace '
+  %_ to replace #
+  %% for parametric types (and vvv); replaces spaces in Boogie name with %% (e.g. "Field Int Bool" -> "Field%%Int%%Bool")
+  %F placed between function name and "parametric type identifier", which is the important parameter type names with %% 
+     (This is save, because the combined names themselfe are completed types, which are otherwise never combined by %%
+      without being parameters of some other type. The (function name +) %F ensure that this is not the case.)
+  %ConstTag_ to define the name of the tag used for unique constants (f"%ConstTag_${typeNameOfTheConst}").
+  */
+
   private val otherChars = "a-zA-Z%"
   def firstCharacter = s"[$otherChars]".r
   def otherCharacter = s"[0-9_.$$$otherChars]".r
   def separator = "_"
 
   /** 
-   * Creates a different identifier every time it is called. First replaces some characters (' -> % and # -> %%) 
+   * Creates a different identifier every time it is called. First replaces some characters (' -> %. and # -> %_) 
    * that are important for code readability but not allowed in B3 (otherwise they would get dropped).
    */
   override def createUniqueIdentifier(s: String): String = {
-    super.createUniqueIdentifier(s.replace("'", "%").replace("#", "%%"))
+    super.createUniqueIdentifier(s.replace("'", "%.").replace("#", "%_"))
   }
 
   def reservedNames = allReservedNames
