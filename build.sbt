@@ -26,4 +26,5 @@ lazy val carbon = (project in file("."))
         assembly / assemblyJarName := "carbon.jar",             // JAR filename
         assembly / mainClass := Some("viper.carbon.Carbon"),    // Define JAR's entry point
         assembly / test := {},                                  // Prevent testing before packaging
+        libraryDependencies += "org.scala-lang.modules" %% "scala-collection-contrib" % "0.4.0"
     )
