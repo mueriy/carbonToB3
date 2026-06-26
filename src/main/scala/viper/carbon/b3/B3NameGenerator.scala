@@ -22,6 +22,7 @@ class B3NameGenerator extends DefaultNameGenerator {
      (This is save, because the combined names themselfe are completed types, which are otherwise never combined by %%
       without being parameters of some other type. The (function name +) %F ensure that this is not the case.)
   %ConstTag_ to define the name of the tag used for unique constants (f"%ConstTag_${typeNameOfTheConst}").
+  %M_ at the start of manually created names that must be unique
   */
 
   private val otherChars = "a-zA-Z%"

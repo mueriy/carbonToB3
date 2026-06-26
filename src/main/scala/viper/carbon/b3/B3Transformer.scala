@@ -2,13 +2,19 @@ package viper.carbon.b3
 import viper.carbon.b3.{B3Adapter => B3}
 import viper.carbon.boogie._
 import language.implicitConversions
+import viper.carbon.verifier.Verifier
 
 /**
  * An implementation for transformers to transform Boogie AST -> B3 AST (RawAst).
  * Cannot reuse the boogie-Transformer used by Carbon, because B3 AST-nodes don't have a shared ancestor like "Node".
+ * Usage: first call 'transformProgram([boogie AST Program Node])', then possibly call 'printInfo()'. 
+ * Create a new instance per Program node!!
  */
-object BoogieToB3Transformer {
-  // Uses the following implicits: idName (Identifier -> String)
+class BoogieToB3Transformer(verifier: Verifier) {
+  // Uses the following implicits: idName (Identifier -> String), fpNamespace
+  
+  implicit val b3TNamespace = verifier.freshNamespace("b3Transf")
+  def axiomNamespace = verifier.freshNamespace("b3Transf.axiom")
 
   // IDENTIFIER UNIQUENESS (and other properties; stolen from PrettyPrinter; 'ident2doc' -> 'idName')
   /** The current mapping from identifier to names. */
@@ -79,7 +85,7 @@ object BoogieToB3Transformer {
   // DEVELOPMENT & DEBUGGING
   // settings
   private val UNPACK_SEQN = true // true = easier to ready code, false = easier to compare to PrettyPrinted code (see method: uncomment)
-  private val DEBUG_MODE = 1 // 0 = ignore, 1 = collect (+ print later), 2 = collect & print (+ print later)
+  private val DEBUG_MODE = 1 // 0 = ignore, 1 = collect (+ print later), 2 = print immediately, but also collect (+ print later (like in DEBUG_MODE 1))
   private val USE_CHECK = false
 
   // other
@@ -118,18 +124,21 @@ object BoogieToB3Transformer {
 
 
 
-
+  var transformProgramWasUsed = false
   // TRANSFORM AST NODES
   /**
    * Transforms a Boogie AST into the corresponding raw B3 AST.
-   * Currently only ONE usage per run of carbon is supported! (To allow conversion of multiple programs
-   *  with one run of carbon, some vals/vars of the BoogieToB3Transformer object would need to be reset)
+   * This function can only be run once per instance of BoogieToB3Transformer!
+   * (To allow conversion of multiple programs, use multiple instances of this class.)
    * 
    * @param prog An (extended) boogie AST (Program)
    * @return A raw B3 AST
    */
   def transformProgram(prog: Program): RawAst.Program = {
-    // (Ignore header field - we cannot convert comments)
+    if (transformProgramWasUsed) {
+      sys.error("Tried to run transformProgram twice!")
+    }
+    transformProgramWasUsed = true
     // Eliminate all CommentedDecl-s
     val flatDeclSeq = flattenedDecl(prog.decls)
 
@@ -151,7 +160,6 @@ object BoogieToB3Transformer {
     globalVars map {gvar => info("collected GlobalVarDecls:", gvar.name)}
     globalInOutPPar = globalVars map {gvar => B3.PParameter(gvar.name, getNameFromTyp(gvar.typ), B3.INOUT)}
     //TODO: Remove globalInOutPPar-update in DEVELOPMENT part
-    // TODO: WhereMap for global variables (e.g.: "var globalVarName: Int where globalVarName > 0")
     //Procedures
     val tProcedures = flatDeclSeq.collect({case proc: Procedure => transformProcedure(proc)})
 
@@ -185,7 +193,7 @@ object BoogieToB3Transformer {
     val boogieTypeAliases = flatDeclSeq collect {case typAlias: TypeAlias => typAlias}
     boogieTypeAliases map {ta => info("INFO: has following type aliases: ", getNameFromTyp(ta.name))}
     boogieTypeAliases map { _ match {
-      case ta: TypeAlias if getNameFromTyp(ta.name) == "Perm" => null //type "aliasing" is done by replacing "Perm" with "real" (or "int" until B3 supports "real")
+      case ta: TypeAlias if getNameFromTyp(ta.name) == "Perm" => null //here, type "aliasing" is done by replacing "Perm" with "real" (or "int" until B3 supports "real")
       case ta: TypeAlias if getNameFromTyp(ta.name) == "HeapType" =>  "TODO"
         // type HeapType = <A, B> [Ref, Field A B]B;
         // TypeAlias(heapTyp, MapType(Seq(refType, fieldType), TypeVar("B"), Seq(TypeVar("A"), TypeVar("B"))))
@@ -198,7 +206,7 @@ object BoogieToB3Transformer {
         // type PMaskType = <A, B> [Ref, Field A B]bool;
         // TypeAlias(pmaskType, MapType(Seq(refType, fieldType), Bool, fieldType.freeTypeVars))
 
-        // TODO: Single Map approach
+        // TODO: Single Map approach (but with multiple update/access fucntions, one for each field type)
 
       case ta@_ => info("ERROR: unknown type alias: ", getNameFromTyp(ta.name))
       // TypeAlias(name: NamedType, definition: Type)
@@ -206,6 +214,8 @@ object BoogieToB3Transformer {
     // (only permType (Perm = Real), pmaskType (PMaskType), maskType (MaskType), heapTyp (HeapType) (3x boogie map))
 
     // TODO: normal map (types linked to Map/Set/Seq instantiations)
+
+
 
 
 
@@ -260,8 +270,7 @@ object BoogieToB3Transformer {
                                 // B3.Function("AssumePermUpperBound", Seq(), "bool"),
                                 // B3.Function("state", Seq(B3.FParameter("x", "HeapType"), B3.FParameter("y", "MaskType")), "bool"),
                                 // )
-    // globalInOutPPar = globalInOutPPar ++ Seq(B3.PParameter("Mask", "MaskType", B3.INOUT), B3.PParameter("Heap", "HeapType", B3.INOUT))
-    val alwaysIncludeTyps = Seq("real", "MaskType", "HeapType", "Perm", "Seq", "Field", "PMaskType").map(x => B3.TypeDecl(x))
+    val alwaysIncludeTyps = Seq("real", "MaskType", "HeapType", "Perm", "Seq", "PMaskType").map(x => B3.TypeDecl(x))
 
     prog.decls.collect({case LiteralDecl(boogieString) => info("DEBUG: LiteralDecl", boogieString.take(20))})
     // DEVELOPMENT ^^^
@@ -283,10 +292,18 @@ object BoogieToB3Transformer {
     * Creates one function-variant for each type combination that has appeared somewhere.
     * Requires that 'allUsedFuncs' has only correct function-combos saved!
     *
-    * @param fct A boogie function (AST node). Attributes are currently not supported.
-    * @return A Seq of the corresponding raw B3 nodes, or empty if the function was never used.
+    * @param func A boogie function (AST node). Attributes are currently not supported.
+    * @return A Seq of the corresponding raw B3 nodes with types according to 'allUsedFuncs', 
+    * or empty if the function was never used.
     */
   private def declareAllFuncVariants(func: Func): Seq[RawAst.Function] = {
+    // TODO: Func also has .attributes, which is a Map that seems to be usually empty. Only translateBackendFunc 
+    // in DefaultFuncPredModule creates a mapping there ("builtin" -> ...). Boogie's manual only has ":bvBuiltin". 
+    // Find out what "builtin" does in Boogie, in what cases this is used, and then support it (if necessairy). 
+    if (!func.attributes.isEmpty) {
+      sys.error("TODO: function attributes not supported (probably tried to use 'builtin: ...')")
+    }
+    
     val usedCombosOfFunc = usedButUndeclaredFuncs.get(func.name)
     usedCombosOfFunc.toSeq map {argTypeCombo => 
       val argNames = func.args map {arg => arg.name}
@@ -678,239 +695,389 @@ object BoogieToB3Transformer {
 
 
 
-// Parametric types:
-//  type name, type parameters
-//  Set to add all combinations of type parameters
-//  functions to access subcombinations (e.g. all "Field A Bool"s) => can use Seq of Strings, placing null at positions where we want to use type parameters
-private class AllTypesInB3() {
-  /**
-   * Stores all type parameter combinations that where found in the program.
-   * Format is: map[typeName, (entryNr, nrOfTypeParameters, (SetOfSeq'sOf)TypeParameterCombinations)] (typeName is w/o parameters)
-   */
-  private val typeCollection = collection.mutable.Map[String, (Int, Int, collection.mutable.Set[Seq[String]])]()
-  /** used to keep order in which types are declared */
-  private var entryNr = 0
+  // Parametric types:
+  //  type name, type parameters
+  //  Set to add all combinations of type parameters
+  //  functions to access subcombinations (e.g. all "Field A Bool"s) => can use Seq of Strings, placing null at positions where we want to use type parameters
+  private class AllTypesInB3() {
+    /**
+     * Stores all type parameter combinations that where found in the program.
+     * Format is: map[typeName, (entryNr, nrOfTypeParameters, (SetOfSeq'sOf)TypeParameterCombinations)] (typeName is w/o parameters)
+     */
+    private val typeCollection = collection.mutable.Map[String, (Int, Int, collection.mutable.Set[Seq[String]])]()
+    /** used to keep order in which types are declared */
+    private var entryNr = 0
 
-  /** Add new Type defined by a boogie node to the collection */
-  def addType(typ: TypeDecl) = {
-    val typName = typ.t.name
-    val nrOfParams = typ.t.typVars.length
-    val noCombosYet = collection.mutable.Set[Seq[String]]()
-    typeCollection.put(typName, (entryNr, nrOfParams, noCombosYet))
-    entryNr += 1
-  }
+    /** Add new Type defined by a boogie node to the collection */
+    def addType(typ: TypeDecl) = {
+      val typName = typ.t.name
+      val nrOfParams = typ.t.typVars.length
+      val noCombosYet = collection.mutable.Set[Seq[String]]()
+      typeCollection.put(typName, (entryNr, nrOfParams, noCombosYet))
+      entryNr += 1
+    }
 
-  /** returns string to use in B3 for the type representing the given type and parameter combination */
-  private def concreteName(name: String, combo: Seq[String]): String = {
+    /** returns string to use in B3 for the type representing the given type and parameter combination */
+    private def concreteName(name: String, combo: Seq[String]): String = {
       getNameFromParamTypeConstel(name, combo)
-  }
-
-  /** Returns a Seq of all type names of all existing type combos for parametric types and all non-parametric types.
-   * They are in the same order as in the Boogie AST.
-   */
-  def declareAllTypes(): Seq[String] = {
-    val unsortedResult = (typeCollection map {typEntry => typEntry match {
-      case (name, (nr, 0, _)) => Seq((nr, name)) // <- non-parametric type
-      case (name, (nr, _, set)) => set.toSeq map {combo => (nr, concreteName(name, combo))}
-    }}).toSeq.flatten
-    //sort by (entry)nr and remove it afterwards
-    unsortedResult.sortBy(_._1) map {_._2}
-  }
-
-  /** Returns a Seq of B3 TypeDecl nodes for all existing type combos for parametric types and all non-parametric types.
-   * The TypeDecls are in the same order as in the Boogie AST.
-   */
-  def declareAllB3Types(): Seq[RawAst.TypeDecl] = {
-    declareAllTypes() map {x => B3.TypeDecl(x)}
-  }
-
-
-  /**
-    * Adds the parameter combination as an existing combination. 
-    *
-    * @param combo The parameter combination to add. The type must exist in the collection, with matching nr of parameters, 
-    *  and all entries must correspond to an existing type (includes other parametrized types with a corresponding entry). 
-    */
-  def addCombo(name: String, combo: Seq[String]): Unit = {
-    val typeInfo = typeCollection(name)
-    if (combo.length != typeInfo._2) {
-      sys.error(f"Tried to add $combo (length=${combo.length}) to $name (paramNr=${typeInfo._2}). Length doesn't match!")
     }
-    typeInfo._3 += combo
-  }
 
-  /**
-    * Adds the parameter combination of given typ if and only if it is a parametric type and all parameters are concrete
-    * (i.e. no free type variables). If the given type parameters are also parametric types, they are also added.
-    *
-    * @param typ The typ whose combination to (possibly) add. The type must exist in the collection, with matching
-    * nr of parameters, and all entries must correspond to an existing type (includes other parametrized types with
-    * a corresponding entry). 
-    */
-  def possiblyAddCombos(typ: Type): Unit = {
-    typ match {
-      case Bool | Int | Real | MapType(_,_,_) | NamedType(_, Seq()) | TypeVar(_) => None // types without parameters don't matter
-      case NamedType(name, typVars) => 
-        if (typ.freeTypeVars.length == 0) { // types with freeTypeVars don't matter
+    /** Returns a Seq of all type names of all existing type combos for parametric types and all non-parametric types.
+     * They are in the same order as in the Boogie AST.
+     */
+    def declareAllTypes(): Seq[String] = {
+      val unsortedResult = (typeCollection map {typEntry => typEntry match {
+        case (name, (nr, 0, _)) => Seq((nr, name)) // <- non-parametric type
+        case (name, (nr, _, set)) => set.toSeq map {combo => (nr, concreteName(name, combo))}
+      }}).toSeq.flatten
+      //sort by (entry)nr and remove it afterwards
+      unsortedResult.sortBy(_._1) map {_._2}
+    }
+
+    /** Returns a Seq of B3 TypeDecl nodes for all existing type combos for parametric types and all non-parametric types.
+     * The TypeDecls are in the same order as in the Boogie AST.
+     */
+    def declareAllB3Types(): Seq[RawAst.TypeDecl] = {
+      info("types: ", declareAllTypes().mkString(", "))
+      declareAllTypes() map {x => B3.TypeDecl(x)}
+    }
+
+
+    /**
+      * Adds the parameter combination as an existing combination. 
+      *
+      * @param combo The parameter combination to add. The type must exist in the collection, with matching nr of parameters, 
+      *  and all entries must correspond to an existing type (includes other parametrized types with a corresponding entry). 
+      */
+    def addCombo(name: String, combo: Seq[String]): Unit = {
+      if (!typeCollection.contains(name)) {
+        info("ERROR: add combo for non-existent type, adding it manually: ", name)
+        typeCollection.addOne((name, (0, combo.length, collection.mutable.Set[Seq[String]]())))
+      }
+      val typeInfo = typeCollection(name)
+      if (combo.length != typeInfo._2) {
+        sys.error(f"Tried to add $combo (length=${combo.length}) to $name (paramNr=${typeInfo._2}). Length doesn't match!")
+      }
+      typeInfo._3 += combo
+    }
+
+    /**
+      * Adds the parameter combination of given typ if and only if it is a parametric type and all parameters are concrete
+      * (i.e. no free type variables). If the given type parameters are also parametric types, they are also added.
+      *
+      * @param typ The typ whose combination to (possibly) add. The type must exist in the collection, with matching
+      * nr of parameters, and all entries must correspond to an existing type (includes other parametrized types with
+      * a corresponding entry). 
+      */
+    def possiblyAddCombos(typ: Type): Unit = {
+      typ match {
+        case Bool | Int | Real | MapType(_,_,_) | NamedType(_, Seq()) | TypeVar(_) => None // types without parameters don't matter
+        case NamedType(name, typVars) => 
+          if (typ.freeTypeVars.length == 0) { // types with freeTypeVars don't matter
             val typNames = typVars map {getNameFromTyp(_)}
-          addCombo(name, typNames)
-          concreteName(name, typNames)
-        }
-        typVars map {possiblyAddCombos(_)} // but single type parameters may still consist of valid combos!
-        // (the reason for that is that e.g. T1 Int doesnt exist, but T1 T1 Int does and there is an axiom with 
-        // "forall <A> x: T1 A, y: A :: ..." => T1 Int is also needed, otherwise other T1 A axioms that would cover 
-        // properties for y there might be missing)
-    }
-  }
-
-  /**
-    * Returns all combos for the given type.
-    *
-    * @param name base-name of type (without type parameters)
-    * @return Seq of all existing combos
-    */
-  def getAllCombos(name: String): Seq[Seq[String]] = {
-    val typeInfo = typeCollection(name)    
-    typeInfo._3.toSeq
-  }
-
-  /**
-    * Returns type names of all combos for the given type that match the given pattern.
-    *
-    * @param name base-name of type (without type parameters)
-    * @param paramPattern Seq of parameters, where specific names are them as string, but parameters are null.
-    *   E.g. for "Field A Bool" (assuming A is a parameter and not a type) you must use paramPattern = [null, "Bool"]
-    * @return Seq of existing combos that match the given pattern
-    */
-  def getCombosOfPattern(name: String, paramPattern: Seq[String]): Seq[Seq[String]] = {
-    val typeInfo = typeCollection(name)
-    if (paramPattern.length != typeInfo._2) {
-      sys.error(f"Tried to match pattern $paramPattern (length=${paramPattern.length}) to $name (paramNr=${typeInfo._2}). Length doesn't match!")
+            addCombo(name, typNames)
+            concreteName(name, typNames)
+          }
+          typVars map {possiblyAddCombos(_)} // but single type parameters may still consist of valid combos!
+          // (the reason for that is that e.g. T1 Int doesnt exist, but T1 T1 Int does and there is an axiom with 
+          // "forall <A> x: T1 A, y: A :: ..." => T1 Int is also needed, otherwise other T1 A axioms that would cover 
+          // properties for y there might be missing)
+      }
     }
 
-    typeInfo._3.toSeq filter {x => x.zip(paramPattern).forall{
-      case (null, _) => true
-      case (_, null) => true
-      case (a, b) => a == b
-    }}
-  }
+    /**
+      * Returns all combos for the given type.
+      *
+      * @param name base-name of type (without type parameters)
+      * @return Seq of all existing combos
+      */
+    def getAllCombos(name: String): Seq[Seq[String]] = {
+      val typeInfo = typeCollection(name)    
+      typeInfo._3.toSeq
+    }
+
+    /**
+      * Returns type names of all combos for the given type that match the given pattern.
+      *
+      * @param name base-name of type (without type parameters)
+      * @param paramPattern Seq of parameters, where specific names are them as string, but parameters are null.
+      *   E.g. for "Field A Bool" (assuming A is a parameter and not a type) you must use paramPattern = [null, "Bool"]
+      * @return Seq of existing combos that match the given pattern
+      */
+    def getCombosOfPattern(name: String, paramPattern: Seq[String]): Seq[Seq[String]] = {
+      val typeInfo = typeCollection(name)
+      if (paramPattern.length != typeInfo._2) {
+        sys.error(f"Tried to match pattern $paramPattern (length=${paramPattern.length}) to $name (paramNr=${typeInfo._2}). Length doesn't match!")
+      }
+
+      typeInfo._3.toSeq filter {x => x.zip(paramPattern).forall{
+        case (null, _) => true
+        case (_, null) => true
+        case (a, b) => a == b
+      }}
+    }
 
 
     /** Collects and adds all combos in the program. This only includes types existing in the Boogie AST.
      * Any "combos" added by BoogieToB3Transformer (e.g. the type for the "Field Int Int"-Heap-submap) must be
      * added through use of addCombo/possiblyAddCombos. Also handles the collection of ConstID=>TypeName info.
-   */
+     */
     def collectTypeCombos(prog: Program): Unit = {
       val flatDeclSeq = flattenedDecl(prog.decls)
       val boogieTypeDecls = flatDeclSeq collect {case typDecl: TypeDecl => typDecl}
       boogieTypeDecls map {allTypeDecls.addType(_)}
       prog.decls map {decl => collectTypeCombosFromDecl(decl)}
-  }
+    }
 
-  /** Handles 'Decl's for collectTypeCombos (see there) */
-  private def collectTypeCombosFromDecl(decl: Decl): Unit = {
-    decl match {
-      case Axiom(exp) => collectTypeCombosFromExp(exp)
-      case CommentedDecl(s, d, size, nLines) => d map {decl => collectTypeCombosFromDecl(decl)}
+    /** Handles 'Decl's for collectTypeCombos (see there) */
+    private def collectTypeCombosFromDecl(decl: Decl): Unit = {
+      decl match {
+        case Axiom(exp) => collectTypeCombosFromExp(exp)
+        case CommentedDecl(s, d, size, nLines) => d map {decl => collectTypeCombosFromDecl(decl)}
         case ConstDecl(name, typ, unique) => 
           val typName = getNameFromTyp(typ)
           constIdentifierTypeMap.put(name, typName)
           possiblyAddCombos(typ)
-      case DeclComment(s) => None
-      case Func(name, args, typ, attributes) =>
-        possiblyAddCombos(typ)
-        args map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
-        // TODO: attributes
-      case GlobalVarDecl(name, typ) => possiblyAddCombos(typ)
-      case LiteralDecl(boogieString) => None
-      case Procedure(name, ins, outs, body) => 
-        ins map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
-        outs map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
-        collectTypeCombosFromStmt(body)
-      case TypeAlias(name, definition) => None
+        case DeclComment(s) => None
+        case Func(name, args, typ, attributes) =>
+          possiblyAddCombos(typ)
+          args map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
+          // TODO: attributes
+        case GlobalVarDecl(name, typ) => possiblyAddCombos(typ)
+        case LiteralDecl(boogieString) => None
+        case Procedure(name, ins, outs, body) => 
+          ins map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
+          outs map {lvdef => collectTypeCombosFromLocalVarDecl(lvdef)}
+          collectTypeCombosFromStmt(body)
+        case TypeAlias(name, definition) => None
         case TypeDecl(_) => None // (always 'T1' or 'T2 A B', never 'T2 Int Int')
+      }
+    }
+
+    /** Handles 'LocalVarDecl's for collectTypeCombos (see there) */
+    private def collectTypeCombosFromLocalVarDecl(lvdef: LocalVarDecl): Unit = {
+      possiblyAddCombos(lvdef.typ)
+      // TODO: lvdef.where
+    }
+
+    /** Handles 'Stmt's for collectTypeCombos (see there) */
+    private def collectTypeCombosFromStmt(stmt: Stmt): Unit = {
+      stmt match {
+        case Goto(dests) => None
+        case AssertImpl(exp, error) => 
+          collectTypeCombosFromExp(exp)
+        case Assign(lhs, rhs) =>
+          collectTypeCombosFromExp(lhs)
+          collectTypeCombosFromExp(rhs)
+        case Assume(exp) => 
+          collectTypeCombosFromExp(exp)
+        case Comment(s) => None 
+        case CommentBlock(_, stmt) => 
+          collectTypeCombosFromStmt(stmt)
+        case HavocImpl(vars) => 
+          vars map {vr => collectTypeCombosFromExp(vr)}
+        case If(cond, thn, els) =>
+          collectTypeCombosFromExp(cond)
+          collectTypeCombosFromStmt(thn)
+          collectTypeCombosFromStmt(els)
+        case Label(lbl) => None
+        case LocalVarWhereDecl(name, where) => None //types of local vars are given by the args of e.g. procedure 
+        case NondetIf(thn, els) => 
+          collectTypeCombosFromStmt(thn)
+          collectTypeCombosFromStmt(els)
+        case Seqn(stmts) =>
+          stmts map {stm => collectTypeCombosFromStmt(stm)}
+      }
+    }
+
+    /** Handles 'Exp's for collectTypeCombos (see there) */
+    private def collectTypeCombosFromExp(expr: Exp): Unit = {
+      expr match {
+        case BinExp(left, binop, right) =>
+          collectTypeCombosFromExp(left)
+          collectTypeCombosFromExp(right)
+        case CondExp(cond, thn, els) => 
+          collectTypeCombosFromExp(cond)
+          collectTypeCombosFromExp(thn)
+          collectTypeCombosFromExp(els)
+        case Const(name) => None // type is defined on instantiation
+        case Exists(vars, triggers, exp, weight) => 
+          vars map {lvar => collectTypeCombosFromLocalVarDecl(lvar)}
+          triggers map {trigger => trigger.exps map {exp => collectTypeCombosFromExp(exp)}}
+          collectTypeCombosFromExp(exp)
+        case FalseLit() => None
+        case Forall(vars, triggers, exp, typeVars, weight) => 
+          vars map {lvar => collectTypeCombosFromLocalVarDecl(lvar)}
+          triggers map {trigger => trigger.exps map {exp => collectTypeCombosFromExp(exp)}}
+          collectTypeCombosFromExp(exp)
+        case FuncApp(name, args, typ) => 
+          args map {exp => collectTypeCombosFromExp(exp)}
+          possiblyAddCombos(typ)
+        case GlobalVar(name, typ) => 
+          possiblyAddCombos(typ)
+        case IntLit(_) => None
+        case LocalVar(name, typ) => 
+          possiblyAddCombos(typ)
+        case MapSelect(map, idxs) => 
+          collectTypeCombosFromExp(map)
+          idxs map {exp => collectTypeCombosFromExp(exp)}
+        case MapUpdate(map, idxs, value) => 
+          collectTypeCombosFromExp(map)
+          idxs map {exp => collectTypeCombosFromExp(exp)}
+          collectTypeCombosFromExp(value)
+        case Old(oldexp) => 
+          collectTypeCombosFromExp(oldexp)
+        case RealConv(_) => None
+        case RealLit(_) => None
+        case TrueLit() => None
+        case UnExp(unop, exp) => 
+          collectTypeCombosFromExp(exp)
+      }
     }
   }
 
-  /** Handles 'LocalVarDecl's for collectTypeCombos (see there) */
-  private def collectTypeCombosFromLocalVarDecl(lvdef: LocalVarDecl): Unit = {
-    possiblyAddCombos(lvdef.typ)
-    // TODO: lvdef.where
-  }
+  private class DoubleMap(baseName: String) {
+    if (!Seq("HeapType", "MaskType", "PMaskType").contains(baseName)) {
+      info("ERROR: Valid names for DoubleMap are only HeapType, MaskType, PMaskType! But currently using: ", baseName)
+    }
 
-  /** Handles 'Stmt's for collectTypeCombos (see there) */
-  private def collectTypeCombosFromStmt(stmt: Stmt): Unit = {
-    stmt match {
-      case Goto(dests) => None
-      case AssertImpl(exp, error) => 
-        collectTypeCombosFromExp(exp)
-      case Assign(lhs, rhs) =>
-        collectTypeCombosFromExp(lhs)
-        collectTypeCombosFromExp(rhs)
-      case Assume(exp) => 
-        collectTypeCombosFromExp(exp)
-      case Comment(s) => None 
-      case CommentBlock(_, stmt) => 
-        collectTypeCombosFromStmt(stmt)
-      case HavocImpl(vars) => 
-        vars map {vr => collectTypeCombosFromExp(vr)}
-      case If(cond, thn, els) =>
-        collectTypeCombosFromExp(cond)
-        collectTypeCombosFromStmt(thn)
-        collectTypeCombosFromStmt(els)
-      case Label(lbl) => None
-      case LocalVarWhereDecl(name, where) => None //types of local vars are given by the args of e.g. procedure 
-      case NondetIf(thn, els) => 
-        collectTypeCombosFromStmt(thn)
-        collectTypeCombosFromStmt(els)
-      case Seqn(stmts) =>
-        stmts map {stm => collectTypeCombosFromStmt(stm)}
+    def refType = NamedType("Ref")
+    def mapType = NamedType(baseName)
+    allTypeDecls.addType(TypeDecl(mapType))
+    def subMapType = NamedType(baseName+"%.")
+    allTypeDecls.addType(TypeDecl(subMapType))
+    def fieldKindType = NamedType("FieldKindType")
+    allTypeDecls.addType(TypeDecl(fieldKindType))
+
+    val mainMap = LocalVarDecl(Identifier("m")(axiomNamespace), mapType)
+    val subMap = LocalVarDecl(Identifier("subm")(axiomNamespace), subMapType)
+    val ref = LocalVarDecl(Identifier("r")(axiomNamespace), refType)
+    val ref2 = LocalVarDecl(Identifier("r2")(axiomNamespace), refType)
+    val fk = LocalVarDecl(Identifier("fk")(axiomNamespace), fieldKindType)
+    val fk2 = LocalVarDecl(Identifier("fk2")(axiomNamespace), fieldKindType)
+    val mainMapSelect = Identifier("%M_"+baseName+"MainMapSelect")
+    val mainMapUpdate = Identifier("%M_"+baseName+"MainMapUpdate")
+    val fieldKindFuncBasename = Identifier("%M_FieldKind")
+    val subSelectFuncBasename = Identifier("%M_"+baseName+"Select") // These do the actual select/
+    val subUpdateFuncBasename = Identifier("%M_"+baseName+"Update") // update in the program => use nice names
+    val subSelect2FuncBasename = Identifier("%M_"+baseName+"SubMapSelect'")
+    val subUpdate2FuncBasename = Identifier("%M_"+baseName+"SubMapUpdate'")
+    // allow use of fctName for these functions (naming convention; mainly important for subSelect & subUpdate (the non-2 versions)) 
+    paramFuctionMap.addOne(fieldKindFuncBasename, Seq(0,1))
+    paramFuctionMap.addOne(subSelectFuncBasename, Seq(0,1,2))
+    paramFuctionMap.addOne(subUpdateFuncBasename, Seq(0,1,2))
+    paramFuctionMap.addOne(subSelect2FuncBasename, Seq(0,1,2))
+    paramFuctionMap.addOne(subUpdate2FuncBasename, Seq(0,1,2))
+    val fieldKindTypeTagger = "FieldKindTypeTagger"
+
+    // MAIN MAP
+    val tagger1 = B3.Tagger(fieldKindTypeTagger, fieldKindType.name)
+    // function mainMapSelect(h: mainMapType, fk: FieldKindType): subMapType;
+    val func1 = Func(mainMapSelect, Seq(mainMap, fk), subMapType)
+    // function mainMapUpdate(h: mainMapType, fk: FieldKindType, subm: subMapType): mainMapType;
+    val func2 = Func(mainMapUpdate, Seq(mainMap, fk, subMap), mapType)
+    // axiom (forall mainMap: mainMapType, fk1: FieldKindType, fk2: FieldKindType, subm: subMapType ::
+    //   { mainMapSelect(mainMapUpdate(mainMap, fk1, subm), fk2) }
+    //   (fk1 == fk2 ==> mainMapSelect(mainMapUpdate(mainMap, fk1, subm), fk2) == subm) &&
+    //   ((fk1 != fk2) ==> mainMapSelect(mainMapUpdate(mainMap, fk1, subm), fk2) == mainMapSelect(mainMap, fk2))
+    // );
+    def mainMapSelectFuncApp(h: Exp, fk: Exp) = FuncApp(mainMapSelect, Seq(h, fk), subMapType)
+    def mainMapUpdateFuncApp(h: Exp, fk: Exp, subm: Exp) = FuncApp(mainMapUpdate, Seq(h, fk, subm), mapType)
+    val selectUpdateFuncApp = mainMapSelectFuncApp(mainMapUpdateFuncApp(mainMap.l, fk.l, subMap.l), fk2.l)
+    val ax1 = Axiom(Forall(
+      Seq(mainMap, fk, fk2, subMap), 
+      Seq(Trigger(Seq(selectUpdateFuncApp))), 
+      ((fk.l === fk2.l ==> selectUpdateFuncApp === subMap.l) &&
+        ((fk.l !== fk2.l) ==> selectUpdateFuncApp === FuncApp(mainMapSelect, Seq(mainMap.l, fk2.l), subMapType)))))
+
+
+    val mainAxiomsB3 = Seq(ax1) map {transformAxiom(_)}
+    val mainFunctionsB3 = Seq(func1, func2) map {transformFunction(_)}
+    val mainTaggersB3 = Seq(tagger1)
+
+    /** Returns all (raw B3) axioms, functions, and taggers needed for Heap/Perm/PMask, for all 
+     * existing Field type constellations. Must be used after all types are collected. 
+     * Does not create new types or any axioms/functions relevant for other functions/axioms,
+     * so it is save to use this at the very last. */
+    def getMapDecls(): (Seq[RawAst.Axiom], Seq[RawAst.Function], Seq[RawAst.Tagger]) = {
+      val allFieldCombos = allTypeDecls.getAllCombos("Field")
+      val axsAndFctsOfCombos = (allFieldCombos map {subMap_FieldAB(_)}).unzip
+      val axiomsB3 = axsAndFctsOfCombos._1.flatten
+      val functionsB3 = axsAndFctsOfCombos._2.flatten
+      (mainAxiomsB3++axiomsB3, mainFunctionsB3++functionsB3, mainTaggersB3)
+    }
+
+    private def subMap_FieldAB(AB: Seq[String]): (Seq[RawAst.Axiom], Seq[RawAst.Function]) = {
+      // type HeapType = <A, B> [Ref, Field A B]B;
+      // type MaskType = <A, B> [Ref, Field A B]Perm;
+      // type PMaskType = <A, B> [Ref, Field A B]bool;
+
+      val B = NamedType(AB.last)
+      val fieldKindFuncName = Identifier(fctName(fieldKindFuncBasename, AB, fieldKindType.name))
+      val updateFuncName = Identifier(fctName(subUpdateFuncBasename, AB, fieldKindType.name))
+      val selectFuncName = Identifier(fctName(subSelectFuncBasename, AB, fieldKindType.name))
+      val updateFuncName2 = Identifier(fctName(subUpdate2FuncBasename, AB, fieldKindType.name))
+      val selectFuncName2 = Identifier(fctName(subSelect2FuncBasename, AB, fieldKindType.name))
+      val fieldTypeVersion = NamedType(getNameFromParamTypeConstel("Field", AB))
+      val field = LocalVarDecl(Identifier("f")(axiomNamespace), fieldTypeVersion)
+      val field2 = LocalVarDecl(Identifier("f2")(axiomNamespace), fieldTypeVersion)
+      val Bval = LocalVarDecl(Identifier("v")(axiomNamespace), B)
+      def selectABFuncApp(h: Exp, r: Exp, f: Exp) = FuncApp(selectFuncName, Seq(h, r, f), B)
+      def updateABFuncApp(h: Exp, r: Exp, f: Exp, vB: Exp) = FuncApp(updateFuncName, Seq(h, r, f, vB), mapType)
+      def selectABFunc2App(subm: Exp, r: Exp, f: Exp) = FuncApp(selectFuncName2, Seq(subm, r, f), B)
+      def updateABFunc2App(subm: Exp, r: Exp, f: Exp, vB: Exp) = FuncApp(updateFuncName2, Seq(subm, r, f, vB), subMapType)
+      def fieldKindABFuncApp = FuncApp(fieldKindFuncName, Seq(), fieldKindType)
+
+      // SUB MAPS
+
+      // type Field_A_B; //(declared by type-system)
+      // function fieldKindAB(): FieldKindType tag FieldKindTypeTagger
+      val fct0 = B3.Function(fieldKindFuncName, Seq(), fieldKindType.name, fieldKindTypeTagger) //(directy as B3 Function because of the tag)
+      // function selectAB(h: mainMapType, r: Ref, f: Field_A_B): B;               // get element from (the A-B-sub-map of a) main map
+      val fct1 = Func(selectFuncName, Seq(mainMap, ref, field), B)
+      // function updateAB(h: mainMapType, r: Ref, f: Field_A_B, v: B): mainMapType;  // put element into (the A-B-sub-map of a) main map
+      val fct2 = Func(updateFuncName, Seq(mainMap, ref, field, Bval), mapType)
+      // function selectAB'(subm: subMapType, r: Ref, f: Field_A_B): B;                 // get element from an A-B-sub-map
+      val fct3 = Func(selectFuncName2, Seq(mainMap, ref, field), B)
+      // function updateAB'(subm: subMapType, r: Ref, f: Field_A_B, v: B): subMapType;  // put element into an A-B-sub-map
+      val fct4 = Func(updateFuncName2, Seq(mainMap, ref, field, Bval), subMapType)
+
+      //info stays in A-B-sub-map
+      // axiom (forall subm: subMapType, r1: Ref, r2: Ref, f1: Field_A_B, f2: Field_A_B, v: B ::
+      //     {selectAB'(updateAB'(subm, r1, f1, v), r2, f2)}
+      //     ((r1 == r2 && f1 == f2) ==> selectAB'(updateAB'(subm, r1, f1, v), r2, f2) == v) &&
+      //     ((r1 != r2 || f1 != f2) ==> selectAB'(updateAB'(subm, r1, f1, v), r2, f2) == selectAB'(subm, r2, f2)));
+      val selectUpdateFuncApp = selectABFunc2App(updateABFunc2App(subMap.l, ref.l, field.l, Bval.l), ref2.l, field2.l)
+      val ax1 = Axiom(Forall(
+        Seq(subMap, ref, ref2, field, field2, Bval), 
+        Seq(Trigger(Seq(selectUpdateFuncApp))),
+        (((ref.l === ref2.l && field.l === field2.l) ==> selectUpdateFuncApp === Bval.l) &&
+         ((ref.l !== ref2.l || field.l !== field2.l) ==> selectUpdateFuncApp === selectABFunc2App(subMap.l, ref2.l, field2.l)))
+      ))
+
+      //interaction with A-B-sub-map through main map 
+      // axiom (forall h: mainMapType, r: Ref, f: Field_A_B ::
+      //     {selectAB(h, r, f)}
+      //     selectAB(h, r, f) == selectAB'(mainMapSelect(h, fieldKindAB), r, f));
+      val ax2 = Axiom(Forall(
+        Seq(mainMap, ref, ref2, field), 
+        Seq(Trigger(Seq(selectABFuncApp(mainMap.l, ref.l, field.l)))),
+        (selectABFuncApp(mainMap.l, ref.l, field.l) === selectABFunc2App(mainMapSelectFuncApp(mainMap.l, fieldKindABFuncApp), ref.l, field.l))
+      ))
+      // axiom (forall h: mainMapType, r: Ref, f: Field_A_B, v: B ::
+      //     {updateAB(h, r, f, v)}
+      //     updateAB(h, r, f, v) == mainMapUpdate(h, fieldKindAB, updateAB'(mainMapSelect(h, fieldKindAB), r, f, v)));
+      val ax3 = Axiom(Forall(
+        Seq(mainMap, ref, ref2, field, Bval), 
+        Seq(Trigger(Seq(updateABFuncApp(mainMap.l, ref.l, field.l, Bval.l)))),
+        (updateABFuncApp(mainMap.l, ref.l, field.l, Bval.l) === mainMapUpdateFuncApp(mainMap.l, fieldKindABFuncApp, updateABFunc2App(mainMapSelectFuncApp(mainMap.l, fieldKindABFuncApp), ref.l, field.l, Bval.l)))
+      ))
+
+      // collect, transform, and return
+      val axiomsB3 = Seq(ax1, ax2, ax3) map {transformAxiom(_)}
+      val functionsB3 = Seq(fct0) ++ (Seq(fct1, fct2, fct3, fct4) map {transformFunction(_)})
+      (axiomsB3, functionsB3)
     }
   }
 
-  /** Handles 'Exp's for collectTypeCombos (see there) */
-  private def collectTypeCombosFromExp(expr: Exp): Unit = {
-    expr match {
-      case BinExp(left, binop, right) =>
-        collectTypeCombosFromExp(left)
-        collectTypeCombosFromExp(right)
-      case CondExp(cond, thn, els) => 
-        collectTypeCombosFromExp(cond)
-        collectTypeCombosFromExp(thn)
-        collectTypeCombosFromExp(els)
-      case Const(name) => None // type is defined on instantiation
-      case Exists(vars, triggers, exp, weight) => 
-        vars map {lvar => collectTypeCombosFromLocalVarDecl(lvar)}
-        triggers map {trigger => trigger.exps map {exp => collectTypeCombosFromExp(exp)}}
-        collectTypeCombosFromExp(exp)
-      case FalseLit() => None
-      case Forall(vars, triggers, exp, typeVars, weight) => 
-        vars map {lvar => collectTypeCombosFromLocalVarDecl(lvar)}
-        triggers map {trigger => trigger.exps map {exp => collectTypeCombosFromExp(exp)}}
-        collectTypeCombosFromExp(exp)
-      case FuncApp(name, args, typ) => 
-        args map {exp => collectTypeCombosFromExp(exp)}
-        possiblyAddCombos(typ)
-      case GlobalVar(name, typ) => 
-        possiblyAddCombos(typ)
-      case IntLit(_) => None
-      case LocalVar(name, typ) => 
-        possiblyAddCombos(typ)
-      case MapSelect(map, idxs) => 
-        collectTypeCombosFromExp(map)
-        idxs map {exp => collectTypeCombosFromExp(exp)}
-      case MapUpdate(map, idxs, value) => 
-        collectTypeCombosFromExp(map)
-        idxs map {exp => collectTypeCombosFromExp(exp)}
-        collectTypeCombosFromExp(value)
-      case Old(oldexp) => 
-        collectTypeCombosFromExp(oldexp)
-      case RealConv(_) => None
-      case RealLit(_) => None
-      case TrueLit() => None
-      case UnExp(unop, exp) => 
-        collectTypeCombosFromExp(exp)
-    }
-  }
-}
 }

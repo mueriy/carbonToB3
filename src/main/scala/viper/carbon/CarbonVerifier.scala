@@ -273,7 +273,7 @@ case class CarbonVerifier(override val reporter: Reporter,
 
     val invokeResult = mode match {
       case Mode.Boogie => invokeBoogie(_translated, options, timeout)
-      case Mode.B3 => invokeB3(_translated, options, timeout)
+      case Mode.B3 => invokeB3(_translated, options, timeout, this)
     }
     invokeResult match {
       case (version,result) =>

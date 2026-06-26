@@ -8,7 +8,7 @@ package viper.carbon.verifier
 
 import viper.carbon.boogie.Program // import viper.carbon.boogie.{Assert, Program}
 import viper.carbon.b3.B3Adapter.runB3
-import viper.carbon.b3.BoogieToB3Transformer.{transformProgram, printInfo}
+import viper.carbon.b3.BoogieToB3Transformer
 // import viper.silver.reporter.BackendSubProcessStages._
 import viper.silver.reporter.Reporter // import viper.silver.reporter.{BackendSubProcessReport, Reporter}
 // import viper.silver.verifier.errors.Internal
@@ -66,10 +66,10 @@ trait B3Interface {
    * @param timeout Currently does noting.
    * @return Currently always ("?", Success), because we dont do error parsing yet
    */
-  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {
-
+  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int], verifier: viper.carbon.verifier.Verifier): (String,VerificationResult) = {
+    val B3Transformer = new BoogieToB3Transformer(verifier)
     // translate Boogie AST to a B3 raw AST
-    val rawB3prog = transformProgram(program)
+    val rawB3prog = B3Transformer.transformProgram(program)
     // print(program.toString)
 
     // invoke B3 and capture any output in outStream (-> output)
@@ -90,7 +90,7 @@ trait B3Interface {
     print(output) // [B3 base: an extension goal would be to implement error parsing here, see BoogieInterface.scala -> parse]
     println("*************************")
 
-    printInfo()
+    B3Transformer.printInfo()
     
     // cannot get b3 version. Since we currently don't parse/handle errors we always return Success
     ("?", Success)
