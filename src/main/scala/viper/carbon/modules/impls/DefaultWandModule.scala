@@ -17,7 +17,6 @@ import viper.silver.ast.{MagicWand, MagicWandStructure}
 import viper.silver.verifier.{PartialVerificationError, reasons}
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3NameGenerator
-import viper.carbon.Mode
 
 class
 DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent with DefinednessComponent{
@@ -31,6 +30,7 @@ DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent 
   type WandShape = Func
   //This needs to be resettable, which is why "lazy val" is not used. See also: wandToShapes method
   private var lazyWandToShapes: Option[Map[MagicWandStructure.MagicWandStructure, WandShape]] = None
+/*
   /** CONSTANTS FOR TRANSFER START**/
 
   /* denotes amount of permission to add/remove during a specific transfer */
@@ -789,4 +789,5 @@ case class PackageSetup(hypState: StateRep, usedState: StateRep, initStmt: Stmt)
     OPS
   }
   // =========================================== End Of Getters ============================================
+*/
 }

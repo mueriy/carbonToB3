@@ -8,9 +8,9 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules._
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Implicits._
 import viper.carbon.verifier.Verifier
-import Implicits._
 import viper.carbon.modules.components.DefinednessState
 import viper.silver.ast.utility.Expressions
 import viper.silver.verifier.PartialVerificationError
@@ -49,12 +49,13 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
 
     // creating a new temp state if we are inside a package statement
     val curState = stateModule.state
-    var initStmtWand: Stmt = Statements.EmptyStmt
-    if(insidePackageStmt){
-      val StateSetup(tempState, initStmt) = wandModule.createAndSetState(None)
-      wandModule.tempCurState = tempState
-      initStmtWand = initStmt
-    }
+    var initStmtWand: Seq[Stmt] = Seq()
+    // B3 ADVANCED:
+    // if(insidePackageStmt){ 
+    //   val StateSetup(tempState, initStmt) = wandModule.createAndSetState(None)
+    //   wandModule.tempCurState = tempState
+    //   initStmtWand = initStmt
+    // }
     val tempState: StateRep = wandModule.tempCurState.asInstanceOf[StateRep]
 
     val exhaleStmt = exps map (e =>
@@ -65,12 +66,12 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
                   Some(DefinednessState(() => stateModule.replaceState(wellDefState)))
                 )
 
-          exhaleConnective(e._1.whenExhaling, e._2, defCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert = isAssert, currentStateForPackage = tempState)
+          TODO_Stmt("exhale", "exhaleConnective") //exhaleConnective(e._1.whenExhaling, e._2, defCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert = isAssert, currentStateForPackage = tempState)
         }
       )
 
-    val assumptions = MaybeCommentBlock("Free assumptions (exhale module)",
-      exps map (e => allFreeAssumptions(e._1)))
+    //"Free assumptions (exhale module)"
+    val assumptions = exps map (e => allFreeAssumptions(e._1))
 
     stateModule.replaceState(curState)
 
@@ -94,7 +95,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
       initStmtWand ++
         exhaleStmt ++
         assumptions ++
-        Comment("Finish exhale") ++
+        //"Finish exhale"
         endExhale
     }
 
@@ -104,6 +105,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     * Emits a definedness check for the input expression if `defCheckData` demands a check and otherwise returns the
     * empty statement
     */
+/*
   private def maybeDefCheck(e: sil.Exp, defCheckData: DefinednessCheckData): Stmt = {
     defCheckData.performDefinednessChecks.fold(Statements.EmptyStmt: Stmt)(definednessError => checkDefinedness(e, definednessError, makeChecks = true, Some(defCheckData.definednessStateOpt.get)))
   }
@@ -301,7 +303,8 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     } else {
       Nil
     }
-  }
+  } 
+*/
 }
 
 

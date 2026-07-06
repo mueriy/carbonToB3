@@ -29,6 +29,8 @@ class B3NameGenerator extends DefaultNameGenerator {
   def firstCharacter = s"[$otherChars]".r
   def otherCharacter = s"[0-9_.$$$otherChars]".r
   def separator = "_"
+  // Silver: val identFirstLetter = "a-zA-Z$_" => TODO: replace starting $ and _ (can use %)
+  // Silver: val identOtherLetterChars = "a-zA-Z0-9$_'" => TODO: replace ' (can use % and, if careful: . )
 
   /** 
    * Creates a different identifier every time it is called. First replaces some characters (' -> %. and # -> %_) 

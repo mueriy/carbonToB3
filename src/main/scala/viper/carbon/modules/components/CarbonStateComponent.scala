@@ -6,7 +6,7 @@
 
 package viper.carbon.modules.components
 
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
 
 /**
  * The [[viper.carbon.modules.StateModule]] allows to register state components that
@@ -30,14 +30,14 @@ trait CarbonStateComponent extends Component {
    * The name and type of the static contribution of this component to the state. The returned value should remain the
    * same even if the state is changed.
    */
-  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[LocalVarDecl]
+  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[Variable]
 
 
   /**
    * The name and type of the current contribution of this component to the state. The numbers of elements in the list and
    * the types must correspond to the ones given in `staticStateContributions`.
    */
-  def currentStateContributions: Seq[LocalVarDecl]
+  def currentStateContributions: Seq[Variable]
 
 
   /**
@@ -46,23 +46,23 @@ trait CarbonStateComponent extends Component {
    *
    * NOTE: these variables may need wrapping in Old(.) when used, as according to usingOldState etc. To do this wrapping internally, call instead currentStateExps below
    */
-  def currentStateVars: Seq[Var]
+  def currentStateVars: Seq[Variable] //B3: maybe just String instead? 
 
   /**
    * The current values for this components state contributions, adjusted for "old".  The number of elements
    * in the list and the types must correspond to the ones given in `stateContributions`.
    */
-  def currentStateExps: Seq[Exp]
+  def currentStateExps: Seq[Expr]
 
   /**
    * Set up a fresh temporary state and returns that new state.
    */
-  def freshTempState(name: String): Seq[Var]
+  def freshTempState(name: String): Seq[Variable] //B3: maybe just String instead? 
 
   /**
    * Throw away the current state and go back to a snapshot.
    */
-  def restoreState(previousState: Seq[Var]): Unit
+  def restoreState(previousState: Seq[Variable]): Unit //B3: maybe just String instead? 
 
   /**
    * Are we currently using an "old" state? Note: this is mainly as documentation that the states passed to other methods above will need wrapping in "olD2 when *used*, if we are currently using an old state. This method would typically be implemented by querying the corresponding StateModule

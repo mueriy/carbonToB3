@@ -7,8 +7,7 @@
 package viper.carbon.modules.components
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
-import viper.silver.ast.LocalVar
+import viper.carbon.b3.B3Nodes._
 
 /**
  * Contributes to the translation of one or several statements.
@@ -30,10 +29,10 @@ trait StmtComponent extends Component {
     * These wand-related parameters (mentioned above) are used when translating statements during packaging a wand.
     * For more details refer to the general note in 'wandModule'.
    */
-  def handleStmt(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false): (Seqn => Seqn)
+  def handleStmt(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): (Block => Block)
 
   /**
    * This method is called when translating a "fresh" statement, and by default does nothing
    */
-  def freshReads(fb: Seq[LocalVar]): Stmt = Statements.EmptyStmt
+  def freshReads(fb: Seq[sil.LocalVar]): Stmt = EmptyStmt
 }

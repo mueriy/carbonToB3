@@ -8,7 +8,7 @@ package viper.carbon.modules
 
 import components.{CarbonStateComponent, ComponentRegistry}
 import viper.silver.components.StatefulComponent
-import viper.carbon.boogie.{Exp, LocalVar, LocalVarDecl, Stmt}
+import viper.carbon.b3.B3Nodes._
 
 /**
  * A module for dealing with the state of a program during execution.  Allows other modules
@@ -27,13 +27,13 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    * Returns a static invocation of the 'is good state' function with the arguments from
    * `stateContributions`.
    */
-  def staticGoodState: Exp
+  def staticGoodState: Expr
 
   /**
    * Returns invocation of the 'is good state' function with the arguments from
    * `currentStateContributions`.
    */
-  def currentGoodState: Exp
+  def currentGoodState: Expr
 
   /**
    * The statements necessary to initialize the Boogie state of all CarbonStateComponent modules.
@@ -58,7 +58,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    * The name and type of the static contribution of the state components registered with this module to the state. The returned value should remain the
    * same even if the state is changed.
    */
-  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true): Seq[LocalVarDecl]
+  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true): Seq[Variable]
 
   /**
    * The current values for all registered components' state contributions.  The number of elements
@@ -66,13 +66,13 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
     *
     * Compared to the currentStateContributions [ALEX: maybe to be deprecated], these expressions may include e.g. old(..) around a heap variable.
    */
-  def currentStateContributionValues: Seq[Exp] = {
+  def currentStateContributionValues: Seq[Expr] = {
     // TODO: This implementation does not return the values of the old or pure state if we're currently using one of those;
     // instead it only wraps expressions into old(..) if we're using the old state.
     stateContributionValues(state)
   }
 
-  def stateContributionValues(snap : StateSnapshot): Seq[Exp]
+  def stateContributionValues(snap : StateSnapshot): Seq[Expr]
 
   type StateSnapshot// used to abstractly capture the Boogie variables, old expressions etc. used to represent a current state in the translation
 
@@ -180,12 +180,12 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
     * returns statement of equating heap represented by snapshot to current heap
     * e.g. the returned statement is in the form of: Assume Heap1 == Heap2
     */
-  def equateHeaps(snapshot: StateSnapshot, c: CarbonStateComponent):Stmt
+  def equateHeaps(snapshot: StateSnapshot, c: CarbonStateComponent): Stmt
 
   /**
     * Representation of state used in wandModule. Pair of stateSnapshot and boolean variable carrying assumptions about this state.
     */
-  case class StateRep(state: StateSnapshot, boolVar: LocalVar)
+  case class StateRep(state: StateSnapshot, boolVar: IntLit)
 
   case class StateSetup(usedState: StateRep, initStmt: Stmt)
 }

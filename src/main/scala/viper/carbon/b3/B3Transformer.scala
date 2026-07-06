@@ -1,3 +1,4 @@
+/*
 package viper.carbon.b3
 import viper.carbon.b3.{B3Adapter => B3}
 import viper.carbon.boogie._
@@ -1081,3 +1082,4 @@ class BoogieToB3Transformer(verifier: Verifier) {
   }
 
 }
+*/

@@ -49,10 +49,10 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   private var nodeToLoopInfoOutput : Map[Int, Seq[LoopGenKind]] = Map.empty
 
   private val sumMaskName : Identifier = Identifier("LoopSumMask")(namespace)
-  private val sumMask = LocalVar(sumMaskName, maskType)
+//  private val sumMask = LocalVar(sumMaskName, NamedType(maskType))
 
   private val sumHeapName : Identifier = Identifier("LoopSumHeap")(namespace)
-  private val sumHeap = LocalVar(sumHeapName, heapType)
+//  private val sumHeap = LocalVar(sumHeapName, NamedType(heapType))
 
   private var currentMethodIsAbstract = false;
   private var usedLoopDetectorOnce = false;
@@ -66,6 +66,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
     stmtModule.register(this, after = Seq(verifier.wandModule,verifier.heapModule,verifier.permModule, verifier.stmtModule))
   }
 
+/*
   override def initializeMethod(m: sil.Method): sil.Method = {
     reset()
 
@@ -422,8 +423,11 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
         (w.invs, writtenVars)
     }
   }
+*/
 
   private def handleWhile(w: sil.While): Stmt = {
+    sys.error("LATER: handleWhile")
+/*
         val guard = translateExp(w.cond)
         val (invs, writtenVars) = getWhileInformation(w)
 
@@ -454,8 +458,10 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
           Assume(guard.not) ++ stateModule.assumeGoodState ++
             inhale(invs map (x => (x, errors.WhileFailed(x))), addDefinednessChecks = false) ++ executeUnfoldings(invs, (inv => errors.Internal(inv)))
         )
+*/
   }
 
+/*
   override def handleStmt(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false): (Seqn => Seqn) = {
     if(useLoopDetector) {
       handleStmtLoopDetector(s, statesStackOfPackageStmt, allStateAssms,insidePackageStmt)
@@ -517,8 +523,11 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
       }
     }
   }
+*/
 
   private def loopInit(loopId: Int): Stmt = {
+    sys.error("LATER: loopInit")
+/*
     val invs : Seq[sil.Exp] = getLoopInvariants(loopId)
     val writtenVars : Seq[sil.LocalVar] = getWrittenVariables(loopId)
 
@@ -541,9 +550,12 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
           MaybeComment("Inhale invariant", inhale(invs map (x => (x, errors.WhileFailed(x))), addDefinednessChecks = false) ++ executeUnfoldings(invs, (inv => errors.Internal(inv))))
       )
     )
+*/
   }
 
   private def backedgeJump(loopId: Int): Stmt = {
+    sys.error("LATER: backedgeJump")
+/*
     val invs : Seq[sil.Exp] = getLoopInvariants(loopId)
     MaybeCommentBlock("Backedge to loop " + loopId,
       MaybeCommentBlock("Check definedness of invariant", NondetIf(
@@ -553,9 +565,12 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
       MaybeComment("Exhale invariant", executeUnfoldings(invs, (inv => errors.LoopInvariantNotPreserved(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotPreserved(e))))) ++
         MaybeComment("Terminate execution", Assume(FalseLit()))
     )
+*/
   }
 
   private def beforeLoopHead(invs: Seq[sil.Exp], loopIdOpt: Option[Int]): Stmt = {
+    sys.error("LATER: beforeLoopHead")
+/*
     MaybeCommentBlock("Before loop head" + loopIdOpt.fold("")(i => Integer.toString(i)),
       MaybeCommentBlock("Exhale loop invariant before loop",
         executeUnfoldings(invs, (inv => errors.LoopInvariantNotEstablished(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotEstablished(e))))
@@ -569,9 +584,12 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
           )
         } )
     )
+*/
   }
 
   private def exitLoops(loopIds: Seq[Int]): Stmt = {
+    sys.error("LATER: exitLoops")
+/*
     if(loopIds.isEmpty) {
       sys.error("Exit loop without any loop identifiers")
     } else {
@@ -592,6 +610,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
           })
       )
     }
+*/
   }
 
   override def name: String = "Loop module"
@@ -606,6 +625,8 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   }
 
   private def getFrame(loopId: Int): (LocalVarDecl, LocalVarDecl) = {
+    sys.error("LATER: getFrame") 
+/*
     frames.get(loopId) match {
       case Some(fMask) => fMask
       case None => {
@@ -615,6 +636,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
         (freshMaskDecl, freshHeapDecl)
       }
     }
+*/
   }
 
   private def getLoopInvariants(loopId: Int): Seq[sil.Exp] = {
@@ -633,7 +655,10 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
 
   //FIXME: duplicated from DefaultStmtModule
   private def executeUnfoldings(exps: Seq[sil.Exp], exp_error: (sil.Exp => PartialVerificationError)): Stmt = {
+    sys.error("LATER: executeUnfoldings") 
+/*
     (exps map (exp => (if (exp.existsDefined[Unit]({case sil.Unfolding(_,_) => })) checkDefinedness(exp, exp_error(exp), false) else Nil:Stmt)))
+*/
   }
 
 }

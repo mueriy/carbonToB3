@@ -6,7 +6,7 @@
 
 package viper.carbon.modules.components
 
-import viper.carbon.boogie.Stmt
+import viper.carbon.b3.B3Nodes.Stmt
 import viper.silver.verifier.PartialVerificationError
 import viper.silver.{ast => sil}
 

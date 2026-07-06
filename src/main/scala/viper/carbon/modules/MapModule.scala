@@ -7,13 +7,13 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.{Type, Exp}
+import viper.carbon.b3.B3Nodes.Expr
 
 /**
   * A module for translating maps.
   */
 trait MapModule extends Module {
-  def isUsed() : Boolean
-  def translateMapExp(exp : sil.Exp) : Exp
-  def translateMapType(mapType : sil.MapType) : Type
+  def isUsed(): Boolean
+  def translateMapExp(exp: sil.Exp): Expr
+  def translateMapType(mapType: sil.MapType): String
 }

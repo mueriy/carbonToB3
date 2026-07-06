@@ -8,7 +8,7 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules.SetModule
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
 import viper.carbon.verifier.Verifier
 import viper.carbon.boogie.Implicits._
 import viper.carbon.modules.impls.dafny_axioms.SetAxiomatization
@@ -47,13 +47,17 @@ class DefaultSetModule(val verifier: Verifier)
  // }
 
   override def preamble = {
+    Seq() //B3 LATER
+    /*
     if (used || verifier.mapModule.isUsed()) {
       LiteralDecl(SetAxiomatization.value)
     } else {
       Nil
     }
+    */
   }
 
+/*
   override def translateSetExp(e: sil.Exp): Exp = {
     def t(e: sil.Exp) = translateExp(e)
     val isMultiset = ((x:sil.Exp) => x.typ match {
@@ -124,12 +128,14 @@ class DefaultSetModule(val verifier: Verifier)
       case _ => sys.error("not a set expression")
     }
   }
+*/
 
   override def translateSetType(setType: sil.SetType): Type = {
     used = true
     NamedType("Set", translateType(setType.elementType))
   }
 
+/*
   override def translateMultisetType(setType: sil.MultisetType): Type = {
     used = true
     NamedType("MultiSet", translateType(setType.elementType))
@@ -142,4 +148,5 @@ class DefaultSetModule(val verifier: Verifier)
   override def reset(): Unit = {
     used = false
   }
+*/
 }

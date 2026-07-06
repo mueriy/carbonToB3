@@ -8,9 +8,12 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules._
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
+// import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.Statements
 import viper.carbon.verifier.Verifier
-import viper.carbon.boogie.Implicits._
+// import viper.carbon.boogie.Implicits._
 import viper.silver.verifier.PartialVerificationError
 
 /**
@@ -33,7 +36,10 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
   override def inhale(exps: Seq[(sil.Exp, PartialVerificationError)], addDefinednessChecks: Boolean, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt = {
     val current_state = stateModule.state
     if(insidePackageStmt && !addDefinednessChecks) { // replace currentState with the correct state in which the inhale occurs during packaging the wand
+      ADVANCED_Stmt("inhale", "only necessairy for wands (1)")
+/*
       stateModule.replaceState(statesStackForPackageStmt(0).asInstanceOf[StateRep].state)
+*/
     }
 
 
@@ -44,8 +50,11 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
     if(insidePackageStmt && !addDefinednessChecks) {
          /* all the assumptions made during packaging a wand (except assumptions about the global state before the package statement)
           * should be replaced by updates to state booleans (see documentation for 'exchangeAssumesWithBoolean') */
+      ADVANCED_Stmt("inhale", "only necessairy for wands (2)")
+/*
       stateModule.replaceState(current_state)
       wandModule.exchangeAssumesWithBoolean(stmt, statesStackForPackageStmt.head.asInstanceOf[StateRep].boolVar)
+*/
     } else {
       stmt
     }
@@ -65,7 +74,8 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
    */
   private def inhaleConnective(e: sil.Exp, error: PartialVerificationError, addDefinednessChecks: Boolean, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt = {
 
-    def maybeDefCheck(eDef: sil.Exp) : Stmt = { if(addDefinednessChecks) checkDefinedness(eDef, error, insidePackageStmt = insidePackageStmt) else Statements.EmptyStmt }
+    /* Contains 0 or 1 Stmts. This avoids including an empty statement. maybeDefCheck is always used as part of a "++"-chain, so this works out well. */
+    def maybeDefCheck(eDef: sil.Exp): Seq[Stmt] = { if(addDefinednessChecks) checkDefinedness(eDef, error, insidePackageStmt = insidePackageStmt) else Seq() }
 
     def maybeFreeAssumptions(eAssm: sil.Exp) : Stmt = {
       /* definedness checks include free assumptions, so only add free assumption if no definedness checks were made
@@ -77,11 +87,12 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
       if(addDefinednessChecks && !insidePackageStmt) {
         Nil
       } else {
-        MaybeCommentBlock("Free assumptions (inhale module)", allFreeAssumptions(eAssm))
+        //"Free assumptions (inhale module)"
+        allFreeAssumptions(eAssm)
       }
     }
 
-    val res =
+    val res: Seq[Stmt] =
       e match {
         case sil.And(e1, e2) =>
           inhaleConnective(e1, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt) ::
@@ -89,24 +100,24 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
             Nil
         case sil.Implies(e1, e2) =>
           val defCheck = maybeDefCheck(e1)
-          val lhsTranslation = if(insidePackageStmt && addDefinednessChecks) { wandModule.getCurOpsBoolvar() ==> translateExpInWand(e1) } else { translateExp(e1) }
+          val lhsTranslation = translateExp(e1)//B3 ADVANCED: use the following to support wands: if(insidePackageStmt && addDefinednessChecks) { wandModule.getCurOpsBoolvar() ==> translateExpInWand(e1) } else { translateExp(e1) }
 
           defCheck ++
-          If(lhsTranslation, inhaleConnective(e2, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt), Statements.EmptyStmt)
+          If(lhsTranslation, inhaleConnective(e2, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt), EmptyStmt)
         case sil.CondExp(c, e1, e2) =>
           val defCheck = maybeDefCheck(c)
-          val condTranslation = if(insidePackageStmt && addDefinednessChecks) { wandModule.getCurOpsBoolvar() ==> translateExpInWand(c) } else { translateExp(c) }
+          val condTranslation = translateExp(c)//B3 ADVANCED: use the following to support wands: if(insidePackageStmt && addDefinednessChecks) { wandModule.getCurOpsBoolvar() ==> translateExpInWand(c) } else { translateExp(c) }
 
           defCheck ++
           If(condTranslation, inhaleConnective(e1, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt),
-                              inhaleConnective(e2, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt))
+                                      inhaleConnective(e2, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt))
         case sil.Let(declared,boundTo,body) if !body.isPure || addDefinednessChecks =>
         {
           val defCheck = maybeDefCheck(boundTo)
           val u = env.makeUniquelyNamed(declared) // choose a fresh binder
           env.define(u.localVar)
           defCheck ::
-          Assign(translateLocalVar(u.localVar),translateExp(boundTo)) ::
+          Assign(translateLocalVar(u.localVar).name ,translateExp(boundTo)) ::
             inhaleConnective(body.replace(declared.localVar, u.localVar), error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt) ::
             {
               env.undefine(u.localVar)
@@ -116,7 +127,8 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
         case _ =>
           def transformStmtInsidePackage(s: Stmt): Stmt = {
             if(insidePackageStmt && addDefinednessChecks) {
-              wandModule.exchangeAssumesWithBoolean(s, statesStackForPackageStmt.head.asInstanceOf[StateRep].boolVar)
+              ADVANCED_Stmt("inhaleConnective", "only necessairy for wands (1)")
+              // wandModule.exchangeAssumesWithBoolean(s, statesStackForPackageStmt.head.asInstanceOf[StateRep].boolVar)
             } else {
               s
             }
@@ -124,7 +136,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
           val definednessChecks = maybeDefCheck(e)
           val freeAssms = maybeFreeAssumptions(e)
           val stmt = components map (_.inhaleExp(e, error))
-          if (stmt.children.isEmpty)
+          if (Statements.children(stmt).isEmpty)
             sys.error(s"missing translation for inhaling of $e")
 
           //do not transform definednessChecks inside package (backwards compatible with older version)
@@ -139,7 +151,8 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
             retStmt
       }
     if(insidePackageStmt && addDefinednessChecks) {
-      If(wandModule.getCurOpsBoolvar(), res, Statements.EmptyStmt)
+      ADVANCED_Stmt("inhaleConnective", "only necessairy for wands (2)")
+      // If(wandModule.getCurOpsBoolvar(), res, Statements.EmptyStmt)
     } else {
       res
     }
@@ -149,7 +162,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
     if (e.isPure) {
       Assume(translateExp(e))
     } else {
-      Nil
+      Nil //B3 CHECK: this could lead to problems, check uses.
     }
   }
 }

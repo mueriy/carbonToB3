@@ -10,8 +10,8 @@ import viper.carbon.modules._
 import viper.carbon.modules.components.{DefinednessComponent, InhaleComponent, SimpleStmtComponent}
 import viper.silver.ast.utility.Expressions
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
-import viper.carbon.boogie.Implicits._
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Implicits._
 import viper.carbon.verifier.Verifier
 import viper.carbon.utility.{PolyMapDesugarHelper, PolyMapRep}
 import viper.silver.ast.utility.QuantifiedPermissions.QuantifiedPermissionAssertion
@@ -46,6 +46,7 @@ class DefaultHeapModule(val verifier: Verifier)
 
   var enableAllocationEncoding : Boolean = true // note: this may be modified on configuration, so should only be used e.g. in method defs which will be called later (e.g. during verification)
 
+/*
   private val fieldTypeName = "Field"
   private val normalFieldTypeName = "NormalField"
   private val normalFieldType = NamedType(normalFieldTypeName)
@@ -329,7 +330,7 @@ class DefaultHeapModule(val verifier: Verifier)
           Trigger(Seq(identicalFuncApp, lookup(eh.l, nullLit, predicateMaskField(predField.l)), isPredicateField(predField.l))) ++
           (verifier.program.predicates map (pred =>
             Trigger(Seq(identicalFuncApp, predicateTriggerAnyState(pred, predField.l), isPredicateField(predField.l))))
-            )*/,
+            )*/*/,
         identicalFuncApp ==>
           (
             (staticPermissionPositive(nullLit, predField.l) && isPredicateField(predField.l)) ==>
@@ -791,9 +792,10 @@ class DefaultHeapModule(val verifier: Verifier)
   override def restoreState(s: Seq[Var]): Unit = {
     heap = s(0) // note: this should be accessed via heapVar or heapExp as appropriate (whether a variable is essential or not)
   }
+*/
 
-  def equateWithCurrentHeap(s: Seq[Var]): Stmt ={
-    Assume(heap === s(0))
+  def equateWithCurrentHeap(s: Seq[Variable]): Stmt = {
+    LATER_Stmt("equateWithCurrentHeap", "need to implement Heap") //Assume(heap === s(0))
   }
 
   override def usingOldState = stateModuleIsUsingOldState
@@ -802,9 +804,10 @@ class DefaultHeapModule(val verifier: Verifier)
 
   override def beginExhale: Stmt = {
 //    Havoc(exhaleHeap)
-    Statements.EmptyStmt
+    EmptyStmt
   }
 
+/*
   override def endExhale: Stmt = {
     if (!usingOldState) Havoc(exhaleHeap) ++ Assume(FuncApp(identicalOnKnownLocsName, Seq(heapExp, exhaleHeap) ++ currentMask, Bool)) ++
       (heapVar := exhaleHeap)
@@ -825,4 +828,5 @@ class DefaultHeapModule(val verifier: Verifier)
 
   override def identicalOnKnownLocations(otherHeap:Seq[Exp],otherMask:Seq[Exp]):Exp =
     FuncApp(identicalOnKnownLocsName,otherHeap ++ heap ++ otherMask, Bool)
+*/
 }

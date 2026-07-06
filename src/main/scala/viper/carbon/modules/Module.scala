@@ -8,7 +8,7 @@ package viper.carbon.modules
 
 import viper.silver.components.{StatefulComponent, LifetimeComponent}
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.{LocalVar, Exp, Decl}
+import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Decl}
 import viper.carbon.verifier.Verifier
 
 /**
@@ -49,7 +49,7 @@ trait Module extends LifetimeComponent with StatefulComponent with viper.carbon.
    * The assumptions that can be made about a value of a given type (e.g. "isGoodMultiset" in the DefaultSetModule).
    * the "isParameter" flag can be used to select assumptions which only apply to parameters
    */
-  def validValue(typ: sil.Type, variable: LocalVar, isParameter: Boolean): Option[Exp] = None
+  def validValue(typ: sil.Type, variable: IdExpr, isParameter: Boolean): Option[Expr] = None
 
   override def toString = name
 }

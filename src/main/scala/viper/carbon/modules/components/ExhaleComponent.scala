@@ -6,7 +6,7 @@
 
 package viper.carbon.modules.components
 
-import viper.carbon.boogie.{Statements, Stmt}
+import viper.carbon.b3.B3Nodes.{Stmt, EmptyStmt}
 import viper.silver.{ast => sil}
 import viper.silver.verifier.PartialVerificationError
 
@@ -19,7 +19,7 @@ trait ExhaleComponent extends Component {
   /**
    * Exhale a single expression.
    */
-  def exhaleExp(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState]): Stmt = Statements.EmptyStmt
+  def exhaleExp(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState]): Stmt = EmptyStmt
 
   /**
     */
@@ -37,6 +37,6 @@ trait ExhaleComponent extends Component {
     * @return
     */
   def exhaleExpBeforeAfter(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState]): (() => Stmt, () => Stmt) =
-    (() => exhaleExp(e, error, definednessStateOpt), () => Statements.EmptyStmt)
+    (() => exhaleExp(e, error, definednessStateOpt), () => EmptyStmt)
 
 }

@@ -73,6 +73,7 @@ class QuantifiedPermModule(val verifier: Verifier)
     wandModule.register(this)
   }
 
+/*
   implicit val namespace = verifier.freshNamespace("perm")
   private val axiomNamespace = verifier.freshNamespace("perm.axiom")
   private val permTypeName = "Perm"
@@ -1592,7 +1593,7 @@ class QuantifiedPermModule(val verifier: Verifier)
     }
   }
 
-  override def freshReads(vars: Seq[viper.silver.ast.LocalVar]): Stmt = {
+  override def freshReads(vars: Seq[sil.LocalVar]): Stmt = {
     val bvs = vars map translateLocalVar
     Havoc(bvs) ++
       (bvs map (v => Assume((v > noPerm) && (v < fullPerm))))
@@ -1984,4 +1985,5 @@ class QuantifiedPermModule(val verifier: Verifier)
     }
 
   }
+*/
 }

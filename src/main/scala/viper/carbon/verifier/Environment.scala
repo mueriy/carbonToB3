@@ -7,24 +7,29 @@
 package viper.carbon.verifier
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.{BoogieNameGenerator, Identifier, LocalVar}
+// import viper.carbon.boogie.{BoogieNameGenerator, Identifier, LocalVar}
+import viper.carbon.b3.B3Nodes.Variable
 import viper.carbon.b3.B3NameGenerator
-import viper.carbon.Mode
 
 /**
  * An environment that assigns unique names to Viper variables;  in SIL, loops can have
  * local variables and thus a method might have two declarations of a local variable
- * with the same name (in different loops).  In Boogie on the other hand, all variables
- * need to be unique.
+ * with the same name (in different loops).  In Boogie, all variables needed to be unique,
+ * but B3 supports shadowing variables again. Now there are other important criterias:
+ * 1) B3 var declarations must include all statements where it should be in scope of, so
+ * these declarations must be done correctly. Luckily this is supported by Seqn.
+ * 2) All custom names must have a definitely unique name. See B3NameGenerator for more on that.
+ * 3) To use a variable in an expression we only need a name (as string), but it might be 
+ * helpful to associate that to a type.
  */
 case class Environment(verifier: Verifier, member: sil.Node) {
 
-  private val names = if (verifier.mode == Mode.B3) new B3NameGenerator() else new BoogieNameGenerator()
+  private val names = new B3NameGenerator()
 
   /** The current mapping of variables. */
-  private val currentMapping = collection.mutable.HashMap[sil.LocalVar, LocalVar]()
+  private val currentMapping = collection.mutable.HashMap[sil.LocalVar, Variable]()
 
-  /** Records the generated Boogie names of all translated Viper variables. */
+  /** Records the generated B3 names of all translated Viper variables. */
   private val allUsedNames = collection.mutable.HashMap[String, String]()
 
   // register types from member
@@ -56,10 +61,10 @@ case class Environment(verifier: Verifier, member: sil.Node) {
   def currentNameMapping : Map[String, String] = allUsedNames.toMap
 
   /**
-   * Returns the Boogie variable for a given Viper variable (it has to be defined first,
+   * Returns the B3 variable for a given Viper variable (it has to be defined first,
    * otherwise an error is thrown).
    */
-  def get(variable: sil.LocalVar): LocalVar = {
+  def get(variable: sil.LocalVar): Variable = {
     currentMapping.get(variable) match {
       case Some(t) => t
       case None => sys.error(s"Internal Error: variable $variable is not defined.")
@@ -68,15 +73,15 @@ case class Environment(verifier: Verifier, member: sil.Node) {
 
   /**
    * Defines a local variable in this environment for a given Viper variable, and returns the corresponding
-   * Boogie variable.
+   * B3 variable.
    */
-  def define(variable: sil.LocalVar): LocalVar = {
+  def define(variable: sil.LocalVar): Variable = {
     currentMapping.get(variable) match {
       case Some(t) =>
         sys.error(s"Internal Error: variable $variable is already defined.")
       case None =>
         val name = uniqueName(variable.name)
-        val bvar = LocalVar(Identifier(name)(verifier.mainModule.silVarNamespace), verifier.typeModule.translateType(variable.typ))
+        val bvar = Variable(name, verifier.typeModule.translateType(variable.typ))
         currentMapping.put(variable, bvar)
         allUsedNames.update(variable.name, name)
         bvar

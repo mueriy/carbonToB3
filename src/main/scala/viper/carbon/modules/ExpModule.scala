@@ -7,7 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.{Exp, LocalVar, Stmt}
+import viper.carbon.b3.B3Nodes.{Expr, Variable, Stmt}
 import viper.carbon.modules.components.{ComponentRegistry, DefinednessComponent, DefinednessState}
 import viper.silver.verifier.PartialVerificationError
 
@@ -15,15 +15,15 @@ import viper.silver.verifier.PartialVerificationError
  * A module for translating Viper expressions.
  */
 trait ExpModule extends Module with ComponentRegistry[DefinednessComponent] {
-  def translateExp(exp: sil.Exp): Exp
+  def translateExp(exp: sil.Exp): Expr
 
   /**
     * Used to translate expressions during packaging a wand.
     * This method Prepares the correct state in which translating an expression takes place then calls translateExp
     */
-  def translateExpInWand(exp: sil.Exp): Exp
+  def translateExpInWand(exp: sil.Exp): Expr
 
-  def translateLocalVar(l: sil.LocalVar): LocalVar
+  def translateLocalVar(l: sil.LocalVar): Variable
 
   /**
    * Free assumptions about an expression.

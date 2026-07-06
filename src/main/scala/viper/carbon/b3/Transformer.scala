@@ -4,7 +4,8 @@
 //
 // Copyright (c) 2011-2021 ETH Zurich.
 
-package viper.carbon.boogie
+package viper.carbon.b3
+import viper.carbon.b3.B3Nodes._
 
 
 /**
@@ -23,66 +24,64 @@ object Transformer {
 
     def recurse(parent: Node): Node = {
       parent match {
-        case Program(header, decls) =>
-          Program(header, decls map go)
-        case LocalVarDecl(name, typ, Some(where)) =>
-          LocalVarDecl(name, go(typ), Some(go(where)))
-        case LocalVarDecl(name, typ, None) =>
-          LocalVarDecl(name, go(typ), None)
-        case Trigger(exps) => Trigger(exps map go)
-        case _: Type => parent
+        case _: NOT_SUPPORTED => parent
+        case Program(signatureTypes, domains, types, taggers, functions, axioms, procedures) =>
+          Program(signatureTypes, domains map go, types map go, taggers map go, 
+                  functions map go, axioms map go, procedures map go)
+        case _: FParameter => parent
+        case _: Variable => parent
+        case _: PParameter => parent
+        case _: Binding => parent
+        case Pattern(es) => Pattern(es map go)
+        case ae: AExpr =>
+          ae match {
+            case AExpression(e) => AExpression(go(e))
+            case AAssertion(s) => AAssertion(go(s))
+          }
         case d: Decl =>
           d match {
-            case ConstDecl(name, typ, unique) => ConstDecl(name, go(typ), unique)
-            case TypeDecl(_) => parent
-            case TypeAlias(n, de) => TypeAlias(go(n), go(de))
-            case Func(name, args, typ, attrs) => Func(name, args map go, go(typ), attrs)
-            case Axiom(exp) => Axiom(go(exp))
-            case GlobalVarDecl(name, typ) => GlobalVarDecl(name, go(typ))
-            case Procedure(name, ins, outs, body) => Procedure(name, ins map go, outs map go, go(body))
-            case CommentedDecl(s, ds, a, b) => CommentedDecl(s, ds map go, a, b)
-            case DeclComment(_) => parent
-            case LiteralDecl(_) => parent
+            // case ConstDecl(name, typ, unique) => ConstDecl(name, go(typ), unique)
+            case TypeDecl(_, _) => parent
+            // case TypeAlias(n, de) => TypeAlias(go(n), go(de))
+            case Tagger(_,_) => parent
+            case Function(name, args, typ, tag) => Function(name, args map go, typ, tag) //TODO: track if there are type modifications done anywhere; if so we need a Type Node
+            case Axiom(explains, exp) => Axiom(explains, go(exp))
+            // case GlobalVarDecl(name, typ) => GlobalVarDecl(name, go(typ))
+            case Procedure(name, args, pre, post, optBody) => Procedure(name, args map go, pre map go, post map go, optBody map go)
+            // case CommentedDecl(s, ds, a, b) => CommentedDecl(s, ds map go, a, b)
+            // case DeclComment(_) => parent
+            // case LiteralDecl(_) => parent
           }
         case ss: Stmt =>
           ss match {
-            case Assign(lhs, rhs) => Assign(go(lhs), go(rhs))
-            case Assert(e, error) => Assert(go(e), error)
+            case VarDecl(name, body, typ, isMutable, optInitVal) => VarDecl(name, go(body), typ, isMutable, optInitVal map go)
+            case Assign(lhs, rhs) => Assign(lhs, go(rhs)) //TODO: track if there are var name modifications done anywhere; if so we need a ID Node
+            case Reinit(_) => parent            
+            case Block(s) => Block(s map go)
+            case Check(e, error) => Check(go(e), error)
             case Assume(e) => Assume(go(e))
-            case HavocImpl(es) => HavocImpl(es map go)
-            case Comment(_) => parent
-            case CommentBlock(s, stmt) => CommentBlock(s, go(stmt))
-            case Seqn(s) => Seqn(s map go)
+            case Assert(e, error) => Assert(go(e), error)
+            case Choose(branches) => Choose(branches map go)
             case If(cond, thn, els) => If(go(cond), go(thn), go(els))
-            case NondetIf(thn, els) => NondetIf(go(thn), go(els))
-            case Label(_) => parent
-            case Goto(_) => parent
-            case LocalVarWhereDecl(idn, where) => LocalVarWhereDecl(idn, go(where))
+            case Loop(inv, body) => Loop(inv map go, go(body))
+            case LabeledStmt(lbl, body) => LabeledStmt(lbl, go(body))
           }
-        case e: Exp =>
+        case e: Expr =>
           // Note: If you have to update this pattern match to make it exhaustive, it
           // might also be necessary to update the PrettyPrinter.toParenDoc method.
           e match {
-            case IntLit(_) => parent
             case BoolLit(_) => parent
-            case RealLit(_) => parent
-            case RealConv(exp) => RealConv(go(exp))
-            case LocalVar(n, t) => LocalVar(n, go(t))
-            case GlobalVar(n, t) => GlobalVar(n, go(t))
-            case Const(_) => parent
-            case MapSelect(map, idxs) => MapSelect(go(map), idxs map go)
-            case MapUpdate(map, idxs, value) => MapUpdate(go(map), idxs map go, go(value))
-            case Old(exp) => Old(go(exp))
-            case CondExp(cond, thn, els) => CondExp(go(cond), go(thn), go(els))
-            case Exists(v, triggers, exp, w) => Exists(v map go, triggers map go, go(exp), w)
-            case Forall(v, triggers, exp, tv, w) => Forall(v map go, triggers map go, go(exp), tv, w)
-            case BinExp(left, binop, right) => BinExp(go(left), binop, go(right))
-            case UnExp(unop, exp) => UnExp(unop, go(exp))
-            case f@FuncApp(func, args, typ) => {
-              val fa = FuncApp(func, args map go, go(typ))
-              fa.showReturnType = f.showReturnType
-              fa
-            }
+            case IntLit(_) => parent
+            // case RealLit(_) => parent
+            case IdExpr(_,_,_) => parent
+            case OperatorExpr(op, es) => OperatorExpr(op, es map go)
+            // case MapSelect(map, idxs) => MapSelect(go(map), idxs map go)
+            // case MapUpdate(map, idxs, value) => MapUpdate(go(map), idxs map go, go(value))
+            // case Old(exp) => Old(go(exp)) //TODO: check if this is actually ever used somewhere
+            case FunctionCallExpr(func, args, typ) => FunctionCallExpr(func, args map go, typ)
+            case LabeledExpr(l, e) => LabeledExpr(l, go(e))
+            case Forall(v, pat, exp) => Forall(v map go, pat map go, go(exp))
+            case Exists(v, pat, exp) => Exists(v map go, pat map go, go(exp))
           }
       }
     }
@@ -98,7 +97,7 @@ object Transformer {
 }
 
 
-
+/*
 object DuplicatingTransformer {
 
   def transform[A <: Node](node: A,
@@ -212,3 +211,4 @@ object DuplicatingTransformer {
     (afterRecursion flatMap post).asInstanceOf[Seq[A]]
   }
 }
+*/

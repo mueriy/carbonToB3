@@ -15,6 +15,7 @@ import viper.carbon.modules.impls.dafny_axioms.SequenceAxiomatization
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState}
 import viper.silver.ast.{SeqIndex, SeqLength}
 import viper.silver.verifier.{PartialVerificationError, reasons}
+import viper.carbon.b3.B3Nodes.TODO_Stmt
 
 /**
  * The default implementation of [[viper.carbon.modules.SeqModule]].
@@ -37,13 +38,17 @@ class DefaultSeqModule(val verifier: Verifier)
   implicit val namespace = verifier.freshNamespace("seq")
 
   override def preamble = {
+    Seq()//B3 LATER
+/*
     if (used) {
       LiteralDecl(SequenceAxiomatization.value)
     } else {
       Nil
     }
+*/
   }
 
+/*
   override def start(): Unit = {
     expModule.register(this)
   }
@@ -131,4 +136,5 @@ class DefaultSeqModule(val verifier: Verifier)
   override def reset(): Unit = {
     used = false
   }
+*/
 }

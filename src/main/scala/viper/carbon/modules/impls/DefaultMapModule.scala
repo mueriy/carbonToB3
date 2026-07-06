@@ -256,6 +256,8 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
   override def start() : Unit = expModule.register(this)
 
   override def translateMapExp(exp : sil.Exp) : Exp = {
+    sys.error("LATER: translateMapExp")
+/*
     used = true
 
     def rec(e : sil.Exp) = translateExp(e) // recurse
@@ -296,11 +298,13 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
 
       case _ => sys.error("not a map expression")
     }
+*/
   }
 
   override def translateMapType(mapType : sil.MapType) : Type = {
-    used = true
-    NamedType("Map", Seq(translateType(mapType.keyType), translateType(mapType.valueType)))
+    sys.error("LATER: translateMapType")
+    // used = true
+    // NamedType("Map", Seq(translateType(mapType.keyType), translateType(mapType.valueType)))
   }
 
   override def simplePartialCheckDefinednessAfter(exp: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): Stmt = {

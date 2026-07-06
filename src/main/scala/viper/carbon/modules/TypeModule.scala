@@ -7,7 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.Type
+import viper.carbon.b3.B3Nodes.Type
 
 /**
  * A module for translating types.

@@ -6,11 +6,11 @@
 
 package viper.carbon.modules
 
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes.{Expr, Variable, Stmt, Type}
 import viper.carbon.modules.components.CarbonStateComponent
 import viper.silver.{ast => sil}
 
-case class PMaskDesugaredRep(selectId: Identifier, storeId: Identifier)
+case class PMaskDesugaredRep(selectId: Variable, storeId: Variable)
 
 /**
  * The permission module determines the encoding of permissions and allows to add or remove
@@ -26,12 +26,12 @@ trait PermModule extends Module with CarbonStateComponent {
   /**
    * Translate a permission amount
    */
-  def translatePerm(e: sil.Exp): Exp
+  def translatePerm(e: sil.Exp): Expr
 
   /**
    * Translate a permission comparison
    */
-  def translatePermComparison(e: sil.Exp): Exp
+  def translatePermComparison(e: sil.Exp): Expr
 
   /**
    * Returns an expression representing that a permission amount is positive
@@ -40,7 +40,7 @@ trait PermModule extends Module with CarbonStateComponent {
    * @param zeroOK whether the comparison should (not) be strict, or not
    * @return the expression representing the fact that the permission is positive
    */
-  def permissionPositive(permission: Exp, zeroOK : Boolean = false): Exp
+  def permissionPositive(permission: Expr, zeroOK : Boolean = false): Expr
 
   def conservativeIsPositivePerm(e: sil.Exp): Boolean
 
@@ -52,32 +52,32 @@ trait PermModule extends Module with CarbonStateComponent {
     * @param e the permission amount to be checked
     * @return the expression representing the fact that the permission is positive
     */
-  def isStrictlyPositivePerm(e: sil.Exp): Exp
+  def isStrictlyPositivePerm(e: sil.Exp): Expr
 
   /**
    * The current mask.
    */
-  def currentMask: Seq[Exp]
+  def currentMask: Seq[Expr]
 
   /**
    * A static reference to the mask.
    */
-  def staticMask: Seq[LocalVarDecl]
+  def staticMask: Seq[Variable]
 
   /**
    * Is the permission for a given expression positive (using the static mask).
    */
-  def staticPermissionPositive(rcv: Exp, loc: Exp): Exp
+  def staticPermissionPositive(rcv: Expr, loc: Expr): Expr
 
   /**
    * The predicate mask field of a given predicate (as its ghost location).
    */
-  def predicateMaskField(pred: Exp): Exp
+  def predicateMaskField(pred: Expr): Expr
 
   /**
     * The wand mask field of a given wand (as its ghost location).
     */
-  def wandMaskField(wand: Exp): Exp
+  def wandMaskField(wand: Expr): Expr
 
   /**
     * The type used for masks.
@@ -96,27 +96,27 @@ trait PermModule extends Module with CarbonStateComponent {
     */
   def pmaskTypeDesugared: PMaskDesugaredRep
 
-  def zeroPMask: Exp
+  def zeroPMask: Expr
 
-  def hasDirectPerm(ra: sil.ResourceAccess): Exp
+  def hasDirectPerm(ra: sil.ResourceAccess): Expr
 
   /**
    * The expression for the current permission at a location.
    */
-  def currentPermission(loc: sil.ResourceAccess): Exp
+  def currentPermission(loc: sil.ResourceAccess): Expr
 
-  def currentPermission(rcv:Exp, loc:Exp):Exp
+  def currentPermission(rcv:Expr, loc:Expr):Expr
 
   /**these methods are for experimental purposes, not yet finalized **/
   /*def beginSumMask : Stmt
 
-  def sumMask : Exp
+  def sumMask : Expr
 
   def endSumMask: Stmt*/
 /*
   def setSummandMask1
   def setSummandMask2
-  def sumMask(assmsToSmt: Exp => Stmt):Stmt
+  def sumMask(assmsToSmt: Expr => Stmt):Stmt
   */
 
   /**
@@ -125,7 +125,7 @@ trait PermModule extends Module with CarbonStateComponent {
     * @param summandMask2
     * @return expression for which its validity implies that the current mask is the sum of the two input masks
     */
-  def sumMask(summandMask1: Seq[Exp], summandMask2: Seq[Exp]): Exp
+  def sumMask(summandMask1: Seq[Expr], summandMask2: Seq[Expr]): Expr
 
   /**
     *
@@ -135,14 +135,14 @@ trait PermModule extends Module with CarbonStateComponent {
     * @return expression for which its validity implies that @{code resultMask} is the sum of the other two input
     *         masks
     */
-  def sumMask(resultMask: Seq[Exp], summandMask1: Seq[Exp], summandMask2: Seq[Exp]) : Exp
+  def sumMask(resultMask: Seq[Expr], summandMask1: Seq[Expr], summandMask2: Seq[Expr]) : Expr
 
     /** returns a mask and the returned statement ensures that the mask  has non-zero permission at rcv.loc and zero
       * permission at all other location
       * this should only be used temporarily, i.e. if there are two calls to this then the previous tempMask returned
       * will be overwritten in the Boogie code
       */
-  def tempInitMask(rcv: Exp, loc:Exp):(Seq[Exp], Stmt)
+  def tempInitMask(rcv: Expr, loc:Expr):(Seq[Expr], Stmt)
 
   def getCurrentAbstractReads(): collection.mutable.ListBuffer[String]
 

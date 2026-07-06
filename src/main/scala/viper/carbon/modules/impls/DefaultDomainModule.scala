@@ -8,9 +8,9 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules.{DomainModule, StatelessComponent}
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
 import viper.carbon.verifier.{Environment, Verifier}
-import viper.carbon.boogie.Implicits._
+import viper.carbon.b3.B3Implicits._
 import viper.silver.ast.NamedDomainAxiom
 
 /**
@@ -31,6 +31,8 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
   def outputName(domain: sil.Domain) : String = domain.name + "DomainType"
 
   override def translateDomain(domain: sil.Domain): Seq[Decl] = {
+    sys.error("LATER: translateDomainFunction")
+    /*
     val prevState = stateModule.state
     stateModule.replaceState(stateModule.pureState)
     val fs = domain.functions.filter(f => f.interpretation.isEmpty) flatMap translateDomainFunction
@@ -39,9 +41,12 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
       TypeDecl(NamedType(this.outputName(domain) , domain.typVars map (tv => TypeVar(tv.name)))), size = 1)
     stateModule.replaceState(prevState)
     CommentedDecl(s"Translation of domain ${domain.name}", ts ++ fs ++ as, nLines = 2)
+    */
   }
 
   private def translateDomainFunction(f: sil.DomainFunc): Seq[Decl] = {
+    sys.error("LATER: translateDomainFunction")
+    /*
     env = Environment(verifier, f)
     val t = translateType(f.typ)
     val res = if (f.unique) {
@@ -54,9 +59,12 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
     }
     env = null
     res
+    */
   }
 
   private def translateDomainAxiom(axiom: sil.DomainAxiom): Seq[Decl] = {
+    sys.error("LATER: translateDomainAxiom")
+    /*
     env = Environment(verifier, axiom)
     //(AS): I believe this is not needed, as locals are introduced in the translation
     //mainModule.defineLocalVars(axiom)
@@ -68,9 +76,12 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
     //mainModule.undefineLocalVars(axiom)
     env = null
     res
+    */
   }
 
-  override def translateDomainFuncApp(fa: sil.DomainFuncApp): Exp = {
+  override def translateDomainFuncApp(fa: sil.DomainFuncApp): Expr = {
+    sys.error("LATER: translateDomainFuncApp")
+    /*
     val funct = verifier.program.findDomainFunction(fa.funcname)
     if (funct.unique) {
       Const(Identifier(funct.name))
@@ -79,12 +90,16 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
       res.showReturnType = true
       res
     }
+    */
   }
 
   override def translateDomainTyp(typ: sil.DomainType): Type = {
+    sys.error("LATER: translateDomainTyp")
+    /*
     val domain = verifier.program.findDomain(typ.domainName)
     val typArgs = domain.typVars map (tv => typ.typVarsMap.getOrElse(tv, tv))
     NamedType(this.outputName(domain), typArgs map translateType)
+    */
   }
 
 }

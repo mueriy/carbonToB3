@@ -8,8 +8,8 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules._
 import viper.carbon.verifier.Verifier
-import viper.carbon.boogie._
-import viper.carbon.boogie.Implicits._
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Implicits._
 import viper.carbon.modules.components.CarbonStateComponent
 
 import scala.collection.mutable
@@ -23,7 +23,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
 
   def name = "State module"
 
-  private val isGoodState = "state"
+  private val isGoodState = "state" //B3 TODO: unique name
 
   implicit val stateNamespace = verifier.freshNamespace("state")
 
@@ -32,6 +32,8 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   }
 
   override def preamble: Seq[Decl] = {
+    Seq() // B3 TODO
+/*
     Func(Identifier(isGoodState), staticStateContributions(), Bool) ++
     {
       val prevState = stateModule.state
@@ -46,6 +48,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
       // so without this assumption, function calls with dummyHeap and emptyMask won't trigger the definition.
       Axiom(res)
     }
+*/
   }
 
   override def reset : Unit = {
@@ -91,9 +94,11 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   }
 
 
-  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true) : Seq[LocalVarDecl] = components flatMap (_.staticStateContributions(withHeap, withPermissions))
-//  def currentStateContributions: Seq[LocalVarDecl] = components flatMap (_.currentStateContributions)
-  def stateContributionValues(snap: StateSnapshot): Seq[Exp] = {
+  def staticStateContributions(withHeap: Boolean = true, withPermissions: Boolean = true): Seq[Variable] = components flatMap (_.staticStateContributions(withHeap, withPermissions))
+  // def currentStateContributions: Seq[LocalVarDecl] = components flatMap (_.currentStateContributions)
+  def stateContributionValues(snap: StateSnapshot): Seq[Expr] = {
+    TODO_Expr_bool("(MAYBE)", "stateContributionValues; no idea what that does right now")
+/*
     var res : Seq[Exp] = Seq()
     val hashMap = snap._1
     for (c <- components) yield {
@@ -102,22 +107,23 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
       }
     }
     res
+*/
   }
 
 
   // Note: For "old" state, these variables should be wrapped in "Old(.)" before use
-  type StateComponentMapping = java.util.IdentityHashMap[CarbonStateComponent, Seq[Var]]
+  type StateComponentMapping = java.util.IdentityHashMap[CarbonStateComponent, Seq[Variable]]
   override type StateSnapshot = (StateComponentMapping, Boolean, Boolean) // mapping to vars, using old state, using pure state
 
   private var curOldState: StateComponentMapping = null
   private var curState: StateComponentMapping = null
 
-  def staticGoodState: Exp = {
-    FuncApp(Identifier(isGoodState), staticStateContributions() map (v => LocalVar(v.name, v.typ)), Bool)
+  def staticGoodState: Expr = {
+    FunctionCallExpr(isGoodState, staticStateContributions() map (v => IdExpr(v.name, v.typ)), Bool)
   }
 
-  def currentGoodState: Exp = {
-    FuncApp(Identifier(isGoodState), currentStateContributionValues, Bool)
+  def currentGoodState: Expr = {
+    FunctionCallExpr(isGoodState, currentStateContributionValues, Bool)
   }
 
   private lazy val stateRepository = new mutable.HashMap[String, StateSnapshot]()
@@ -136,7 +142,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     val s = for (c <- components) yield {
       val tmpExps = c.freshTempState(name)
       val curExps = c.currentStateExps // note: this will wrap them in "Old" as necessary for correct initialisation
-      val stmt: Stmt = if (discardCurrent) Nil else (tmpExps zip curExps) map (x => (x._1 := x._2))
+      val stmt: Stmt = if (discardCurrent) Nil else (tmpExps zip curExps) map (x => (x._1.name := x._2))
       previousState._1.put(c, c.currentStateVars) // reconstruct information from previous state (this is logically similar to a clone of what curState used to represent)
       curState.put(c, tmpExps) // repopulate current state
       c.restoreState(tmpExps)
@@ -166,7 +172,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
 
   override def initToCurrentStmt(snapshot: StateSnapshot) : Stmt = {
     for (e <- snapshot._1.entrySet().asScala.toSeq) yield {
-      val s: Stmt = (e.getValue zip e.getKey.currentStateExps) map (x => x._1 := x._2)
+      val s: Stmt = (e.getValue zip e.getKey.currentStateExps) map (x => x._1.name := x._2)
       s
     }
   }
@@ -185,7 +191,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     usingPureState = snapshot._3
   }
 
-  override def equateHeaps(snapshot: StateSnapshot, c: CarbonStateComponent):Stmt =
+  override def equateHeaps(snapshot: StateSnapshot, c: CarbonStateComponent): Stmt =
   {
     heapModule.equateWithCurrentHeap(snapshot._1.get(c))
   }

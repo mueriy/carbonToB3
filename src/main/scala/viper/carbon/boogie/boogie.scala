@@ -12,7 +12,6 @@ import viper.silver.ast.pretty._
 import viper.silver.verifier.VerificationError
 
 import scala.collection.mutable
-import viper.carbon.Mode
 
 /** The root of the Boogie AST. */
 sealed trait Node {
@@ -92,9 +91,7 @@ sealed trait Node {
     Transformer.transform[this.type](this, pre)(recursive, post)
 
   /** This is Boogie only! For other modes (B3) you should use 'toStringOfMode' instead! */
-  override def toString = PrettyPrinter.pretty(this, Mode.Boogie)
-  /** 'toString'-variant where the mode can be chosen, i.e. which verifier to use: Boogie/B3 */
-  def toStringOfMode(mode: Mode.Mode) = PrettyPrinter.pretty(this, mode)
+  override def toString = PrettyPrinter.pretty(this)
 }
 
 /**
@@ -114,7 +111,7 @@ case class LocalVarDecl(name: Identifier, typ: Type, where: Option[Exp] = None) 
  */
 trait Identifier {
   def name: String
-  def namespace: Namespace
+  def namespace: viper.carbon.b3.Namespace // using b3.Namespace here avoids compiler errors while not everything is transformed
   def preferredName = name
   override def equals(o: Any) = {
     o match {
@@ -125,7 +122,7 @@ trait Identifier {
   override def hashCode = List(name, namespace).hashCode
 }
 case object Identifier {
-  def apply(n: String)(implicit ns: Namespace): Identifier =
+  def apply(n: String)(implicit ns: viper.carbon.b3.Namespace): Identifier = // using b3.Namespace here avoids compiler errors while not everything is transformed
     new Identifier {
       val name = n
       val namespace = ns

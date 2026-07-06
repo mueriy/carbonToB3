@@ -6,14 +6,15 @@
 
 package viper.carbon.modules.impls
 
-import viper.carbon.boogie.{Bool, CondExp, Exp, FalseLit, Forall, If, Int, IntLit, LocalVar, LocalVarDecl, MaybeCommentBlock, Stmt, Trigger, TypeVar, _}
+// import viper.carbon.boogie.{Bool, CondExp, Exp, FalseLit, Forall, If, Int, IntLit, LocalVar, LocalVarDecl, MaybeCommentBlock, Stmt, Trigger, TypeVar, _}
+import viper.carbon.b3.B3Nodes._
 import viper.carbon.modules._
 import viper.silver.ast.{FuncApp => silverFuncApp}
 import viper.silver.ast.utility.Expressions.{contains, whenExhaling, whenInhaling}
 import viper.silver.ast.{NoPerm, PermGtCmp, PredicateAccess, PredicateAccessPredicate, Unfolding}
 import viper.silver.{ast => sil}
 import viper.carbon.verifier.{Environment, Verifier}
-import viper.carbon.boogie.Implicits._
+import viper.carbon.b3.B3Implicits._
 import viper.silver.ast.utility._
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState, ExhaleComponent, InhaleComponent}
 import viper.silver.verifier.{NullPartialVerificationError, PartialVerificationError, errors}
@@ -41,6 +42,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   import heapModule._
   import permModule._
 
+/*
   implicit val fpNamespace = verifier.freshNamespace("funcpred")
 
   /* Maps function names to their height.
@@ -87,8 +89,11 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
   private var functionFrames : FrameInfos = FrameInfos();
   private var predicateFrames: FrameInfos = FrameInfos();
+*/
 
   override def preamble = {
+    Seq() //B3 TODO
+/*
     val fp = if (verifier.program.functions.isEmpty) Nil
     else {
       val m = heights.values.max
@@ -184,8 +189,10 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
           )
         )
       }, size = 1)
+*/
   }
 
+/*
   override def start(): Unit = {
     expModule.register(this)
     inhaleModule.register(this, before = Seq(verifier.inhaleModule)) // this is because of inhaleExp definition, which tries to add extra information from executing the unfolding first
@@ -251,17 +258,22 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       Axiom(Forall(args, Trigger(funcApp), funcApp === funcApp2 && dummyFuncApplication)) ++
       Axiom(Forall(args, Trigger(funcApp2), dummyFuncApplication))
   }
+*/
 
-  override def dummyFuncApp(e: Exp): Exp = FuncApp(dummyTriggerName, Seq(e), Bool)
+  override def dummyFuncApp(e: Expr): Expr = TODO_Expr_bool("dummyFuncApp") //FuncApp(dummyTriggerName, Seq(e), Bool)
 
   override def translateFuncApp(fa: sil.FuncApp) = {
+    TODO_Expr_bool("translateFuncApp")
+/*
     val forceNonLimited = fa.info.getUniqueInfo[sil.AnnotationInfo] match {
       case Some(ai) if ai.values.contains("reveal") => true
       case _ => false
     }
     translateFuncApp(fa.funcname, heapModule.currentStateExps ++ (fa.args map translateExp), fa.typ, forceNonLimited)
+*/
   }
 
+/*
   def translateFuncApp(fname : String, args: Seq[Exp], typ: sil.Type, forceNonLimited: Boolean) = {
     val func = verifier.program.findFunction(fname)
     val useLimited = !forceNonLimited && (func.info.getUniqueInfo[sil.AnnotationInfo] match {
@@ -1209,4 +1221,5 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     env = null
     res
   }
+*/
 }

@@ -7,7 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.{Type, Decl, Exp}
+import viper.carbon.b3.B3Nodes.{Type, Decl, Expr}
 
 /**
  * A module for translating Viper domains.
@@ -15,6 +15,6 @@ import viper.carbon.boogie.{Type, Decl, Exp}
  */
 trait DomainModule extends Module {
   def translateDomain(exp: sil.Domain): Seq[Decl]
-  def translateDomainFuncApp(fa: sil.DomainFuncApp): Exp
+  def translateDomainFuncApp(fa: sil.DomainFuncApp): Expr
   def translateDomainTyp(typ: sil.DomainType): Type
 }

@@ -6,9 +6,9 @@
 
 package viper.carbon.verifier
 
-import viper.carbon.boogie.Program // import viper.carbon.boogie.{Assert, Program}
+import RawAst.Program // import viper.carbon.boogie.{Assert, Program}
 import viper.carbon.b3.B3Adapter.runB3
-import viper.carbon.b3.BoogieToB3Transformer
+import viper.carbon.b3.B3Development
 // import viper.silver.reporter.BackendSubProcessStages._
 import viper.silver.reporter.Reporter // import viper.silver.reporter.{BackendSubProcessReport, Reporter}
 // import viper.silver.verifier.errors.Internal
@@ -59,18 +59,14 @@ trait B3Interface {
 
   /**
    * This will setup and run B3 on the given program using the specified options. 
-   * Includes transformation step to (raw) B3 AST. Timeout currently not working.
+   * Timeout currently not suppported.
    * 
-   * @param program The Program (Boogie AST) we want to verify
+   * @param program The Program (B3 AST (RawAst)) we want to verify
    * @param options Sequence containing B3 flags. These MUST be valid B3 flags in "--flagName" format.
-   * @param timeout Currently does noting.
+   * @param timeout Currently does noting. (B3 ADVANCED)
    * @return Currently always ("?", Success), because we dont do error parsing yet
    */
-  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int], verifier: viper.carbon.verifier.Verifier): (String,VerificationResult) = {
-    val B3Transformer = new BoogieToB3Transformer(verifier)
-    // translate Boogie AST to a B3 raw AST
-    val rawB3prog = B3Transformer.transformProgram(program)
-    // print(program.toString)
+  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {
 
     // invoke B3 and capture any output in outStream (-> output)
     val outStream = new ByteArrayOutputStream()
@@ -78,7 +74,7 @@ trait B3Interface {
     val oldOut = System.out
     try {
       System.setOut(newOut)
-      runB3(rawB3prog, b3defaultOptions ++ options) // [B3 todo?: currently no timeout mechanism]
+      runB3(program, b3defaultOptions ++ options) // [B3 todo?: currently no timeout mechanism]
       newOut.flush()
     } finally {
       System.setOut(oldOut)
@@ -90,7 +86,7 @@ trait B3Interface {
     print(output) // [B3 base: an extension goal would be to implement error parsing here, see BoogieInterface.scala -> parse]
     println("*************************")
 
-    B3Transformer.printInfo()
+    B3Development.printALL()
     
     // cannot get b3 version. Since we currently don't parse/handle errors we always return Success
     ("?", Success)

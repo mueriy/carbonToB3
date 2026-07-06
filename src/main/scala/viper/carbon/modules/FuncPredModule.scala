@@ -7,7 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
 
 import scala.collection.mutable
 
@@ -21,21 +21,21 @@ trait FuncPredModule extends Module {
    */
   def translateFunction(f: sil.Function, names: Option[mutable.Map[String, String]]): Seq[Decl]
 
-  def translateFuncApp(fa: sil.FuncApp): Exp
+  def translateFuncApp(fa: sil.FuncApp): Expr
 
   // wrap an expression in a dummy function with "true" value (sometimes useful for triggering)
-  def dummyFuncApp(e: Exp): Exp
+  def dummyFuncApp(e: Expr): Expr
 
   /* Translate a predicate. If the second parameter is defined, also record the Boogie names of all translated Viper
    * variables to the given map.
    */
   def translatePredicate(p: sil.Predicate, names: Option[mutable.Map[String, String]]): Seq[Decl]
 
-  def predicateVersionType : Type
+  def predicateVersionType: String
 
   def assumeAllFunctionDefinitions: Stmt
 
-  def translateResult(r: sil.Result): Exp
+  def translateResult(r: sil.Result): Expr
 
   // code to go first, and code to go last (other modules may contribute in between)
   /**
@@ -54,14 +54,14 @@ trait FuncPredModule extends Module {
     */
   def translateUnfold(unfold: sil.Unfold, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt
 
-  def toExpressionsUsedInTriggers(e: Exp): Seq[Exp]
-  def toExpressionsUsedInTriggers(e: Seq[Exp]): Seq[Seq[Exp]]
-  def rewriteTriggersToExpressionsUsedInTriggers(e: Seq[Trigger]) : Seq[Trigger] =
-    e flatMap (t => (toExpressionsUsedInTriggers(t.exps))
-      map (Trigger(_)) // build a trigger for each sequence element returned (in general, one original trigger can yield multiple alternative new triggers)
+  def toExpressionsUsedInTriggers(e: Expr): Seq[Expr]
+  def toExpressionsUsedInTriggers(e: Seq[Expr]): Seq[Seq[Expr]]
+  def rewriteTriggersToExpressionsUsedInTriggers(e: Seq[Pattern]) : Seq[Pattern] =
+    e flatMap (t => (toExpressionsUsedInTriggers(t.exprs))
+      map (Pattern(_)) // build a trigger for each sequence element returned (in general, one original trigger can yield multiple alternative new triggers)
       )
 
 
-  def translateBackendFuncApp(fa: sil.BackendFuncApp): Exp
+  def translateBackendFuncApp(fa: sil.BackendFuncApp): Expr
   def translateBackendFunc(f: sil.DomainFunc): Seq[Decl]
 }

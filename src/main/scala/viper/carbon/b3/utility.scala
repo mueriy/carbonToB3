@@ -4,7 +4,9 @@
 //
 // Copyright (c) 2011-2021 ETH Zurich.
 
-package viper.carbon.boogie
+package viper.carbon.b3
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Implicits._
 
 
 /**
@@ -12,7 +14,7 @@ package viper.carbon.boogie
  */
 object Statements {
   /** An empty statement. */
-  val EmptyStmt = Seqn(Nil)
+  val EmptyStmt = Block(Seq())
 
   /**
    * Returns a list of all actual statements contained in a given statement.  That
@@ -23,14 +25,18 @@ object Statements {
    */
   def children(s: Stmt): Seq[Stmt] = {
     s match {
-      case If(_, thn, els) => Seq(s) ++ children(thn) ++ children(els)
-      case NondetIf(thn, els) => Seq(s) ++ children(thn) ++ children(els)
-      case Seqn(ss) => ss flatMap children
-      case CommentBlock(_, stmt) => Seq(stmt)
+      case c: If => Seq(s) ++ children(c.thn) ++ children(c.els)
+      case c: Choose => 
+        // supports any number of branches
+        val options = c.branches
+        Seq(s) ++ (options flatMap children)
+      case c: Block => c.stmts flatMap children
+      // B3 TODO: check if there are other cases that we use in B3 (there is e.g. IfCase, but we dont use that, so we dont need it here - for now)
       case _ => List(s)
     }
   }
 
+/*
   /**
    * Returns a list of all undeclared local variables used in this statement.
    * If the same local variable is used with different
@@ -67,8 +73,10 @@ object Statements {
     }
     s.reduce(Nil, addDecls, combineResults)
   }
+*/
 }
 
+/*
 /**
  * Utility methods for AST nodes.
 
@@ -178,3 +186,4 @@ object Nodes {
     }
   }
 }
+*/
