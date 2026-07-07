@@ -1,7 +1,7 @@
 package viper.carbon.utility
 
 import viper.carbon.boogie.{Axiom, Forall, Func, FuncApp, Identifier, LocalVarDecl, NamedType, Trigger, Type, TypeVar}
-import viper.carbon.b3.Namespace
+import viper.carbon.b3.B3Naming.Namespace
 
 /**
   * Representation of desugared version of polymorphic type

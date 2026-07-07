@@ -2,9 +2,10 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules.LoopModule
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Naming._
 import viper.carbon.verifier.Verifier
-import Implicits._
+import viper.carbon.b3.B3Implicits._
 import viper.carbon.modules.components.StmtComponent
 import viper.carbon.utility._
 import viper.silver.ast.utility.ViperStrategy
@@ -39,7 +40,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   implicit val namespace = verifier.freshNamespace("loop")
 
   //separate masks for each loop to store the permissions which are framed away
-  private var frames: Map[Int, (LocalVarDecl,LocalVarDecl)] = Map[Int, (LocalVarDecl, LocalVarDecl)]();
+  private var frames: Map[Int, (Variable,Variable)] = Map[Int, (Variable, Variable)]();
 
   private var loopToInvs: Map[Int, Seq[sil.Exp]] = Map.empty
   private var labelLoopInfoMap: Map[String, LoopInfo] = Map.empty
@@ -49,10 +50,10 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   private var nodeToLoopInfoOutput : Map[Int, Seq[LoopGenKind]] = Map.empty
 
   private val sumMaskName : Identifier = Identifier("LoopSumMask")(namespace)
-//  private val sumMask = LocalVar(sumMaskName, NamedType(maskType))
+  private val sumMask = IdExpr(sumMaskName, maskType)
 
   private val sumHeapName : Identifier = Identifier("LoopSumHeap")(namespace)
-//  private val sumHeap = LocalVar(sumHeapName, NamedType(heapType))
+  private val sumHeap = IdExpr(sumHeapName, heapType)
 
   private var currentMethodIsAbstract = false;
   private var usedLoopDetectorOnce = false;
@@ -624,7 +625,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
     useLoopDetector = false
   }
 
-  private def getFrame(loopId: Int): (LocalVarDecl, LocalVarDecl) = {
+  private def getFrame(loopId: Int): (Variable, Variable) = {
     sys.error("LATER: getFrame") 
 /*
     frames.get(loopId) match {

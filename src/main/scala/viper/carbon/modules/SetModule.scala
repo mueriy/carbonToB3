@@ -7,13 +7,13 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.{Type, Exp}
+import viper.carbon.b3.B3Nodes.{Type, Expr}
 
 /**
  * A module for translating sets and multisets.
  */
 trait SetModule extends Module {
-  def translateSetExp(exp: sil.Exp): Exp
+  def translateSetExp(exp: sil.Exp): Expr
   def translateSetType(setType: sil.SetType): Type
   def translateMultisetType(setType: sil.MultisetType): Type
 }

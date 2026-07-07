@@ -10,6 +10,7 @@ import viper.carbon.modules.{ExpModule, StatelessComponent}
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Naming.Identifier
 import viper.carbon.b3.Transformer
 import viper.carbon.verifier.Verifier
 import viper.silver.verifier.{PartialVerificationError, reasons}
@@ -88,6 +89,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
       case sil.Applying(_, exp) => translateExp(exp)
       case sil.Asserting(_, exp) => translateExp(exp)
       case sil.Old(exp) =>
+        //B3 QUEST: why did Carbon not use boogie's old()-expression?
         val prevState = stateModule.state
         stateModule.replaceState(stateModule.oldState)
         val res = translateExp(exp)
@@ -316,7 +318,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
 */
   }
 
-  override def translateLocalVar(l: sil.LocalVar): Variable = {
+  override def translateLocalVar(l: sil.LocalVar): IdExpr = {
     env.get(l)
   }
 
@@ -326,11 +328,11 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
     val stmt: Stmt = (if (makeChecks)
       e match {
         case sil.Div(_, b) =>
-            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)).toString())
+            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)))
         case sil.Mod(_, b) =>
-            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)).toString())
+            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)))
         case sil.FractionalPerm(_, b) =>
-            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)).toString())
+            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)))
         case _ => Nil
       }
     else Nil)
@@ -404,7 +406,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         {
           val u = env.makeUniquelyNamed(v) // choose a fresh "v" binder
           env.define(u.localVar)
-          Assign(translateLocalVar(u.localVar).name, translateExp(e)) ::
+          Assign(translateLocalVar(u.localVar), translateExp(e)) ::
           checkDefinednessImpl(body.replace(v.localVar, u.localVar), error, makeChecks = makeChecks, definednessStateOpt) ::
             {
               env.undefine(u.localVar)
@@ -518,19 +520,17 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
     // definedness without worrying about missing variable declarations, and then replace all of them
     // with fresh variables.
     val namespace = verifier.freshNamespace("exp.quantifier")
-    val newVars = vars map (x => (translateLocalVar(x.localVar), x.name))
-    // val newVars = vars map (x => (translateLocalVar(x.localVar),
-    //   // we use a fresh namespace to make sure we get fresh variables
-    //   Identifier(x.name)(namespace)
-    //   ))
+    val newVars = vars map (x => (translateLocalVar(x.localVar),
+      // we use a fresh namespace to make sure we get fresh variables
+      Identifier(x.name)(namespace)
+      ))
     Choose(Block(Seq(Transformer.transform(res, {
-      case v:IdExpr =>
-        val name = v.name
+      case v@IdExpr(name, _, isOld) =>
         newVars.find(x => (name == x._1.name)) match {
           case None => v // no change
           case Some((x, xb)) =>
             // use the new variable
-            IdExpr(xb, x.typ)
+            IdExpr(xb, x.typ, isOld)
         }
     })(),Assume(FalseLit()))))
   }
@@ -553,7 +553,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           case sil.Let(v, e, body) => {
             val u = env.makeUniquelyNamed(v) // choose a fresh "v" binder
             env.define(u.localVar)
-            val stmts = Assign(translateLocalVar(u.localVar).name, translateExp(e)) ++ allFreeAssumptions(body.replace(v.localVar,u.localVar))
+            val stmts = Assign(translateLocalVar(u.localVar), translateExp(e)) ++ allFreeAssumptions(body.replace(v.localVar,u.localVar))
             env.undefine(u.localVar)
             stmts
           }

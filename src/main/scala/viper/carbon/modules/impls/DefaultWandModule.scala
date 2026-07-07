@@ -9,8 +9,8 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules._
 import viper.carbon.verifier.Verifier
-import viper.carbon.boogie._
-import viper.carbon.boogie.Implicits._
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Implicits._
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState, StmtComponent}
 import viper.silver.ast.utility.Expressions
 import viper.silver.ast.{MagicWand, MagicWandStructure}
@@ -27,7 +27,7 @@ DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent 
   val transferNamespace = verifier.freshNamespace("transfer")
   val wandNamespace = verifier.freshNamespace("wands")
   //wands stored
-  type WandShape = Func
+  type WandShape = Function
   //This needs to be resettable, which is why "lazy val" is not used. See also: wandToShapes method
   private var lazyWandToShapes: Option[Map[MagicWandStructure.MagicWandStructure, WandShape]] = None
 /*

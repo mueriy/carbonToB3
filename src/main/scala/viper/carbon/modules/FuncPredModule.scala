@@ -7,7 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Nodes.{Decl, Expr, Type, Stmt, Pattern}
 
 import scala.collection.mutable
 
@@ -31,7 +31,7 @@ trait FuncPredModule extends Module {
    */
   def translatePredicate(p: sil.Predicate, names: Option[mutable.Map[String, String]]): Seq[Decl]
 
-  def predicateVersionType: String
+  def predicateVersionType: Type
 
   def assumeAllFunctionDefinitions: Stmt
 

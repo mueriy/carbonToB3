@@ -7,7 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.b3.B3Nodes.Expr
+import viper.carbon.b3.B3Nodes.{Expr, Type}
 
 /**
   * A module for translating maps.
@@ -15,5 +15,5 @@ import viper.carbon.b3.B3Nodes.Expr
 trait MapModule extends Module {
   def isUsed(): Boolean
   def translateMapExp(exp: sil.Exp): Expr
-  def translateMapType(mapType: sil.MapType): String
+  def translateMapType(mapType: sil.MapType): Type
 }

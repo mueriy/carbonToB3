@@ -794,7 +794,7 @@ class DefaultHeapModule(val verifier: Verifier)
   }
 */
 
-  def equateWithCurrentHeap(s: Seq[Variable]): Stmt = {
+  def equateWithCurrentHeap(s: Seq[IdExpr]): Stmt = {
     LATER_Stmt("equateWithCurrentHeap", "need to implement Heap") //Assume(heap === s(0))
   }
 

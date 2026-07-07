@@ -6,14 +6,14 @@
 
 package viper.carbon.modules.impls
 
-import viper.carbon.boogie._
+import viper.carbon.b3.B3Nodes._
 import viper.carbon.modules.MapModule
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState}
 import viper.carbon.modules.impls.map_axioms.MapAxiomatization
 import viper.carbon.verifier.Verifier
 import viper.silver.verifier.{PartialVerificationError, reasons}
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.Implicits._
+import viper.carbon.b3.B3Implicits._
 
 
 class DefaultMapModule(val verifier: Verifier) extends MapModule with DefinednessComponent {
@@ -58,6 +58,10 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
   // private val mapBuildName = Identifier("Map#Build")
 
   override def preamble : Seq[Decl] = {
+    Seq()
+    // if (used) Seq(LiteralDecl(MapAxiomatization.value)) else Seq()
+
+
     // val mapUV = LocalVarDecl(Identifier("m")(axiomNamespace), mapType)
     // val map2 = LocalVarDecl(Identifier("m2")(axiomNamespace), mapType)
     // val uU = LocalVarDecl(Identifier("u")(axiomNamespace), TypeVar("U"))
@@ -250,12 +254,11 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
     // //     |""".stripMargin
     // DeclComment("TODO: Remove this")
 
-    if (used) Seq(LiteralDecl(MapAxiomatization.value)) else Seq()
   }
 
   override def start() : Unit = expModule.register(this)
 
-  override def translateMapExp(exp : sil.Exp) : Exp = {
+  override def translateMapExp(exp : sil.Exp) : Expr = {
     sys.error("LATER: translateMapExp")
 /*
     used = true
@@ -313,9 +316,9 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
         val containsExp = translateMapExp(sil.MapContains(key, base)(exp.pos, exp.info, exp.errT))
         Assert(containsExp, error.dueTo(reasons.MapKeyNotContained(base, key)))
       }
-      case _ => Statements.EmptyStmt
+      case _ => EmptyStmt
     }
-    else Statements.EmptyStmt
+    else EmptyStmt
   }
 
   override def reset() : Unit = used = false

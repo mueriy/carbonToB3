@@ -1,8 +1,8 @@
 package viper.carbon.b3
 import dafny._
-import _root_.scala.jdk.CollectionConverters._  // would also run without the "_root_.", but Metals doesnt like that 
-import _root_.scala.reflect.ClassTag            // same
-import _root_.scala.collection.mutable          // same
+import scala.jdk.CollectionConverters._
+import scala.reflect.ClassTag
+import scala.collection.mutable
 import viper.silver.ast.Member
 import viper.silver.verifier.VerificationError
 
@@ -196,6 +196,7 @@ object B3Adapter {
 
 object B3Nodes {
   import viper.carbon.b3.DafnyHelper._
+  import viper.carbon.b3.B3Naming._
 
   /** 
    * The root of the Scala-B3 AST.
@@ -220,7 +221,14 @@ object B3Nodes {
     //(Taken from boogie.scala -> Node) ^^^
   }
   sealed trait Decl extends Node // Domain, TypeDecl, Tagger, Function, Axiom, and Procedure. (TypeName is String)
-  
+  sealed trait LocalVarDecl extends Node {//Binding, PParameter, FParameter
+  // Binding(name: String, typ: Type)
+  // PParameter(name: String, typ: Type, mode: RawAst.ParameterMode = IN)
+  // FParameter(name: String, typ: Type, isInjective: Boolean = false)
+    def name: Identifier
+    def typ: Type
+  } 
+
   // "SPECIAL" NOODES
   /* Classes extending this trait are not supported for now */
   trait NOT_SUPPORTED extends Node
@@ -294,7 +302,7 @@ object B3Nodes {
     }
   }
  
-  class Domain extends NOT_SUPPORTED
+  class Domain extends NOT_SUPPORTED with Decl
   class DomainInstantiation extends NOT_SUPPORTED
 
   /**
@@ -311,7 +319,7 @@ object B3Nodes {
       //   case Some(domIon) => Some(domIon.b3fy)
       //   case None => None
       // }
-      new RawAst.TypeDecl(StringToDString(name), daf(None))
+      new RawAst.TypeDecl(StringToDString(name), daf(dom))
     }
   }
 
@@ -331,32 +339,32 @@ object B3Nodes {
     * @param tag The name of a tag (if any; default "" means no tag). 
     * The values returned by different functions with the same tag are disjoint.
     */
-  case class Function(name: String, parameters: Seq[FParameter], resultType: String, tag: String = "") extends Decl {
+  case class Function(name: Identifier, parameters: Seq[FParameter], resultType: Type, tag: String = "") extends Decl {
     def b3fy: RawAst.Function = {
       val optB3Tag = if (tag == "") Option_None[DString] else Option_Some[DString](daf(tag))
       new RawAst.Function(daf(name), 
                           daf(parameters map {_.b3fy}),
-                          daf(resultType),
+                          daf(resultType.b3fy),
                           optB3Tag,
                           Option_None)  // <- Carbon never uses function bodies/definitions (FunctionDefinition); it defines them using axioms.
     }
   }
 
   /** Scala representation of a B3 RawAst FParameter node (a function parameter) */
-  case class FParameter(name: String, typ: Type, isInjective: Boolean = false) extends Node {
+  case class FParameter(name: Identifier, typ: Type, isInjective: Boolean = false) extends LocalVarDecl {
     def b3fy: RawAst.FParameter = new RawAst.FParameter(daf(name), isInjective, daf(typ.b3fy))
   }
 
   
   /** Scala representation of a B3 RawAst Axiom node. */
-  case class Axiom(explains: Seq[String], expr: Expr) extends Decl {
-    def b3fy: RawAst.Axiom = new RawAst.Axiom(daf(explains), expr.b3fy)
+  case class Axiom(explains: Seq[Identifier], expr: Expr) extends Decl {
+    def b3fy: RawAst.Axiom = new RawAst.Axiom(daf(explains map idName), expr.b3fy)
   }
 
 
 
   /** Scala representation of a B3 RawAst Procedure node */
-  case class Procedure(name: String,
+  case class Procedure(name: Identifier,
                       parameters: Seq[PParameter],
                       pre: Seq[AExpr],
                       post: Seq[AExpr],
@@ -371,14 +379,15 @@ object B3Nodes {
   }
 
   /** 
-   * Scala representation of a B3 RawAst Variable 
-   * (Used for VarDecl, but also nice way to store Var info in general)
+   * Scala representation of a B3 RawAst Variable (B3 uses this to define the created variable
+   * in VarDecl, but we can also use it to store Var info in general, although LocalVarDecl
+   * is often a P/F-Parameter)
    * 
    * @param name The name of the Variable
    * @param typ must either be "bool", "int", or "tag" OR a type defined by a TypeDecl
    * @param isMutable 'var' (true) vs 'val' (false)
    */
-  case class Variable(name: String, typ: Type, isMutable: Boolean = true) extends Node {
+  case class Variable(name: Identifier, typ: Type, isMutable: Boolean = true) extends Node {
     val varId: IdExpr = IdExpr(name, typ)
     def b3fy: RawAst.Variable = {
       new RawAst.Variable(daf(name),                  // var name
@@ -397,7 +406,7 @@ object B3Nodes {
     * @param mode Is it a input (IN), output (OUT), or inout (INOUT) parameter? (IN/INOUT/OUT are variables defined in the current object)
     * @return The corresponding (raw) PParameter
     */
-  case class PParameter(name: String, typ: Type, mode: RawAst.ParameterMode = IN) extends Node {
+  case class PParameter(name: Identifier, typ: Type, mode: RawAst.ParameterMode = IN) extends LocalVarDecl {
     def b3fy: RawAst.PParameter = new RawAst.PParameter(daf(name), mode, daf(typ.b3fy), Option_None)
   }
   /* All RawAst.ParameterMode versions, for easy use: */
@@ -418,22 +427,25 @@ object B3Nodes {
   }
 
 
-
+  import viper.silver.verifier.errors.AssertFailed
+  import viper.silver.verifier.reasons.FeatureUnsupported
+  import viper.silver.ast.{Assert=>SilAssert, TrueLit=>SilTrueLit}
+  def fakeError(msg: String) = AssertFailed(SilAssert(SilTrueLit()())(), FeatureUnsupported(SilAssert(SilTrueLit()())(), msg)) 
   // STATEMENT NODES
   /** Corresponds to the Stmt: "'TODO_Stmt_info1': {check true}". Use this if a Stmt is required, but you dont want to implement it yet. */
   def TODO_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addTODO(info1, info2)
-    LabeledStmt(s"TODO_Stmt_$info1", Block(Seq(Check(TrueLit(), "TODO"))))
+    LabeledStmt(s"TODO_Stmt_$info1", Block(Seq(Check(TrueLit(), fakeError("TODO")))))
   }
   /** Corresponds to the Stmt: "'LATER_Stmt_info1': {check true}". Use this if a Stmt is required, but it is actually an advanced feature. */
   def LATER_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addLATER(info1, info2)
-    LabeledStmt(s"LATER_Stmt_$info1", Block(Seq(Check(TrueLit(), "LATER"))))
+    LabeledStmt(s"LATER_Stmt_$info1", Block(Seq(Check(TrueLit(), fakeError("LATER")))))
   }
   /** Corresponds to "'ADVANCED_Stmt_info1': {check true}". Use this if a Stmt is required, but it is actually an advanced feature. */
   def ADVANCED_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addADVANCED(info1, info2)
-    LabeledStmt(s"ADVANCED_Stmt_$info1", Block(Seq(Check(TrueLit(), "ADVANCED"))))
+    LabeledStmt(s"ADVANCED_Stmt_$info1", Block(Seq(Check(TrueLit(), fakeError("ADVANCED")))))
   }
 
   /** An empty statement. */
@@ -449,12 +461,17 @@ object B3Nodes {
      * Block-Stmt, then the Stmt's inside of it are placed into a new Block-Stmt together 
      * with the other Stmt(s). (Instead of placing the Block-Stmts into the new Block-Stmt) */
     def +++(other: Stmt): Block = combineStmts(this, other)
+    /**
+     * Returns a list of all actual statements contained in this statement.  That
+     * is, all statements except `Block`, including statements in the body of loops, etc.
+     */
+    def children = Statements.children(this)
   }
 
   /** 
    * Scala representation of a B3 RawAst VarDecl-Stmt node. (introduces a local variable)
    * 
-   * Has the 'variable' variable, to access the corresponding Variable node.
+   * Has val variable = corresponding Variable node.
    * 
    * @param name The name of the Variable
    * @param body The variable is ONLY in scope in the given body! (Overshadows 'parent' VarDecl's with same name).
@@ -462,7 +479,7 @@ object B3Nodes {
    * @param isMutable var (true) vs val (false)
    * @param optInitValue optionally provide the initial value here (in form of an Expression, i.e. Option[Expr])
    */
-  case class VarDecl(name: String, body: Stmt, typ: Type, isMutable: Boolean = true, optInitValue: Option[Expr] = None) extends Stmt {
+  case class VarDecl(name: Identifier, body: Stmt, typ: Type, isMutable: Boolean = true, optInitValue: Option[Expr] = None) extends Stmt {
     val variable = Variable(name, typ, isMutable)
     override def b3fy: RawAst.Stmt = new RawAst.Stmt_VarDecl(variable.b3fy, daf(optInitValue map {_.b3fy}) , body.b3fy) // Option_None ==> do not initiate variables (which we never want to do) 
   }
@@ -472,13 +489,13 @@ object B3Nodes {
    * Scala representation of a B3 RawAst VarDecl-Stmt node. 'lhs := rhs'
    * @param lhr must be the name of a variable in scope (= must be in body of a corresponding VarDecl) 
    */
-  case class Assign(lhs: String, rhs: Expr) extends Stmt {
-    override def b3fy: RawAst.Stmt_Assign = new RawAst.Stmt_Assign(daf(lhs), rhs.b3fy)
+  case class Assign(lhs: IdExpr, rhs: Expr) extends Stmt {
+    override def b3fy: RawAst.Stmt_Assign = new RawAst.Stmt_Assign(daf(lhs.name), rhs.b3fy)
   }
 
   /** Scala representation of a B3 RawAst Reinit-Stmt node. (= havoc) */
-  case class Reinit(vars: Seq[String]) extends Stmt {
-    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Reinit(daf(vars))
+  case class Reinit(vars: Seq[IdExpr]) extends Stmt {
+    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Reinit(daf(vars map {v => idName(v.name)}))
   }
 
   /** Scala representation of a B3 RawAst Block-Stmt node. (= Seqn) */
@@ -487,14 +504,14 @@ object B3Nodes {
   }
 
   /* (Calls a Procedure)*/
-  // case class Call(name: String, args: Seq[CallArgument]) extends Stmt
+  // case class Call(name: Identifier, args: Seq[CallArgument]) extends Stmt
 
 
 
   //Assertions
   /** Scala representation of a B3 RawAst Check-Stmt node. (Check = Assert, then forget; see B3 manual)
    * @param error currently not supported by B3; we still require it for when that changes */
-  case class Check(expr: Expr, error: String) extends Stmt {
+  case class Check(expr: Expr, error: VerificationError) extends Stmt {
     override def b3fy: RawAst.Stmt = new RawAst.Stmt_Check(expr.b3fy)
   }
 
@@ -508,12 +525,12 @@ object B3Nodes {
 
   /** Scala representation of a B3 RawAst Assert-Stmt node. (Assert = "Check + Assume")
    * @param error Currently not supported by B3, but we require it for when that changes */
-  case class Assert(expr: Expr, error: String) extends Stmt {
+  case class Assert(expr: Expr, error: VerificationError) extends Stmt {
     override def b3fy: RawAst.Stmt = new RawAst.Stmt_Assert(expr.b3fy)
   }
 
   /** (not documented enough to use) */
-  // case class AForall(name: String, typ: Type, body: Stmt) extends Stmt
+  // case class AForall(name: String?, typ: Type, body: Stmt) extends Stmt
 
 
   //Control flow
@@ -538,7 +555,8 @@ object B3Nodes {
   }
 
   /** Scala representation of a B3 RawAst Loop-Stmt node. 
-   * Labels are not allowed to shadow other labels. TODO: decribe allowed names */
+   * Labels are not allowed to shadow other labels. TODO: decribe allowed names 
+   * ADVANCED: To actually support labels (for goto, etc.) we will need Identifier instead of String */
   case class LabeledStmt(lbl: String, body: Stmt) extends Stmt {
     override def b3fy: RawAst.Stmt = new RawAst.Stmt_LabeledStmt(daf(lbl), body.b3fy)
   }
@@ -623,15 +641,15 @@ object B3Nodes {
     def ===(other: Expr) = OperatorExpr(EqCmp, Seq(this, other))
     def !==(other: Expr) = OperatorExpr(NeCmp, Seq(this, other))
     def :=(rhs: Expr) = this match {
-      case fst: IdExpr => Assign(fst.name, rhs)
+      case fst: IdExpr => Assign(fst, rhs)
       case fst => sys.error("FAIL: Using Expr.':=' operator, which expects lhs to be an IdExpr, but it was " + fst.getClass.getName)
     }
     def +=(rhs: Expr) = this match {
-      case fst: IdExpr => Assign(fst.name, fst + rhs)
+      case fst: IdExpr => Assign(fst, fst + rhs)
       case fst => sys.error("FAIL: Using '+=' operator, which expects lhs to be an IdExpr, but it was " + fst.getClass.getName)
     }
     def -=(rhs: Expr) = this match {
-      case fst: IdExpr => Assign(fst.name, fst - rhs)
+      case fst: IdExpr => Assign(fst, fst - rhs)
       case fst => sys.error("FAIL: Using '-=' operator, which expects lhs to be an IdExpr, but it was " + fst.getClass.getName)
     }
     def +(other: Expr) = OperatorExpr(Add, Seq(this, other))
@@ -659,18 +677,10 @@ object B3Nodes {
     // def transform(f: PartialFunction[Expr, Option[Expr]]) = Nodes.transform(this, f)
     
     class PartialCondExpr(cond: Expr, thn: Expr) {
-      def els(els: Expr) = OperatorExpr(CondExp, Seq(cond, thn, els))
+      def els(els: Expr) = CondExp(cond, thn, els)
     }
   }
 
-  /**
-   * "adds" ':=' operator method to String by automatically packaging it inside 
-   * this class and using the methods of this class whenever that is called
-   * on a String. 
-   */
-  implicit class B3AssignOpWrapper(val first: String) {
-    def :=(rhs: Expr) = Assign(first, rhs)
-  }
 
   /** Scala representation of a B3 RawAst BLiteral-Expr node. (Boolean values) */
   sealed abstract class BoolLit(val b: Boolean) extends Expr {
@@ -692,13 +702,14 @@ object B3Nodes {
   }
 
   /* CustomLiteral  =^=  "|" LiteralIdentifier ":" Type "|"  =>  not what we want; we use nonary functions if we have to. */
-  // case class CustomLiteral(name: String, typ: Type) extends Expr
+  // case class CustomLiteral(name: Identifier, typ: Type) extends Expr
 
   /** (≃ LocalVar) Scala representation of a B3 RawAst IdExpr-Expr node. 
    * @param typ is only there for internal type tracking and is not used by B3
   */
-  case class IdExpr(name: String, typ: Type, isOld: Boolean = false) extends Expr {
+  case class IdExpr(name: Identifier, typ: Type, isOld: Boolean = false) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_IdExpr(daf(name), isOld)
+    def :=(rhs: Expr) = Assign(this, rhs)
   }
 
   /** Scala representation of a B3 RawAst OperatorExpr-Expr node. 
@@ -707,8 +718,15 @@ object B3Nodes {
   case class OperatorExpr(op: RawAst.Operator, exprs: Seq[Expr]) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_OperatorExpr(op, daf(exprs map {_.b3fy}))
   }
+  /** Scala representation of a B3 RawAst OperatorExpr-Expr node in CondExp-mode. 
+   * @param op RawAst Operators are provided as values by the current Object (use ObjectName.{Op-name})
+   */
+  case class CondExp(cond: Expr, thn: Expr, els: Expr) extends Expr {
+    override def b3fy: RawAst.Expr = new RawAst.Expr_OperatorExpr(new RawAst.Operator_IfThenElse, daf(Seq(cond, thn, els) map {_.b3fy}))
+  }
+
   /* For easy use of B3 operators: (same names as in Silver) */
-  val CondExp = new RawAst.Operator_IfThenElse
+  // val CondExp = new RawAst.Operator_IfThenElse (Made into case class CondExp for easier use)
   val Add = new RawAst.Operator_Plus
   val And = new RawAst.Operator_LogicalAnd
   val Div = new RawAst.Operator_Div //TODO: This is WRONG! Div is for "RealLit"s, which we need to handle in a special way.
@@ -729,7 +747,7 @@ object B3Nodes {
   /** Scala representation of a B3 RawAst FunctionCallExpr-Expr node. 
    * The function must be defined in the current Program with matching number of args.
    * @param typ is only for internal purposes */
-  case class FunctionCallExpr(name: String, args: Seq[Expr], typ: Type) extends Expr {
+  case class FunctionCallExpr(name: Identifier, args: Seq[Expr], typ: Type) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_FunctionCallExpr(daf(name), daf(args map {_.b3fy}))
   }
 
@@ -775,7 +793,7 @@ object B3Nodes {
 
   // MORE GENERAL NODES
   /** Scala representation of a B3 RawAst Binding node. ("VarDecl" for bound variables in exist/forall expressions). */
-  case class Binding(name: String, typ: Type) extends Node {
+  case class Binding(name: Identifier, typ: Type) extends LocalVarDecl {
     def b3fy: RawAst.Binding = new RawAst.Binding(daf(name), daf(typ.b3fy))
   }
 
@@ -866,7 +884,8 @@ object B3Development {
  */
 object B3Implicits {
   import viper.carbon.b3.B3Nodes._
-  import _root_.scala.language.implicitConversions
+  import viper.carbon.b3.B3Naming._
+  import language.implicitConversions
 
   // DAFNY HELPERS
   implicit def dseqToSeq[T](dseq: DafnySequence[_ <: T]): Seq[T] = {
@@ -946,39 +965,62 @@ object B3Implicits {
 }
 
 
-/**
- * An identifier of a Boogie program.  Creators of identifiers must make sure that
- * names from the same category are unique in any given program (otherwise, the two
- * identifiers refer to the same thing), but the pretty-printer then tries to use
- * the name `preferredName` if possible.
- */
-trait Identifier {
-  def name: String
-  def namespace: Namespace
-  def preferredName = name
-  override def equals(o: Any) = {
-    o match {
-      case Identifier(n, ns) => n == name && ns == namespace
-      case _ => false
+object B3Naming {
+  /**
+   * An identifier of a Boogie program.  Creators of identifiers must make sure that
+   * names from the same category are unique in any given program (otherwise, the two
+   * identifiers refer to the same thing), but the pretty-printer then tries to use
+   * the name `preferredName` if possible.
+   */
+  trait Identifier {
+    def name: String
+    def namespace: Namespace
+    def preferredName = name
+    override def equals(o: Any) = {
+      o match {
+        case Identifier(n, ns) => n == name && ns == namespace
+        case _ => false
+      }
+    }
+    override def hashCode = List(name, namespace).hashCode
+  }
+  case object Identifier {
+    def apply(n: String)(implicit ns: Namespace): Identifier =
+      new Identifier {
+        val name = n
+        val namespace = ns
+      }
+    def unapply(i: Identifier) = Some(i.name, i.namespace)
+  }
+
+  import language.implicitConversions
+  /** B3NameGenerator instance. */
+  private val nameGen = new B3NameGenerator()
+  /** The current mapping from identifier to names. */
+  private val idnMap = collection.mutable.HashMap[Identifier, String]()
+  /** The current mapping from unique B3 names to the original identifiers (inverse mapping of idnMap,
+    * where the names of the identifiers are used directly). */
+  val backMap = collection.mutable.HashMap[String, String]()
+  /** Map an identifier to a string, making it unique first if necessary. */
+  implicit def idName(i: Identifier): String = {
+    idnMap.get(i) match {
+      case Some(s) => s
+      case None =>
+        val s = nameGen.createUniqueIdentifier(i.preferredName)
+        idnMap.put(i, s)
+        backMap.update(s, i.name)
+        s
     }
   }
-  override def hashCode = List(name, namespace).hashCode
+
+  /**
+   * A namespace to make it easier to avoid duplicated Identities.
+   *
+   * @param name The name of the namespace; only used for debugging purposes.
+   * @param id The ID of this namespace; used to identify the namespace.
+   */
+  case class Namespace(name: String, id: Int)
 }
-case object Identifier {
-  def apply(n: String)(implicit ns: Namespace): Identifier =
-    new Identifier {
-      val name = n
-      val namespace = ns
-    }
-  def unapply(i: Identifier) = Some(i.name, i.namespace)
-}
-/**
- * A namespace to make it easier to avoid duplicated entities in the Boogie output.
-  *
-  * @param name The name of the namespace; only used for debugging purposes.
- * @param id The ID of this namespace; used to identify the namespace.
- */
-case class Namespace(name: String, id: Int)
 
 object ErrorMemberMapping {
   // The "weak" hash map is necessary to avoid leaking memory.

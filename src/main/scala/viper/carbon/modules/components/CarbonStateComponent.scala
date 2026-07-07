@@ -30,14 +30,14 @@ trait CarbonStateComponent extends Component {
    * The name and type of the static contribution of this component to the state. The returned value should remain the
    * same even if the state is changed.
    */
-  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[Variable]
+  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[LocalVarDecl]
 
 
   /**
    * The name and type of the current contribution of this component to the state. The numbers of elements in the list and
    * the types must correspond to the ones given in `staticStateContributions`.
    */
-  def currentStateContributions: Seq[Variable]
+  def currentStateContributions: Seq[LocalVarDecl]
 
 
   /**
@@ -46,7 +46,7 @@ trait CarbonStateComponent extends Component {
    *
    * NOTE: these variables may need wrapping in Old(.) when used, as according to usingOldState etc. To do this wrapping internally, call instead currentStateExps below
    */
-  def currentStateVars: Seq[Variable] //B3: maybe just String instead? 
+  def currentStateVars: Seq[IdExpr]
 
   /**
    * The current values for this components state contributions, adjusted for "old".  The number of elements
@@ -57,12 +57,12 @@ trait CarbonStateComponent extends Component {
   /**
    * Set up a fresh temporary state and returns that new state.
    */
-  def freshTempState(name: String): Seq[Variable] //B3: maybe just String instead? 
+  def freshTempState(name: String): Seq[IdExpr] //B3: maybe just String instead? 
 
   /**
    * Throw away the current state and go back to a snapshot.
    */
-  def restoreState(previousState: Seq[Variable]): Unit //B3: maybe just String instead? 
+  def restoreState(previousState: Seq[IdExpr]): Unit //B3: maybe just String instead? 
 
   /**
    * Are we currently using an "old" state? Note: this is mainly as documentation that the states passed to other methods above will need wrapping in "olD2 when *used*, if we are currently using an old state. This method would typically be implemented by querying the corresponding StateModule

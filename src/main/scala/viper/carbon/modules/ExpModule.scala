@@ -7,7 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.b3.B3Nodes.{Expr, Variable, Stmt}
+import viper.carbon.b3.B3Nodes.{Expr, IdExpr, Stmt}
 import viper.carbon.modules.components.{ComponentRegistry, DefinednessComponent, DefinednessState}
 import viper.silver.verifier.PartialVerificationError
 
@@ -23,7 +23,7 @@ trait ExpModule extends Module with ComponentRegistry[DefinednessComponent] {
     */
   def translateExpInWand(exp: sil.Exp): Expr
 
-  def translateLocalVar(l: sil.LocalVar): Variable
+  def translateLocalVar(l: sil.LocalVar): IdExpr
 
   /**
    * Free assumptions about an expression.

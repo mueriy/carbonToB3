@@ -8,12 +8,10 @@ package viper.carbon.modules.impls
 
 import viper.carbon.modules._
 import viper.silver.{ast => sil}
-// import viper.carbon.boogie._
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
 import viper.carbon.b3.Statements
 import viper.carbon.verifier.Verifier
-// import viper.carbon.boogie.Implicits._
 import viper.silver.verifier.PartialVerificationError
 
 /**
@@ -117,7 +115,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
           val u = env.makeUniquelyNamed(declared) // choose a fresh binder
           env.define(u.localVar)
           defCheck ::
-          Assign(translateLocalVar(u.localVar).name ,translateExp(boundTo)) ::
+          Assign(translateLocalVar(u.localVar) ,translateExp(boundTo)) ::
             inhaleConnective(body.replace(declared.localVar, u.localVar), error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt) ::
             {
               env.undefine(u.localVar)
@@ -136,7 +134,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
           val definednessChecks = maybeDefCheck(e)
           val freeAssms = maybeFreeAssumptions(e)
           val stmt = components map (_.inhaleExp(e, error))
-          if (Statements.children(stmt).isEmpty)
+          if (stmt.children.isEmpty)
             sys.error(s"missing translation for inhaling of $e")
 
           //do not transform definednessChecks inside package (backwards compatible with older version)

@@ -8,7 +8,7 @@ package viper.carbon.verifier
 
 import viper.silver.{ast => sil}
 import viper.carbon.modules._
-import viper.carbon.b3.Namespace
+import viper.carbon.b3.B3Naming.Namespace
 
 /**
  * A verifier for Viper in Carbon (defines what modules need to be available).

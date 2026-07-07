@@ -13,7 +13,7 @@ package viper.carbon.modules
 import viper.carbon.modules.components.{ComponentRegistry, TransferComponent}
 import viper.silver.verifier.PartialVerificationError
 import viper.silver.{ast => sil}
-import viper.carbon.boogie.{Exp, LocalVar, Stmt, TrueLit}
+import viper.carbon.b3.B3Nodes.{Expr, IdExpr, Stmt, TrueLit}
 
 
 trait WandModule extends Module with ComponentRegistry[TransferComponent] {
@@ -57,11 +57,11 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
     * @param insidePackageStmt boolean represents whether this function is being called during another package statement or not.
     * @return
     */
-  def translatePackage(p: sil.Package, error: PartialVerificationError, statesStackForPackageStmt: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false):Stmt
+  def translatePackage(p: sil.Package, error: PartialVerificationError, statesStackForPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false):Stmt
 
-  def getWandRepresentation(w: sil.MagicWand):Exp
+  def getWandRepresentation(w: sil.MagicWand): Expr
 
-  def getWandRepresentationWithArgs(w: sil.MagicWand, args: Seq[sil.Exp]):Exp
+  def getWandRepresentationWithArgs(w: sil.MagicWand, args: Seq[sil.Exp]): Expr
 
   def getWandName(w: sil.MagicWand): String
 
@@ -69,7 +69,7 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
     * Translates the 'apply' statements to the corresponding Boogie statements
     * the 'statesStackForPackageStmt', 'allStateAssms' and 'insidePackageStmt' parameters are used when being called inside a package statement
     */
-  def translateApply(p: sil.Apply, error: PartialVerificationError, statesStackForPackageStmt: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false):Stmt
+  def translateApply(p: sil.Apply, error: PartialVerificationError, statesStackForPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false):Stmt
 
 
   /**
@@ -84,7 +84,7 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
     * @param havocHeap boolean that controls havocing the heap after the exhale or not
     * @return the boogie code for the behavior described above.
     */
-  def exhaleExt(states: List[Any], used:Any, e: sil.Exp, allStateAssms: Exp, RHS: Boolean = false, error: PartialVerificationError, havocHeap: Boolean = true):Stmt
+  def exhaleExt(states: List[Any], used:Any, e: sil.Exp, allStateAssms: Expr, RHS: Boolean = false, error: PartialVerificationError, havocHeap: Boolean = true):Stmt
 
   /**
     * This method creates a new state and sets it as the current state. The following parameters help customize the newly created state.
@@ -96,7 +96,7 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
     * This method returns a structure (StateModule.StateSetup) which can be used at the beginning of many operations involved in the package (Pair of
     *          the created state and the statements needed to be added to the boogie code)
     */
-  def createAndSetState(initBool:Option[Exp],usedString:String = "Used",setToNew:Boolean=true,
+  def createAndSetState(initBool:Option[Expr],usedString:String = "Used",setToNew:Boolean=true,
                         init:Boolean=true):Any
 
   /*
@@ -107,7 +107,7 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
   * Assume y >= 0 is transformed to:
   * b := (b && x!= null); b := (b && y >= 0);
   */
-  def exchangeAssumesWithBoolean(stmt: Stmt,boolVar: LocalVar):Stmt
+  def exchangeAssumesWithBoolean(stmt: Stmt, boolVar: IdExpr):Stmt
 
   /**
     * create a state Result which is the union of two states. The first state is taken from the given parameters 'state Other'
@@ -117,7 +117,7 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
     * @param boolCur State boolean carrying the assumptions of the curretn state
     * @return Boogie statement for executing the union.
     */
-  def createAndSetSumState(stateOther: Any ,boolOther:Exp,boolCur:Exp):Any
+  def createAndSetSumState(stateOther: Any ,boolOther:Expr,boolCur:Expr):Any
 
   /**
     * Called before executing any statement inside a package statement. It performs the needed initializations for the execution of a ghost operation.
@@ -175,7 +175,7 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
   /**
     * @return state boolean for the current ops-state (representing the assumptions about this state)
     */
-  def getCurOpsBoolvar(): LocalVar
+  def getCurOpsBoolvar(): IdExpr
 
 
   /**
@@ -186,5 +186,5 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
     * ftsm == 1   ==>   returns sm representation (wand#sm)
     * ftsm == 0   ==>   returns ft representation (wand#ft)
     */
-  def getWandFtSmRepresentation(wand: sil.MagicWand, ftsm: Int): Exp
+  def getWandFtSmRepresentation(wand: sil.MagicWand, ftsm: Int): Expr
 }

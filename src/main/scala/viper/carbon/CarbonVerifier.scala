@@ -7,7 +7,7 @@
 package viper.carbon
 
 import boogie.BoogieModelTransformer
-import b3.Namespace
+import b3.B3Naming.Namespace
 import modules.impls._
 import viper.silver.ast.{MagicWand, Program, Quasihavoc, Quasihavocall}
 import viper.silver.utility.Paths

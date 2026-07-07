@@ -63,7 +63,7 @@ trait B3Interface {
    * 
    * @param program The Program (B3 AST (RawAst)) we want to verify
    * @param options Sequence containing B3 flags. These MUST be valid B3 flags in "--flagName" format.
-   * @param timeout Currently does noting. (B3 ADVANCED)
+   * @param timeout Currently does nothing. (B3 ADVANCED)
    * @return Currently always ("?", Success), because we dont do error parsing yet
    */
   def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {
@@ -86,6 +86,7 @@ trait B3Interface {
     print(output) // [B3 base: an extension goal would be to implement error parsing here, see BoogieInterface.scala -> parse]
     println("*************************")
 
+    // (printing some additional infos for development)
     B3Development.printALL()
     
     // cannot get b3 version. Since we currently don't parse/handle errors we always return Success

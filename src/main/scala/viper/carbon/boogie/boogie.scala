@@ -111,7 +111,7 @@ case class LocalVarDecl(name: Identifier, typ: Type, where: Option[Exp] = None) 
  */
 trait Identifier {
   def name: String
-  def namespace: viper.carbon.b3.Namespace // using b3.Namespace here avoids compiler errors while not everything is transformed
+  def namespace: viper.carbon.b3.B3Naming.Namespace // using B3Naming.Namespace here avoids compiler errors while not everything is transformed
   def preferredName = name
   override def equals(o: Any) = {
     o match {
@@ -122,7 +122,7 @@ trait Identifier {
   override def hashCode = List(name, namespace).hashCode
 }
 case object Identifier {
-  def apply(n: String)(implicit ns: viper.carbon.b3.Namespace): Identifier = // using b3.Namespace here avoids compiler errors while not everything is transformed
+  def apply(n: String)(implicit ns: viper.carbon.b3.B3Naming.Namespace): Identifier = // using B3Naming.Namespace here avoids compiler errors while not everything is transformed
     new Identifier {
       val name = n
       val namespace = ns

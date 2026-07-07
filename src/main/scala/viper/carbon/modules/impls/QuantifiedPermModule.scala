@@ -10,31 +10,11 @@ import viper.carbon.modules._
 import viper.carbon.modules.components._
 import viper.silver.ast.utility.Expressions
 import viper.silver.{ast => sil}
-import viper.carbon.boogie._
-import viper.carbon.boogie.Implicits._
+import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Implicits._
 import viper.silver.verifier._
-import viper.carbon.boogie.NamedType
-import viper.carbon.boogie.MapSelect
-import viper.carbon.boogie.LocalVarWhereDecl
-import viper.carbon.boogie.Trigger
 import viper.silver.verifier.PartialVerificationError
-import viper.carbon.boogie.LocalVarDecl
-import viper.carbon.boogie.Assume
-import viper.carbon.boogie.RealLit
-import viper.carbon.boogie.GlobalVar
-import viper.carbon.boogie.GlobalVarDecl
-import viper.carbon.boogie.Axiom
-import viper.carbon.boogie.BinExp
-import viper.carbon.boogie.MapType
-import viper.carbon.boogie.Assert
-import viper.carbon.boogie.ConstDecl
-import viper.carbon.boogie.Const
-import viper.carbon.boogie.LocalVar
 import viper.silver.ast.{LocationAccess, PermMul, PredicateAccess, PredicateAccessPredicate, ResourceAccess, WildcardPerm}
-import viper.carbon.boogie.Forall
-import viper.carbon.boogie.Func
-import viper.carbon.boogie.TypeAlias
-import viper.carbon.boogie.FuncApp
 import viper.carbon.utility.PolyMapDesugarHelper
 import viper.carbon.verifier.Verifier
 import viper.silver.ast.utility.rewriter.Traverse

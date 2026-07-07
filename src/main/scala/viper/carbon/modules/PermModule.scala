@@ -6,11 +6,12 @@
 
 package viper.carbon.modules
 
-import viper.carbon.b3.B3Nodes.{Expr, Variable, Stmt, Type}
+import viper.carbon.b3.B3Nodes.{Expr, Stmt, Type, LocalVarDecl}
+import viper.carbon.b3.B3Naming._
 import viper.carbon.modules.components.CarbonStateComponent
 import viper.silver.{ast => sil}
 
-case class PMaskDesugaredRep(selectId: Variable, storeId: Variable)
+case class PMaskDesugaredRep(selectId: Identifier, storeId: Identifier)
 
 /**
  * The permission module determines the encoding of permissions and allows to add or remove
@@ -62,7 +63,7 @@ trait PermModule extends Module with CarbonStateComponent {
   /**
    * A static reference to the mask.
    */
-  def staticMask: Seq[Variable]
+  def staticMask: Seq[LocalVarDecl]
 
   /**
    * Is the permission for a given expression positive (using the static mask).
@@ -105,7 +106,7 @@ trait PermModule extends Module with CarbonStateComponent {
    */
   def currentPermission(loc: sil.ResourceAccess): Expr
 
-  def currentPermission(rcv:Expr, loc:Expr):Expr
+  def currentPermission(rcv:Expr, loc: Expr): Expr
 
   /**these methods are for experimental purposes, not yet finalized **/
   /*def beginSumMask : Stmt
@@ -142,7 +143,7 @@ trait PermModule extends Module with CarbonStateComponent {
       * this should only be used temporarily, i.e. if there are two calls to this then the previous tempMask returned
       * will be overwritten in the Boogie code
       */
-  def tempInitMask(rcv: Expr, loc:Expr):(Seq[Expr], Stmt)
+  def tempInitMask(rcv: Expr, loc: Expr): (Seq[Expr], Stmt)
 
   def getCurrentAbstractReads(): collection.mutable.ListBuffer[String]
 

@@ -8,9 +8,8 @@ package viper.carbon.modules
 
 import viper.carbon.modules.components.{ComponentRegistry, StmtComponent}
 import viper.silver.{ast => sil}
-// import viper.carbon.boogie.{Exp, Namespace, Stmt, TrueLit}
-import viper.carbon.b3.B3Nodes._
-import viper.carbon.b3.Namespace
+import viper.carbon.b3.B3Nodes.{Expr, Stmt, TrueLit}
+import viper.carbon.b3.B3Naming._
 
 /**
  * A module for translating Viper statements.

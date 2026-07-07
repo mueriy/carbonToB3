@@ -68,8 +68,8 @@ trait HeapModule extends Module with CarbonStateComponent {
 
   /**
    * Get a function application representing that one heap-state (as represented by currentStateContributions of HeapModule) is a predecessor of another
-   */
-  def successorHeapState(first: Seq[Variable], second: Seq[Variable]): Expr
+   */ //B3 LATER: check if we can use a sub-class of LocalVarDecl isntead 
+  def successorHeapState(first: Seq[LocalVarDecl], second: Seq[LocalVarDecl]) : Expr
 
   /**
    * The type used for wands.
@@ -84,7 +84,7 @@ trait HeapModule extends Module with CarbonStateComponent {
   /**
    * Definitions for a field.
    */
-  // def translateField(f: sil.Field): Seq[Decl] // B3 ADVANCED
+  def translateField(f: sil.Field): Seq[Decl]
 
   /**
    * Definitions for the ghost field of a predicate.
@@ -165,21 +165,20 @@ trait HeapModule extends Module with CarbonStateComponent {
 
   /**
     * Adds assumption that current heap equals heap represented by s
-    * B3 DEV: or STRING instead of Variable??
     */
-  def equateWithCurrentHeap(s: Seq[Variable]): Stmt
+  def equateWithCurrentHeap(s: Seq[IdExpr]): Stmt
 
   // returns wand#sm (secondary mask for the wand)
-  // def wandMaskIdentifier(f: Identifier): Identifier // B3 ADVANCED
+//   def wandMaskIdentifier(f: Identifier): Identifier // B3 ADVANCED
 
   // returns wand#ft (footprint of the magic wand)
   // this is inhaled at the beginning of packaging a wand to frame fields while the wand being packaged (
   // as the permission to the wand is gained at the end of the package statement)
-  // def wandFtIdentifier(f: Identifier): Identifier  // B3 ADVANCED
+//   def wandFtIdentifier(f: Identifier): Identifier  // B3 ADVANCED
 
-  // def predicateMaskFieldTypeOfWand(wand: String): Type // B3 ADVANCED
+//   def predicateMaskFieldTypeOfWand(wand: String): Type // B3 ADVANCED
 
-  // def predicateVersionFieldTypeOfWand(wand: String): Type // B3 ADVANCED
+//   def predicateVersionFieldTypeOfWand(wand: String): Type // B3 ADVANCED
 
   // adds permission to field e to the secondary mask of the wand
   def addPermissionToWMask(wMask: Expr, e: sil.Exp): Stmt

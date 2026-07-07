@@ -7,9 +7,9 @@
 package viper.carbon.verifier
 
 import viper.silver.{ast => sil}
-// import viper.carbon.boogie.{BoogieNameGenerator, Identifier, LocalVar}
-import viper.carbon.b3.B3Nodes.Variable
 import viper.carbon.b3.B3NameGenerator
+import viper.carbon.b3.B3Nodes.IdExpr
+import viper.carbon.b3.B3Naming._
 
 /**
  * An environment that assigns unique names to Viper variables;  in SIL, loops can have
@@ -21,13 +21,14 @@ import viper.carbon.b3.B3NameGenerator
  * 2) All custom names must have a definitely unique name. See B3NameGenerator for more on that.
  * 3) To use a variable in an expression we only need a name (as string), but it might be 
  * helpful to associate that to a type.
+ * B3 TODO: the above is wrong/not fully accurate; fix!
  */
 case class Environment(verifier: Verifier, member: sil.Node) {
 
-  private val names = new B3NameGenerator()
+  private val names = new B3NameGenerator() //B3 TODO: this vs generator in B3Naming ??
 
   /** The current mapping of variables. */
-  private val currentMapping = collection.mutable.HashMap[sil.LocalVar, Variable]()
+  private val currentMapping = collection.mutable.HashMap[sil.LocalVar, IdExpr]()
 
   /** Records the generated B3 names of all translated Viper variables. */
   private val allUsedNames = collection.mutable.HashMap[String, String]()
@@ -64,7 +65,7 @@ case class Environment(verifier: Verifier, member: sil.Node) {
    * Returns the B3 variable for a given Viper variable (it has to be defined first,
    * otherwise an error is thrown).
    */
-  def get(variable: sil.LocalVar): Variable = {
+  def get(variable: sil.LocalVar): IdExpr = {
     currentMapping.get(variable) match {
       case Some(t) => t
       case None => sys.error(s"Internal Error: variable $variable is not defined.")
@@ -75,13 +76,13 @@ case class Environment(verifier: Verifier, member: sil.Node) {
    * Defines a local variable in this environment for a given Viper variable, and returns the corresponding
    * B3 variable.
    */
-  def define(variable: sil.LocalVar): Variable = {
+  def define(variable: sil.LocalVar): IdExpr = {
     currentMapping.get(variable) match {
       case Some(t) =>
         sys.error(s"Internal Error: variable $variable is already defined.")
       case None =>
         val name = uniqueName(variable.name)
-        val bvar = Variable(name, verifier.typeModule.translateType(variable.typ))
+        val bvar = IdExpr(Identifier(name)(verifier.mainModule.silVarNamespace), verifier.typeModule.translateType(variable.typ))
         currentMapping.put(variable, bvar)
         allUsedNames.update(variable.name, name)
         bvar

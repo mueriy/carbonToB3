@@ -8,7 +8,7 @@ package viper.carbon.modules
 
 import components.{CarbonStateComponent, ComponentRegistry}
 import viper.silver.components.StatefulComponent
-import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Stmt, LocalVarDecl}
 
 /**
  * A module for dealing with the state of a program during execution.  Allows other modules
@@ -58,7 +58,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    * The name and type of the static contribution of the state components registered with this module to the state. The returned value should remain the
    * same even if the state is changed.
    */
-  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true): Seq[Variable]
+  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true): Seq[LocalVarDecl]
 
   /**
    * The current values for all registered components' state contributions.  The number of elements
@@ -185,7 +185,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   /**
     * Representation of state used in wandModule. Pair of stateSnapshot and boolean variable carrying assumptions about this state.
     */
-  case class StateRep(state: StateSnapshot, boolVar: IntLit)
+  case class StateRep(state: StateSnapshot, boolVar: IdExpr)
 
   case class StateSetup(usedState: StateRep, initStmt: Stmt)
 }
