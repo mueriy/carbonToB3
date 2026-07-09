@@ -26,13 +26,13 @@ trait MainModule extends Module {
 
   // B3 TODO: Check if these options make sense. Maybe we need P/F-Parameter creation and Quantifier Bindings.
   /**
-   * Translate a local variable along with its type (into a B3 declaration).  Assumes that the variable is already
+   * Translate a local variable along with its type (into a B3 VarDecl).  Assumes that the variable is already
    * defined in the current environment.
    */
-  // def translateLocalVarSig(typ:sil.Type, v:sil.LocalVar, isMutable: Boolean = true): Variable
-  // def translateLocalVarDecl(l: sil.LocalVarDecl, isMutable: Boolean = true): Variable = {
-  //   translateLocalVarSig(l.typ,l.localVar, isMutable)
-  // }
+  def translateLocalVarSigToVarDecl(typ:sil.Type, v:sil.LocalVar, isMutable: Boolean = true): VarDecl
+  def translateLocalVarDeclToVarDecl(l: sil.LocalVarDecl, isMutable: Boolean = true): VarDecl = {
+    translateLocalVarSigToVarDecl(l.typ,l.localVar, isMutable)
+  }
 
   /**
    * Translate a local variable along with its type (into a B3 Predicate parameter).  Assumes that the variable is already

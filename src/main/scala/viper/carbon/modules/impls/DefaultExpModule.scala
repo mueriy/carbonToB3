@@ -63,27 +63,28 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
   }
 
   override def translateExp(e: sil.Exp): Expr = {
-    TODO_Expr_bool("translateExp")
-/*
     e match {
       case sil.IntLit(i) =>
         IntLit(i)
       case sil.BoolLit(b) =>
         BoolLit(b)
       case sil.NullLit() =>
-        translateNull
+        TODO_Expr_bool("translateExp(sil.NullLit)", "TODO2")//translateNull
       case l@sil.LocalVar(_, _) =>
         translateLocalVar(l)
       case r@sil.Result(_) =>
+        TODO_Expr_bool("translateExp", "sil.Result")
+/*
         translateResult(r)
+*/
       case f@sil.FieldAccess(_, _) =>
-        translateResourceAccess(f)
+        TODO_Expr_bool("translateExp", "sil.FieldAccess (TODO2)")//translateResourceAccess(f)
       case sil.InhaleExhaleExp(_, _) =>
         sys.error("should not occur here (either, we inhale or exhale this expression, in which case whenInhaling/whenExhaling should be used, or the expression is not allowed to occur.")
       case p@sil.PredicateAccess(_, _) =>
-        translateResourceAccess(p)
+        TODO_Expr_bool("translateExp", "sil.PredicateAccess (TODO2)")//translateResourceAccess(p)
       case w: sil.MagicWand =>
-        translateResourceAccess(w)
+        ADVANCED_Expr_bool("translateExp", "sil.MagicWand")//translateResourceAccess(w)
       case sil.Unfolding(_, exp) =>
         translateExp(exp)
       case sil.Applying(_, exp) => translateExp(exp)
@@ -96,6 +97,8 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         stateModule.replaceState(prevState)
         res
       case sil.LabelledOld(exp, oldLabel) =>
+        LATER_Expr_bool("translateExp", "sil.LabelledOld")
+/*
         var findLabel = oldLabel
         if(findLabel.equals("lhs"))
           findLabel = findLabel+wandModule.getActiveLhs()
@@ -108,7 +111,10 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         val res = translateExp(exp)
         stateModule.replaceState(prevState)
         res
+*/
       case sil.Let(lvardecl, exp, body) =>
+        ADVANCED_Expr_bool("translateExp", "sil.Let; might not be an advanced feature...")
+/*
         val translatedExp = translateExp(exp) // expression to bind "v" to
       val v = env.makeUniquelyNamed(lvardecl) // choose a fresh "v" binder
         env.define(v.localVar)
@@ -116,6 +122,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
       val substitutedBody = translatedBody.replace(env.get(v.localVar), translatedExp) // now replace all "v"s with expression. Doing this after translation avoids constructs such as heap-dependant expressions getting reevaluated after substitution in the wrong heaps (e.g. if substituted into an "old" expression).
         env.undefine(v.localVar)
         substitutedBody
+*/
       case sil.CondExp(cond, thn, els) =>
         CondExp(translateExp(cond), translateExp(thn), translateExp(els))
       case q@sil.Exists(vars, triggers, exp) => {
@@ -124,15 +131,15 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           val v1 = env.makeUniquelyNamed(v); env.define(v1.localVar); v1
         });
         val renaming = (e: sil.Exp) => Expressions.instantiateVariables(e, (vars map (_.localVar)), renamedVars map (_.localVar))
-        val ts : Seq[Trigger] = (triggers map
+        val ts : Seq[Pattern] = (triggers map
           (t => (funcPredModule.toExpressionsUsedInTriggers(t.exps map (e => translateExp(renaming(e)))))
-            map (Trigger(_)) // build a trigger for each sequence element returned (in general, one original trigger can yield multiple alternative new triggers)
+            map (Pattern(_)) // build a trigger for each sequence element returned (in general, one original trigger can yield multiple alternative new triggers)
             )).flatten
         val weight = q.info match {
           case sil.WeightedQuantifier(value) => Some(value)
           case _ => None
         }
-        val res = Exists(renamedVars map translateLocalVarDecl, ts, translateExp(renaming(exp)), weight)
+        val res = Exists(renamedVars map translateLocalVarDeclToBinding, ts, translateExp(renaming(exp))) //B3 INFO: 'weight' was used here, but is currently not supported by B3
         renamedVars map (v => env.undefine(v.localVar))
         res
       }
@@ -142,20 +149,21 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           val v1 = env.makeUniquelyNamed(v); env.define(v1.localVar); v1
         });
         val renaming = (e: sil.Exp) => Expressions.instantiateVariables(e, (vars map (_.localVar)), renamedVars map (_.localVar))
-        val ts : Seq[Trigger] = (triggers map
+        val ts : Seq[Pattern] = (triggers map
           (t => (funcPredModule.toExpressionsUsedInTriggers(t.exps map (e => translateExp(renaming(e)))))
-            map (Trigger(_)) // build a trigger for each sequence element returned (in general, one original trigger can yield multiple alternative new triggers)
+            map (Pattern(_)) // build a trigger for each sequence element returned (in general, one original trigger can yield multiple alternative new triggers)
             )).flatten
         val weight = q.info match {
           case sil.WeightedQuantifier(value) => Some(value)
           case _ => None
         }
-        val res = Forall(renamedVars map translateLocalVarDecl, ts, translateExp(renaming(exp)), Nil, weight)
+        val res = Forall(renamedVars map translateLocalVarDeclToBinding, ts, translateExp(renaming(exp))) //B3 INFO: 'weight' was used here, but is currently not supported by B3
         renamedVars map (v => env.undefine(v.localVar))
         res
       }
       case sil.ForPerm(variables, accessRes, body) => {
-
+        LATER_Expr_bool("translateExp", "sil.ForPerm")
+/*
         val locations = Seq(accessRes)
 
         // alpha renaming, to avoid clashes in context
@@ -183,21 +191,22 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           BinExp(filter._1, Implies, translateExp(renaming(body))))
         renamedVars.foreach(renamedVar => env.undefine(renamedVar.localVar))
         res
+*/
       }
       case sil.WildcardPerm() =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.WildcardPerm)")//translatePerm(e)
       case sil.FullPerm() =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.FullPerm)")//translatePerm(e)
       case sil.NoPerm() =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.NoPerm)")//translatePerm(e)
       case sil.EpsilonPerm() =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.EpsilonPerm)")//translatePerm(e)
       case sil.PermMinus(_) =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.PermMinus)")//translatePerm(e)
       case sil.CurrentPerm(_) =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.CurrentPerm)")//translatePerm(e)
       case sil.FractionalPerm(_, _) =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.FractionalPerm)")//translatePerm(e)
       case sil.AccessPredicate(_, _) =>
         sys.error("not handled by expression module")
       case sil.EqCmp(left, right) =>
@@ -211,9 +220,9 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           case _: sil.MapType =>
             translateMapExp(e)
           case x if x == sil.Perm =>
-            translatePermComparison(e)
+            LATER_Expr_bool("translateExp", "EqCmp sil.Perm")//translatePermComparison(e)
           case _ =>
-            BinExp(translateExp(left), EqCmp, translateExp(right))
+            translateExp(left) === translateExp(right)
         }
       case sil.NeCmp(left, right) =>
         left.typ match {
@@ -226,29 +235,30 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           case _: sil.MapType =>
             translateMapExp(e)
           case x if x == sil.Perm =>
-            translatePermComparison(e)
+            LATER_Expr_bool("translateExp", "NeCmp sil.Perm")//translatePermComparison(e)
           case _ =>
-            BinExp(translateExp(left), NeCmp, translateExp(right))
+            translateExp(left) !== translateExp(right)
         }
       case sil.DomainBinExp(_, sil.PermGeOp, _) |
            sil.DomainBinExp(_, sil.PermGtOp, _) |
            sil.DomainBinExp(_, sil.PermLeOp, _) |
            sil.DomainBinExp(_, sil.PermLtOp, _) =>
-        translatePermComparison(e)
+        LATER_Expr_bool("translateExp(sil.DomainBinExLogic)")//translatePermComparison(e)
       case sil.DomainBinExp(_, sil.PermAddOp, _) |
            sil.DomainBinExp(_, sil.PermMulOp, _) |
            sil.DomainBinExp(_, sil.PermSubOp, _) |
            sil.DomainBinExp(_, sil.IntPermMulOp, _) |
            sil.DomainBinExp(_, sil.FracOp, _) |
            sil.DomainBinExp(_, sil.PermDivOp, _) =>
-        translatePerm(e)
+        LATER_Expr_int("translateExp(sil.DomainBinExCalc)")//translatePerm(e)
       case sil.DomainBinExp(left, op, right) =>
+        var reverse = false
         val bop = op match {
           case sil.OrOp => Or
           case sil.LeOp => LeCmp
           case sil.LtOp => LtCmp
-          case sil.GeOp => GeCmp
-          case sil.GtOp => GtCmp
+          case sil.GeOp => reverse = true; LeCmp // B3 does not support GeCmp, but we can just use LeCmp and reverse lhs <-> rhs,
+          case sil.GtOp => reverse = true; LtCmp // since a >= b <==> b <= a (and same for GtCmp) 
           case sil.AddOp => Add
           case sil.SubOp => Sub
           case sil.DivOp => IntDiv
@@ -259,18 +269,27 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           case _ =>
             sys.error("Expression translation did not match any cases (should be handled before reaching translateExp code)" + e.getClass())
         }
-        BinExp(translateExp(left), bop, translateExp(right))
+        if (reverse) {
+          OperatorExpr(bop, Seq(translateExp(right), translateExp(left)))
+        } else {
+          OperatorExpr(bop, Seq(translateExp(left), translateExp(right)))
+        }
       case sil.Minus(exp) =>
-        UnExp(Minus, translateExp(exp))
+        translateExp(exp).neg
       case sil.Not(exp) =>
-        UnExp(Not, translateExp(exp))
+        translateExp(exp).not
       case fa@sil.FuncApp(_, _) =>
+        TODO_Expr_bool("translateExp", "sil.FuncApp")
+/* 
         translateFuncApp(fa)
+*/
       case fa@sil.DomainFuncApp(_, _, _) =>
-        translateDomainFuncApp(fa)
+        LATER_Expr_bool("translateExp", "DomainFuncApp")//translateDomainFuncApp(fa)
       case fa@sil.BackendFuncApp(_, _) =>
+        TODO_Expr_bool("translateExp", "sil.BackendFuncApp")
+/*         
         translateBackendFuncApp(fa)
-
+ */
       case seqExp@sil.EmptySeq(_) =>
         translateSeqExp(seqExp)
       case seqExp@sil.ExplicitSeq(_) =>
@@ -315,7 +334,6 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
 
       case _ => sys.error("Viper expression didn't match any existing case.")
     }
-*/
   }
 
   override def translateLocalVar(l: sil.LocalVar): IdExpr = {
@@ -349,7 +367,9 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
 
     val oldCurState = stateModule.state
     if(duringPackageStmt) {
+/*B3 ADVANCED
       stateModule.replaceState(wandModule.UNIONState.asInstanceOf[StateRep].state)
+*/
     }
 
     val definednessDescription =
@@ -446,7 +466,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           val res = if (e.isInstanceOf[sil.ForPerm]) {
             val eAsForallRef = Expressions.renameVariables(e, orig_vars.map(_.localVar), bound_vars.map(_.localVar)).asInstanceOf[sil.ForPerm]
 
-            val filter: Expr = hasDirectPerm(eAsForallRef.resource)
+            val filter: Expr = LATER_Expr_bool("checkDefinednessImpl", "val filter needs hasDirectPerm(...)")//hasDirectPerm(eAsForallRef.resource)
 
             handleQuantifiedLocals(bound_vars, If(filter, translate(eAsForallRef, definednessStateOpt), Nil))
           } else {
@@ -462,6 +482,8 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
             stateModule.replaceState(prevState)
             res
           case sil.LabelledOld(_, oldLabel) =>
+            ADVANCED_Stmt("checkDefinednessimpl", "sil.LabelledOld")
+/*
             var findLabel = oldLabel
             if(findLabel.equals("lhs"))
               findLabel = "lhs"+wandModule.getActiveLhs()
@@ -474,6 +496,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
             val res = translate(e, None) //definedness state is the labelled old state (i.e., same as currently set state)
             stateModule.replaceState(prevState)
             res
+*/
           case _ =>
             translate(e, definednessStateOpt)
         }

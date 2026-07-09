@@ -14,7 +14,9 @@ import viper.carbon.b3.B3Nodes.{Type, Decl, Expr}
 
  */
 trait DomainModule extends Module {
+/*
   def translateDomain(exp: sil.Domain): Seq[Decl]
   def translateDomainFuncApp(fa: sil.DomainFuncApp): Expr
   def translateDomainTyp(typ: sil.DomainType): Type
+*/
 }

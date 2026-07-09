@@ -52,8 +52,11 @@ class DefaultSeqModule(val verifier: Verifier)
   override def start(): Unit = {
     expModule.register(this)
   }
+*/
 
-  override def translateSeqExp(e: sil.Exp): Exp = {
+  override def translateSeqExp(e: sil.Exp): Expr = {
+    LATER_Expr_bool("translateSeqExp", "some seq")
+/*
     def t(e: sil.Exp) = translateExp(e)
     used = true
     val typ = translateType(e.typ)
@@ -99,7 +102,9 @@ class DefaultSeqModule(val verifier: Verifier)
         UnExp(Not, FuncApp(Identifier("Seq#Equal"), List(t(left), t(right)), typ))
       case _ => sys.error("not a sequence expression")
     }
+*/
   }
+/*
 
   override def translateSeqType(seqType: sil.SeqType): Type = {
     used = true
@@ -128,6 +133,7 @@ class DefaultSeqModule(val verifier: Verifier)
       }
     else Nil
   }
+*/
 
   /**
    * Reset the state of this module so that it can be used for new program. This method is called
@@ -136,5 +142,4 @@ class DefaultSeqModule(val verifier: Verifier)
   override def reset(): Unit = {
     used = false
   }
-*/
 }

@@ -12,6 +12,7 @@ import viper.silver.ast.utility.Expressions
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 import viper.silver.verifier._
 import viper.silver.verifier.PartialVerificationError
 import viper.silver.ast.{LocationAccess, PermMul, PredicateAccess, PredicateAccessPredicate, ResourceAccess, WildcardPerm}
@@ -53,12 +54,12 @@ class QuantifiedPermModule(val verifier: Verifier)
     wandModule.register(this)
   }
 
-/*
   implicit val namespace = verifier.freshNamespace("perm")
   private val axiomNamespace = verifier.freshNamespace("perm.axiom")
   private val permTypeName = "Perm"
   private val maskTypeName = "MaskType"
   override val maskType = NamedType(maskTypeName)
+/*
   private val pmaskTypeName = "PMaskType"
   override val pmaskType = NamedType(pmaskTypeName)
   private val maskName = Identifier("Mask")
@@ -246,14 +247,19 @@ class QuantifiedPermModule(val verifier: Verifier)
     (maskVar := zeroMask)
   }
 
+*/
   override def reset = {
+    addADVANCED("QuantifiedPermModule", "reset")
+/*
     mask = originalMask
     qpId = 0
     inverseFuncs = new ListBuffer[Func]();
     rangeFuncs = new ListBuffer[Func]();
     triggerFuncs = new ListBuffer[Func]();
     assertReadPermOnly = false
+*/
   }
+/*
 
   override def setCheckReadPermissionOnly(readOnly: Boolean): Boolean = {
     val oldValue = assertReadPermOnly
@@ -868,11 +874,16 @@ class QuantifiedPermModule(val verifier: Verifier)
   override def transferValid(e:TransferableEntity):Seq[(Stmt,Exp)] = {
     Nil
   }
+*/
 
   override def inhaleExp(e: sil.Exp, error: PartialVerificationError): Stmt = {
+    LATER_Stmt("QuantifiedPermModule", "inhaleExp")
+/*
     inhaleAux(e, Assume, error)
+*/
   }
 
+/*
   override def inhaleWandFt(w: sil.MagicWand): Stmt = {
     val wandRep = wandModule.getWandFtSmRepresentation(w, 0)
     val curPerm = currentPermission(translateNull, wandRep)
@@ -1578,8 +1589,11 @@ class QuantifiedPermModule(val verifier: Verifier)
     Havoc(bvs) ++
       (bvs map (v => Assume((v > noPerm) && (v < fullPerm))))
   }
+*/
 
-  override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false) : (Seqn => Seqn) = {
+  override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
+    stmts => TODO_Stmt("QuantifiedPermModule", "handleStmt")++stmts
+/*
     stmts =>
       s match {
         case n@sil.NewStmt(target, fields) =>
@@ -1592,8 +1606,10 @@ class QuantifiedPermModule(val verifier: Verifier)
           //        (Nil, Nil)
           stmts
       }
+*/
   }
 
+/*
   private def permEq(a: Exp, b: Exp): Exp = {
     a === b
   }

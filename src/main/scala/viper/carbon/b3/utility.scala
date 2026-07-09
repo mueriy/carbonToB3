@@ -36,7 +36,6 @@ object Statements {
     }
   }
 
-/*
   /**
    * Returns a list of all undeclared local variables used in this statement.
    * If the same local variable is used with different
@@ -44,9 +43,9 @@ object Statements {
    *
    * Taken from the Viper AST with minimal adaptation.
    */
-  def undeclLocalVars(s: Stmt): Seq[LocalVar] = {
+  def undeclLocalVars(s: Stmt): Seq[IdExpr] = {
     def extractLocal(n: Node, decls: Seq[LocalVarDecl]) = n match {
-      case l: LocalVar => decls.find(_.name == l.name) match {
+      case l: IdExpr => decls.find(_.name == l.name) match {
         case None => List(l)
         case Some(d) if d.typ != l.typ => {
           sys.error("Local variable " + l.name + " is declared with type " + d.typ + " but used with type " + l.typ + ".")
@@ -55,7 +54,7 @@ object Statements {
       }
       case _ => Nil
     }
-    def combineLists(s1: Seq[LocalVar], s2: Seq[LocalVar]) = {
+    def combineLists(s1: Seq[IdExpr], s2: Seq[IdExpr]) = {
       for (l1 <- s1; l2 <- s2) {
         if (l1.name == l2.name && l1.typ != l2.typ) {
           sys.error("Local variable " + l1.name + " is used with different types " + l1.typ + " and " + l2.typ)
@@ -68,15 +67,13 @@ object Statements {
       case Forall(v, _, _, _, _) => decls ++ v
       case _ => decls
     }
-    def combineResults(n: Node, decls: Seq[LocalVarDecl], localss: Seq[Seq[LocalVar]]) = {
+    def combineResults(n: Node, decls: Seq[LocalVarDecl], localss: Seq[Seq[IdExpr]]) = {
       localss.fold(extractLocal(n, decls))(combineLists)
     }
     s.reduce(Nil, addDecls, combineResults)
   }
-*/
 }
 
-/*
 /**
  * Utility methods for AST nodes.
 
@@ -88,63 +85,57 @@ object Nodes {
    */
   def subnodes(n: Node): Seq[Node] = {
     n match {
-      case Program(_, decls) =>
-        decls
-      case LocalVarDecl(_, _, where) =>
-        where match {
-          case Some(e) => Seq(e)
-          case None => Nil
+      case _: NOT_SUPPORTED => Nil
+      case Program(_, doms, typs, tags, fcts, axs, procs) =>
+        doms ++ typs ++ tags ++ fcts ++ axs ++ procs
+      case _: Variable => Nil
+      case lvd:LocalVarDecl => 
+        lvd match {
+          case _: FParameter => Nil
+          case _: PParameter => Nil
+          case _: Binding => Nil
         }
-      case Trigger(exps) => exps
-      case _: Type => Nil
+      case ae: AExpr =>
+        ae match {
+          case AExpression(e) => e
+          case AAssertion(s) => s
+        }
       case d: Decl =>
         d match {
-          case ConstDecl(_, _, _) => Nil
-          case TypeDecl(_) => Nil
-          case TypeAlias(_, _) => Nil
-          case Func(_, args, _, _) => args
-          case Axiom(exp) => Seq(exp)
-          case GlobalVarDecl(_, _) => Nil
-          case Procedure(_, ins, outs, body) => ins ++ outs ++ Seq(body)
-          case CommentedDecl(_, ds, _, _) => ds
-          case DeclComment(_) => Nil
-          case LiteralDecl(_) => Nil
+          case TypeDecl(_, _) => Nil
+          case Tagger(_, _) => Nil
+          case Function(_, args, _, _) => args
+          case Axiom(_, exp) => exp
+          case Procedure(_, args, pre, post, optBody) => args ++ pre ++ post ++ (optBody map {_.toSeq})
         }
       case ss: Stmt =>
         ss match {
+          case VarDecl(_, body, _, _, optInitVal) => body ++ (optInitVal map {_.toSeq.asInstanceOf[Node]})
           case Assign(lhs, rhs) => Seq(lhs, rhs)
-          case Assert(e, _) => Seq(e)
-          case Assume(e) => Seq(e)
-          case HavocImpl(es) => es
-          case Comment(_) => Nil
-          case CommentBlock(_, stmt) => Seq(stmt)
-          case Seqn(s) => s
+          case Reinit(v) => v
+          case Block(s) => s
+          case Check(e, error) => e
+          case Assume(e) => e
+          case Assert(e, error) => e
+          case Choose(branches) => branches
           case If(cond, thn, els) => Seq(cond, thn, els)
-          case NondetIf(thn, els) => Seq(thn, els)
-          case Label(_) => Nil
-          case Goto(_) => Nil
-          case LocalVarWhereDecl(_, where) => Seq(where)
+          case Loop(inv, body) => inv ++ body
+          case LabeledStmt(_, body) => body
         }
-      case e: Exp =>
+      case e: Expr =>
         // Note: If you have to update this pattern match to make it exhaustive, it
         // might also be necessary to update the PrettyPrinter.toParenDoc method.
         e match {
-          case IntLit(_) => Nil
           case BoolLit(_) => Nil
-          case RealLit(_) => Nil
-          case RealConv(exp) => Seq(exp)
-          case LocalVar(_, _) => Nil
-          case GlobalVar(_, _) => Nil
-          case Const(_) => Nil
-          case MapSelect(map, idxs) => Seq(map) ++ idxs
-          case MapUpdate(map, idxs, value) => Seq(map) ++ idxs ++ Seq(value)
-          case Old(exp) => Seq(exp)
+          case IntLit(_) => Nil
+          case IdExpr(_,_,_) => Nil
+          case OperatorExpr(_, es) => es
           case CondExp(cond, thn, els) => Seq(cond, thn, els)
-          case Exists(v, triggers, exp, _) => v ++ triggers ++ Seq(exp)
-          case Forall(v, triggers, exp, _, _) => v ++ triggers ++ Seq(exp)
-          case BinExp(left, _, right) => Seq(left, right)
-          case UnExp(_, exp) => Seq(exp)
-          case FuncApp(_, args, _) => args
+          case FunctionCallExpr(_, args, _) => args
+          case LabeledExpr(_, e) => e
+          case Forall(v, pat, exp, _, _) => v ++ pat ++ exp
+          case Exists(v, pat, exp, _) => v ++ pat ++ exp
+          case Pattern(es) => es
         }
     }
   }
@@ -155,8 +146,8 @@ object Nodes {
    * The function `f` must produce expressions that are valid in the given context.  For instance, it cannot
    * replace an integer literal by a boolean literal.
    */
-  def transform(exp: Exp, f: PartialFunction[Exp, Option[Exp]]): Exp = {
-    val func = (e: Exp) => transform(e, f)
+  def transform(exp: Expr, f: PartialFunction[Expr, Option[Expr]]): Expr = {
+    val func = (e: Expr) => transform(e, f)
     val t = if (f.isDefinedAt(exp)) f(exp) else None
     t match {
       case Some(ee) => ee
@@ -164,26 +155,20 @@ object Nodes {
         exp match {
           case IntLit(i) => exp
           case BoolLit(b) => exp
-          case RealLit(b) => exp
-          case RealConv(exp) => RealConv(func(exp))
-          case LocalVar(n, tt) => exp
-          case GlobalVar(n, tt) => exp
-          case Const(i) => exp
-          case MapSelect(map, idxs) => MapSelect(func(map), idxs map func)
-          case MapUpdate(map, idxs, value) => MapUpdate(func(map), idxs map func, func(value))
-          case Old(e) => Old(func(e))
+          // case RealLit(b) => exp
+          // case RealConv(exp) => RealConv(func(exp))
+          case IdExpr(n, t, b) => exp
+          case OperatorExpr(op, exprs) => OperatorExpr(op, exprs map func)
+          // case Const(i) => exp
+          // case MapSelect(map, idxs) => MapSelect(func(map), idxs map func)
+          // case MapUpdate(map, idxs, value) => MapUpdate(func(map), idxs map func, func(value))
+          // case Old(e) => Old(func(e))
           case CondExp(cond, thn, els) => CondExp(func(cond), func(thn), func(els))
-          case Exists(v, triggers, e, w) => Exists(v, (triggers map (_ match {case Trigger(es) => Trigger(es map func)})), func(e), w)
-          case Forall(v, triggers, e, tv, w) => Forall(v, (triggers map (_ match {case Trigger(es) => Trigger(es map func)})), func(e), tv, w)
-          case BinExp(left, binop, right) => BinExp(func(left), binop, func(right))
-          case UnExp(unop, e) => UnExp(unop, func(e))
-          case f@FuncApp(ff, args, typ) => {
-            val fa = FuncApp(ff, args map func, typ)
-            fa.showReturnType = f.showReturnType
-            fa
-          }
+          case FunctionCallExpr(ff, args, typ) => FunctionCallExpr(ff, args map func, typ)
+          case LabeledExpr(label, expr) => LabeledExpr(label, func(expr)) 
+          case Exists(v, triggers, e, w) => Exists(v, (triggers map (_ match {case (es) => Pattern(es map func)})), func(e), w)
+          case Forall(v, triggers, e, tv, w) => Forall(v, (triggers map (_ match {case Pattern(es) => Pattern(es map func)})), func(e), tv, w)
         }
     }
   }
 }
-*/

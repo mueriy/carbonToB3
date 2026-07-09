@@ -28,11 +28,13 @@ object Transformer {
         case Program(signatureTypes, domains, types, taggers, functions, axioms, procedures) =>
           Program(signatureTypes, domains map go, types map go, taggers map go, 
                   functions map go, axioms map go, procedures map go)
-        case _: FParameter => parent
         case _: Variable => parent
-        case _: PParameter => parent
-        case _: Binding => parent
-        case Pattern(es) => Pattern(es map go)
+        case lvd:LocalVarDecl => 
+          lvd match {
+            case _: FParameter => parent
+            case _: PParameter => parent
+            case _: Binding => parent
+          }
         case ae: AExpr =>
           ae match {
             case AExpression(e) => AExpression(go(e))
@@ -44,7 +46,7 @@ object Transformer {
             case TypeDecl(_, _) => parent
             // case TypeAlias(n, de) => TypeAlias(go(n), go(de))
             case Tagger(_,_) => parent
-            case Function(name, args, typ, tag) => Function(name, args map go, typ, tag) //TODO: track if there are type modifications done anywhere; if so we need a Type Node
+            case Function(name, args, typ, tag) => Function(name, args map go, typ, tag)
             case Axiom(explains, exp) => Axiom(explains, go(exp))
             // case GlobalVarDecl(name, typ) => GlobalVarDecl(name, go(typ))
             case Procedure(name, args, pre, post, optBody) => Procedure(name, args map go, pre map go, post map go, optBody map go)
@@ -55,7 +57,7 @@ object Transformer {
         case ss: Stmt =>
           ss match {
             case VarDecl(name, body, typ, isMutable, optInitVal) => VarDecl(name, go(body), typ, isMutable, optInitVal map go)
-            case Assign(lhs, rhs) => Assign(lhs, go(rhs)) //TODO: track if there are var name modifications done anywhere; if so we need a ID Node
+            case Assign(lhs, rhs) => Assign(lhs, go(rhs))
             case Reinit(_) => parent            
             case Block(s) => Block(s map go)
             case Check(e, error) => Check(go(e), error)
@@ -75,13 +77,15 @@ object Transformer {
             // case RealLit(_) => parent
             case IdExpr(_,_,_) => parent
             case OperatorExpr(op, es) => OperatorExpr(op, es map go)
+            case CondExp(cond, thn, els) => CondExp(go(cond), go(thn), go(els))
             // case MapSelect(map, idxs) => MapSelect(go(map), idxs map go)
             // case MapUpdate(map, idxs, value) => MapUpdate(go(map), idxs map go, go(value))
             // case Old(exp) => Old(go(exp)) //TODO: check if this is actually ever used somewhere
             case FunctionCallExpr(func, args, typ) => FunctionCallExpr(func, args map go, typ)
             case LabeledExpr(l, e) => LabeledExpr(l, go(e))
-            case Forall(v, pat, exp) => Forall(v map go, pat map go, go(exp))
-            case Exists(v, pat, exp) => Exists(v map go, pat map go, go(exp))
+            case Forall(v, pat, exp, tv, w) => Forall(v map go, pat map go, go(exp), tv map go, w)
+            case Exists(v, pat, exp, w) => Exists(v map go, pat map go, go(exp), w)
+            case Pattern(es) => Pattern(es map go)
           }
       }
     }
@@ -97,7 +101,7 @@ object Transformer {
 }
 
 
-/*
+
 object DuplicatingTransformer {
 
   def transform[A <: Node](node: A,
@@ -119,85 +123,98 @@ object DuplicatingTransformer {
 
     def recurse(parent: Node): Seq[Node] = {
       parent match {
-        case Program(header, declarations) =>
-          goSeq(declarations) map (Program(header,_))
-        case LocalVarDecl(name, typ, Some(where)) =>
-          for {typResult <- go(typ); whereResult <- go(where)} yield
-          LocalVarDecl(name, typResult, Some(whereResult))
-        case LocalVarDecl(name, typ, None) =>
-          go(typ) map (LocalVarDecl(name, _, None))
-        case Trigger(exps) =>
-          goSeq(exps) map (Trigger(_))
+        case _: NOT_SUPPORTED => Seq(parent)
+        case Program(signatureTypes, domains, types, taggers, functions, axioms, procedures) =>
+          for {domainsResult <- goSeq(domains); typesResult <- goSeq(types); 
+               taggersResult <- goSeq(taggers); functionsResult <- goSeq(functions); 
+               axiomsResult <- goSeq(axioms); proceduresResult <- goSeq(procedures)} yield 
+                Program(signatureTypes, domainsResult, typesResult, taggersResult, 
+                        functionsResult, axiomsResult, proceduresResult)
+        case _: Variable => Seq(parent)
+        case lvd: LocalVarDecl =>
+          lvd match {
+            case _: FParameter => Seq(parent)
+            case _: PParameter => Seq(parent)
+            case _: Binding => Seq(parent)
+          }
+        case ae: AExpr =>
+          ae match {
+            case AExpression(e) => go(e) map (AExpression(_))
+            case AAssertion(s) => go(s) map (AAssertion(_))
+          }
+        // case LocalVarDecl(name, typ, Some(where)) =>
+        //   for {typResult <- go(typ); whereResult <- go(where)} yield
+        //   LocalVarDecl(name, typResult, Some(whereResult))
+        // case LocalVarDecl(name, typ, None) =>
+        //   go(typ) map (LocalVarDecl(name, _, None))
         case _: Type => Seq(parent)
         case d: Decl =>
           d match {
-            case ConstDecl(name, typ, unique) => go(typ) map (ConstDecl(name, _, unique))
-            case TypeDecl(_) => Seq(parent)
-            case TypeAlias(n, de) => for {nResult <- go(n); deResult <- go(de)} yield TypeAlias(nResult, deResult)
-            case Func(name, args, typ, attrs) => for {argsResult <- goSeq(args); typResult <- go(typ)} yield Func(name, argsResult, typResult, attrs)
-            case Axiom(exp) => go(exp) map (Axiom(_))
-            case GlobalVarDecl(name, typ) => go(typ) map (GlobalVarDecl(name, _))
-            case Procedure(name, ins, outs, body) =>
-              for {insResult <- goSeq(ins); outsResult <- goSeq(outs); bodyResult <- go(body)} yield
-                Procedure(name, insResult, outsResult, bodyResult)
-            case CommentedDecl(s, ds, a, b) => goSeq(ds) map (CommentedDecl(s, _, a, b))
-            case DeclComment(_) => Seq(parent)
-            case LiteralDecl(_) => Seq(parent)
+            // case ConstDecl(name, typ, unique) => go(typ) map (ConstDecl(name, _, unique))
+            case TypeDecl(_,_) => Seq(parent)
+            case Tagger(_,_) => Seq(parent)
+            // case TypeAlias(n, de) => for {nResult <- go(n); deResult <- go(de)} yield TypeAlias(nResult, deResult)
+            case Function(name, args, typ, tag) => for {argsResult <- goSeq(args); typResult <- go(typ)} yield Function(name, argsResult, typResult, tag)
+            case Axiom(explains, exp) => go(exp) map (Axiom(explains, _))
+            // case GlobalVarDecl(name, typ) => go(typ) map (GlobalVarDecl(name, _))
+            case Procedure(name, args, pre, post, optBody) =>
+              for {argsResult <- goSeq(args); preResult <- goSeq(pre); postResult <- goSeq(post); 
+              bodyResult <- {optBody match {
+                case None => None
+                case Some(stmt) => go(stmt) map (Some(_))}
+              }} yield Procedure(name, argsResult, preResult, postResult, bodyResult)
           }
         case ss: Stmt =>
           ss match {
+            case VarDecl(name, body, typ, isMutable, optInitVal) => 
+              for {bodyResult <- go(body); initValResult <- {optInitVal match {
+                case None => None
+                case Some(expr) => go(expr).map(Some(_))}
+              }} yield VarDecl(name, bodyResult, typ, isMutable, initValResult)
             case Assign(lhs, rhs) => for {lhsResult <- go(lhs); rhsResult <- go(rhs)} yield Assign(lhsResult, rhsResult)
-            case Assert(e, error) => go(e) map (Assert(_, error))
+            case Reinit(es) => goSeq(es) map (Reinit(_))
+            case Block(s) => goSeq(s) map (Block(_))
+            case Check(e, error) => go(e) map (Check(_, error))
             case Assume(e) => go(e) map (Assume(_))
-            case HavocImpl(es) => goSeq(es) map (HavocImpl(_))
-            case Comment(_) => Seq(parent)
-            case CommentBlock(s, stmt) => go(stmt) map (CommentBlock(s, _))
-            case Seqn(s) => goSeq(s) map (Seqn(_))
+            case Assert(e, error) => go(e) map (Assert(_, error))
+            case Choose(branches) => goSeq(branches) map (Choose(_))
             case If(cond, thn, els) =>
               for {condResult <- go(cond); thnResult <- go(thn); elsResult <- go(els)} yield
                 (If(condResult, thnResult, elsResult))
-            case NondetIf(thn, els) =>
-              for {thnResult <- go(thn); elsResult <- go(els)} yield
-                (NondetIf(thnResult, elsResult))
-            case Label(_) => Seq(parent)
-            case Goto(_) => Seq(parent)
-            case LocalVarWhereDecl(idn, where) => go(where) map (LocalVarWhereDecl(idn, _))
+            case Loop(inv, body) =>
+              for {invResult <- goSeq(inv); bodyResult <- go(body)} yield
+                (Loop(invResult, bodyResult))
+            case LabeledStmt(lbl, body) => go(body) map (LabeledStmt(lbl, _))
           }
-        case e: Exp =>
+        case e: Expr =>
           // Note: If you have to update this pattern match to make it exhaustive, it
           // might also be necessary to update the PrettyPrinter.toParenDoc method.
           e match {
-            case IntLit(_) => Seq(parent)
             case BoolLit(_) => Seq(parent)
-            case RealLit(_) => Seq(parent)
-            case RealConv(exp) => go(exp) map (RealConv(_))
-            case LocalVar(n, t) => go(t) map (LocalVar(n, _))
-            case GlobalVar(n, t) => go(t) map (GlobalVar(n, _))
-            case Const(_) => Seq(parent)
-            case MapSelect(map, idxs) =>
-              for {mapResult <- go(map); idxsResult <- goSeq(idxs)} yield MapSelect(mapResult, idxsResult)
-            case MapUpdate(map, idxs, value) =>
-              for {mapResult <- go(map); idxsResult <- goSeq(idxs); valueResult <- go(value)} yield MapUpdate(mapResult, idxsResult, valueResult)
-            case Old(exp) => go(exp) map (Old(_))
+            case IntLit(_) => Seq(parent)
+            // case RealLit(_) => Seq(parent)
+            case IdExpr(n,t,o) => go(t) map (IdExpr(n,_,o))
+            // case RealConv(exp) => go(exp) map (RealConv(_))
+            // case Const(_) => Seq(parent)
+            // case MapSelect(map, idxs) =>
+            //   for {mapResult <- go(map); idxsResult <- goSeq(idxs)} yield MapSelect(mapResult, idxsResult)
+            // case MapUpdate(map, idxs, value) =>
+            //   for {mapResult <- go(map); idxsResult <- goSeq(idxs); valueResult <- go(value)} yield MapUpdate(mapResult, idxsResult, valueResult)
+            // case Old(exp) => go(exp) map (Old(_))
+            case OperatorExpr(op, es) => goSeq(es) map (OperatorExpr(op,_))
             case CondExp(cond, thn, els) =>
               for {condResult <- go(cond); thnResult <- go(thn); elsResult <- go(els)} yield
                 (CondExp(condResult, thnResult, elsResult))
+            case FunctionCallExpr(func, args, typ) => {
+              for {argsResult <- goSeq(args); typResult <- go(typ)} yield FunctionCallExpr(func, argsResult, typResult)
+            }
             case Exists(v, triggers, exp, w) =>
               for {vResult <- goSeq(v); triggersResult <- goSeq(triggers); expResult <- go(exp)} yield
                 Exists(vResult, triggersResult, expResult, w)
-
             case Forall(v, triggers, exp, tv, w) =>
               for {vResult <- goSeq(v); triggersResult <- goSeq(triggers); expResult <- go(exp)} yield
               Forall(vResult, triggersResult, expResult, tv, w)
-            case BinExp(left, binop, right) =>
-              for {leftResult <- go(left); rightResult <- go(right)} yield BinExp(leftResult, binop, rightResult)
-            case UnExp(unop, exp) => go(exp) map (UnExp(unop, _))
-            case f@FuncApp(func, args, typ) => {
-              val results =
-                for {argsResult <- goSeq(args); typResult <- go(typ)} yield FuncApp(func, argsResult, typResult)
-              results.foreach(fa => fa.showReturnType = f.showReturnType)
-              results
-            }
+            case Pattern(exps) => goSeq(exps) map (Pattern(_))
           }
       }
     }
@@ -211,4 +228,3 @@ object DuplicatingTransformer {
     (afterRecursion flatMap post).asInstanceOf[Seq[A]]
   }
 }
-*/

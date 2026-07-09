@@ -18,6 +18,7 @@ import viper.carbon.b3.B3Nodes.{Expr, IdExpr, Stmt, TrueLit}
 
 trait WandModule extends Module with ComponentRegistry[TransferComponent] {
 
+/*
   /*====================================================================== General Note ======================================================================
     Statements being translated inside package statements are handled differently in two ways:
     exhaling: The permissions are exhaled from many states (the global current state, lhs state ...) instead of just one state.
@@ -187,4 +188,5 @@ trait WandModule extends Module with ComponentRegistry[TransferComponent] {
     * ftsm == 0   ==>   returns ft representation (wand#ft)
     */
   def getWandFtSmRepresentation(wand: sil.MagicWand, ftsm: Int): Expr
+*/
 }

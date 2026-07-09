@@ -16,16 +16,19 @@ import scala.collection.mutable
 
  */
 trait FuncPredModule extends Module {
+/* °Q+
   /* Translate a function. If the second parameter is defined, also record the Boogie names of all translated Viper
    * variables to the given map.
    */
   def translateFunction(f: sil.Function, names: Option[mutable.Map[String, String]]): Seq[Decl]
+*/
 
   def translateFuncApp(fa: sil.FuncApp): Expr
 
   // wrap an expression in a dummy function with "true" value (sometimes useful for triggering)
   def dummyFuncApp(e: Expr): Expr
 
+/*
   /* Translate a predicate. If the second parameter is defined, also record the Boogie names of all translated Viper
    * variables to the given map.
    */
@@ -53,9 +56,11 @@ trait FuncPredModule extends Module {
     * For more details refer to the general note in 'wandModule'.
     */
   def translateUnfold(unfold: sil.Unfold, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt
+*/
 
   def toExpressionsUsedInTriggers(e: Expr): Seq[Expr]
   def toExpressionsUsedInTriggers(e: Seq[Expr]): Seq[Seq[Expr]]
+/*
   def rewriteTriggersToExpressionsUsedInTriggers(e: Seq[Pattern]) : Seq[Pattern] =
     e flatMap (t => (toExpressionsUsedInTriggers(t.exprs))
       map (Pattern(_)) // build a trigger for each sequence element returned (in general, one original trigger can yield multiple alternative new triggers)
@@ -64,4 +69,5 @@ trait FuncPredModule extends Module {
 
   def translateBackendFuncApp(fa: sil.BackendFuncApp): Expr
   def translateBackendFunc(f: sil.DomainFunc): Seq[Decl]
+*/
 }

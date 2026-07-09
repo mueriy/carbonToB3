@@ -30,6 +30,7 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
   // name for output identifier (to try to avoid clashes - should be improved for robustness (see issue #19)
   def outputName(domain: sil.Domain) : String = domain.name + "DomainType"
 
+/*
   override def translateDomain(domain: sil.Domain): Seq[Decl] = {
     sys.error("LATER: translateDomainFunction")
     /*
@@ -101,5 +102,6 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
     NamedType(this.outputName(domain), typArgs map translateType)
     */
   }
+*/
 
 }

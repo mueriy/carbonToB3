@@ -32,9 +32,9 @@ class DefaultTypeModule(val verifier: Verifier) extends TypeModule with Stateles
       case sil.Int =>
         Int
       case sil.Ref =>
-        refType // B3 TODO: was DefaultHeapModule -> refType. Check if there can be a conflict (i.e. can "Ref" also be a custom type from Viper?)
+        Int //refType // B3 TODO2: was (DefaultHeapModule ->) refType. Reverse for Heap-stuff.
       case sil.Perm =>
-        permType // B3 TODO: replace with real as soon as real is supported
+        Int //permType (<--B3 TODO2) // B3 TODO: replace with real as soon as real is supported
       case t: sil.SeqType =>
         sys.error("B3 TODO: SeqType not supported yet.") //translateSeqType(t)
       case t: sil.SetType =>

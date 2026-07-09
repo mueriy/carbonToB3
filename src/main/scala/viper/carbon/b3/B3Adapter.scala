@@ -206,6 +206,21 @@ object B3Nodes {
    */
   sealed trait Node {
     //(Taken from boogie.scala -> Node) vvv
+    /**
+     * Returns a list of all direct sub-nodes of this node.
+     */
+    lazy val subnodes = Nodes.subnodes(this)
+    /**
+     * Applies the function `f` to the node and the results of the subnodes.
+     */
+    def reduce[T](f: (Node, Seq[T]) => T) = Visitor.reduce[T](this)(f)
+
+    /**
+     * More powerful version of reduce that also carries a context argument through the tree.
+     */
+    def reduce[C, R](context: C, enter: (Node, C) => C, combine: (Node, C, Seq[R]) => R) = {
+      Visitor.reduce[C, R](this)(context, enter, combine)
+    }
     /** 
      * 
     * This extra level of indirection (not calling transform directly), appears to affect the type-checking. We need to look into this.
@@ -227,6 +242,8 @@ object B3Nodes {
   // FParameter(name: String, typ: Type, isInjective: Boolean = false)
     def name: Identifier
     def typ: Type
+    /* returns the identifier expression of this locally declared variable */
+    def l = IdExpr(name, typ)
   } 
 
   // "SPECIAL" NOODES
@@ -257,10 +274,7 @@ object B3Nodes {
 
   private val typeTracker = collection.mutable.MultiDict.empty[String, Seq[String]]
   def addType(name: String, typVarNames: Seq[String]): Unit = {
-    typVarNames match {
-      case Seq() => Nil
-      case _ => typeTracker += ((name, typVarNames))
-    }
+    typeTracker += ((name, typVarNames))
   }
 
   /** 
@@ -435,17 +449,20 @@ object B3Nodes {
   /** Corresponds to the Stmt: "'TODO_Stmt_info1': {check true}". Use this if a Stmt is required, but you dont want to implement it yet. */
   def TODO_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addTODO(info1, info2)
-    LabeledStmt(s"TODO_Stmt_$info1", Block(Seq(Check(TrueLit(), fakeError("TODO")))))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""}
+    LabeledStmt(s"TODO_Stmt_$info1"+info2inlc, Block(Seq(Check(TrueLit(), fakeError("TODO")))))
   }
   /** Corresponds to the Stmt: "'LATER_Stmt_info1': {check true}". Use this if a Stmt is required, but it is actually an advanced feature. */
   def LATER_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addLATER(info1, info2)
-    LabeledStmt(s"LATER_Stmt_$info1", Block(Seq(Check(TrueLit(), fakeError("LATER")))))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""}
+    LabeledStmt(s"LATER_Stmt_$info1"+info2inlc, Block(Seq(Check(TrueLit(), fakeError("LATER")))))
   }
   /** Corresponds to "'ADVANCED_Stmt_info1': {check true}". Use this if a Stmt is required, but it is actually an advanced feature. */
   def ADVANCED_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addADVANCED(info1, info2)
-    LabeledStmt(s"ADVANCED_Stmt_$info1", Block(Seq(Check(TrueLit(), fakeError("ADVANCED")))))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""}
+    LabeledStmt(s"ADVANCED_Stmt_$info1"+info2inlc, Block(Seq(Check(TrueLit(), fakeError("ADVANCED")))))
   }
 
   /** An empty statement. */
@@ -466,6 +483,11 @@ object B3Nodes {
      * is, all statements except `Block`, including statements in the body of loops, etc.
      */
     def children = Statements.children(this)
+    /**
+     * Returns a list of all undeclared local variables contained in this statement and
+     * throws an exception if the same variable is used with different types.
+     */
+    def undeclLocalVars: Seq[IdExpr] = Statements.undeclLocalVars(this)
   }
 
   /** 
@@ -479,7 +501,7 @@ object B3Nodes {
    * @param isMutable var (true) vs val (false)
    * @param optInitValue optionally provide the initial value here (in form of an Expression, i.e. Option[Expr])
    */
-  case class VarDecl(name: Identifier, body: Stmt, typ: Type, isMutable: Boolean = true, optInitValue: Option[Expr] = None) extends Stmt {
+  case class VarDecl(name: Identifier, body: Stmt, typ: Type, isMutable: Boolean = true, optInitValue: Option[Expr] = None) extends Stmt with LocalVarDecl {
     val variable = Variable(name, typ, isMutable)
     override def b3fy: RawAst.Stmt = new RawAst.Stmt_VarDecl(variable.b3fy, daf(optInitValue map {_.b3fy}) , body.b3fy) // Option_None ==> do not initiate variables (which we never want to do) 
   }
@@ -596,42 +618,48 @@ object B3Nodes {
 
 
   // EXPRESSION NODES
-
+  val INLCUDE_SECOND_MSG = true
   /** Corresponds to the "'TODO_Expr_bool_info1': true" (labeled) bool-Expr. 
    * Use these if a bool expr is required, but you dont want to implement it yet. */
   def TODO_Expr_bool(info1: String = "", info2: String = ""): Expr = {
     B3Development.addTODO(info1, info2)
-    LabeledExpr(s"TODO_Expr_bool_$info1", TrueLit())
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
+    LabeledExpr(s"TODO_Expr_bool_$info1"+info2inlc, TrueLit())
   }
   /** Corresponds to the "'TODO_Expr_int_info1': 666" (labeled) int-Expr. 
    * Use these if a int expr is required, but you dont want to implement it yet. */
   def TODO_Expr_int(info1: String = "", info2: String = ""): Expr = {
     B3Development.addTODO(info1, info2)
-    LabeledExpr(s"TODO_Expr_bool_$info1", IntLit(666))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
+    LabeledExpr(s"TODO_Expr_bool_$info1"+info2inlc, IntLit(666))
   }
   /** Corresponds to the "'LATER_Expr_bool_info1': true" (labeled) bool-Expr. 
    * Use these if a bool expr is required, but you dont want to implement it yet. */
   def LATER_Expr_bool(info1: String = "", info2: String = ""): Expr = {
     B3Development.addLATER(info1, info2)
-    LabeledExpr(s"LATER_Expr_bool_$info1", TrueLit())
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
+    LabeledExpr(s"LATER_Expr_bool_$info1"+info2inlc, TrueLit())
   }
   /** Corresponds to the "'LATER_Expr_int_info1': 666" (labeled) int-Expr. 
    * Use these if a int expr is required, but you dont want to implement it yet. */
   def LATER_Expr_int(info1: String = "", info2: String = ""): Expr = {
     B3Development.addLATER(info1, info2)
-    LabeledExpr(s"LATER_Expr_bool_$info1", IntLit(666))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
+    LabeledExpr(s"LATER_Expr_bool_$info1"+info2inlc, IntLit(666))
   }
   /** Corresponds to the "'ADVANCED_Expr_bool_info1': true" (labeled) bool-Expr. 
    * Use these if a bool expr is required, but you dont want to implement it yet. */
   def ADVANCED_Expr_bool(info1: String = "", info2: String = ""): Expr = {
     B3Development.addADVANCED(info1, info2)
-    LabeledExpr(s"ADVANCED_Expr_bool_$info1", TrueLit())
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
+    LabeledExpr(s"ADVANCED_Expr_bool_$info1"+info2inlc, TrueLit())
   }
   /** Corresponds to the "'ADVANCED_Expr_int_info1': 666" (labeled) int-Expr. 
    * Use these if a int expr is required, but you dont want to implement it yet. */
   def ADVANCED_Expr_int(info1: String = "", info2: String = ""): Expr = {
     B3Development.addADVANCED(info1, info2)
-    LabeledExpr(s"ADVANCED_Expr_bool_$info1", IntLit(666))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
+    LabeledExpr(s"ADVANCED_Expr_bool_$info1"+info2inlc, IntLit(666))
   }
 
 
@@ -674,7 +702,7 @@ object B3Nodes {
     def not = OperatorExpr(Not, Seq(this))
     def thn(thn: Expr) = new PartialCondExpr(this, thn)
 
-    // def transform(f: PartialFunction[Expr, Option[Expr]]) = Nodes.transform(this, f)
+    def transform(f: PartialFunction[Expr, Option[Expr]]) = Nodes.transform(this, f)
     
     class PartialCondExpr(cond: Expr, thn: Expr) {
       def els(els: Expr) = CondExp(cond, thn, els)
@@ -709,10 +737,9 @@ object B3Nodes {
   */
   case class IdExpr(name: Identifier, typ: Type, isOld: Boolean = false) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_IdExpr(daf(name), isOld)
-    def :=(rhs: Expr) = Assign(this, rhs)
   }
 
-  /** Scala representation of a B3 RawAst OperatorExpr-Expr node. 
+  /** Scala representation of a B3 RawAst OperatorExpr-Expr node. (Replaces BinExp and UnExp; CondExp has its own class)
    * @param op RawAst Operators are provided as values by the current Object (use ObjectName.{Op-name})
    */
   case class OperatorExpr(op: RawAst.Operator, exprs: Seq[Expr]) extends Expr {
@@ -773,9 +800,13 @@ object B3Nodes {
     * @param vars Seq of B3 Bindings (bound variables (w/ name + type))
     * @param patterns Seq of patterns for pattern-matching. (same as Silver Trigger's)
     * @param expr The body. Can use any variables in scope, including the ones defined by 'bindings'
+    * @param typeVars Type vars are not supported by B3! However, this parameter makes it more practical to handle Domains and many parts
+    *  of the preambles, as we can first create a parametric version and then instanciate that for all required TypeVar-combinations 
+    * @param weight Currently not supported by B3, but if B3 ever supports this we are ready. This info comes from Silver and can be used
+    *  for "specifying the weight of a quantifier in the SMT encoding".
     */
-  case class Forall(vars: Seq[Binding], patterns: Seq[Pattern], expr: Expr) extends QuantifiedExpr {
-    override def b3fy: RawAst.Expr = new RawAst.Expr_QuantifierExpr(true, daf(vars map {_.b3fy}), daf(patterns map {_.b3fy}), expr.b3fy)
+  case class Forall(vars: Seq[Binding], patterns: Seq[Pattern], expr: Expr, typeVars: Seq[TypeVar] = Nil, weight: Option[Int] = None) extends QuantifiedExpr {
+    override def b3fy: RawAst.Expr = new RawAst.Expr_QuantifierExpr(true, daf(vars map {_.b3fy}), daf(patterns map {_.b3fyPattern}), expr.b3fy)
   } 
   /**
     * Scala representation of a B3 RawAst Quantifier(Exists)-Expr node.
@@ -783,9 +814,11 @@ object B3Nodes {
     * @param vars Seq of B3 Bindings (bound variables (w/ name + type))
     * @param patterns Seq of patterns for pattern-matching. (same as Silver Trigger's)
     * @param expr The body. Can use any variables in scope, including the ones defined by 'bindings'
+    * @param weight Currently not supported by B3, but if B3 ever supports this we are ready. This info comes from Silver and can be used
+    *  for "specifying the weight of a quantifier in the SMT encoding".
     */
-  case class Exists(vars: Seq[Binding], patterns: Seq[Pattern], expr: Expr) extends QuantifiedExpr {
-    override def b3fy: RawAst.Expr = new RawAst.Expr_QuantifierExpr(false, daf(vars map {_.b3fy}), daf(patterns map {_.b3fy}), expr.b3fy)
+  case class Exists(vars: Seq[Binding], patterns: Seq[Pattern], expr: Expr, weight: Option[Int] = None) extends QuantifiedExpr {
+    override def b3fy: RawAst.Expr = new RawAst.Expr_QuantifierExpr(false, daf(vars map {_.b3fy}), daf(patterns map {_.b3fyPattern}), expr.b3fy)
   } 
 
 
@@ -797,9 +830,11 @@ object B3Nodes {
     def b3fy: RawAst.Binding = new RawAst.Binding(daf(name), daf(typ.b3fy))
   }
 
-  /** (= Trigger) Scala representation of a B3 RawAst Pattern node. (equivalent to a sil.Trigger; for pattern-matching in forall/exists). */
-  case class Pattern(exprs: Seq[Expr]) extends Node {
-    def b3fy: DafnySequence[RawAst.Expr] = daf(exprs map {_.b3fy}) // We dont use "new RawAst.Pattern(daf(exprs map {_.b3fy}))" because QuantifierExpr expects DafnySequence[_ <: RawAst.Expr] instead of RawAst.Pattern"
+  /** (= Trigger) Scala representation of a B3 RawAst Pattern node. (equivalent to a sil.Trigger; for pattern-matching in forall/exists). 
+   * (Actually, Pattern nodes only exist in standard B3, but not in B3.jar - there it is "Seq[Seq[Expr]]". But using this nonetheless makes certain transformations easier.) */
+  case class Pattern(exprs: Seq[Expr]) extends Expr {
+    def b3fy: RawAst.Expr = sys.error("You are not allowed to call 'b3fy' on a Pattern node! Use 'b3fyPattern' instead")
+    def b3fyPattern: DafnySequence[RawAst.Expr] = daf(exprs map {_.b3fy}) // We dont use "new RawAst.Pattern(daf(exprs map {_.b3fy}))" because QuantifierExpr expects DafnySequence[_ <: RawAst.Expr] instead of RawAst.Pattern" in B3's java version
   }
 
   // case class ClosureBinding extends Node

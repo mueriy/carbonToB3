@@ -8,6 +8,7 @@ package viper.carbon.modules.impls
 
 // import viper.carbon.boogie.{Bool, CondExp, Exp, FalseLit, Forall, If, Int, IntLit, LocalVar, LocalVarDecl, MaybeCommentBlock, Stmt, Trigger, TypeVar, _}
 import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.DuplicatingTransformer
 import viper.carbon.modules._
 import viper.silver.ast.{FuncApp => silverFuncApp}
 import viper.silver.ast.utility.Expressions.{contains, whenExhaling, whenInhaling}
@@ -15,6 +16,7 @@ import viper.silver.ast.{NoPerm, PermGtCmp, PredicateAccess, PredicateAccessPred
 import viper.silver.{ast => sil}
 import viper.carbon.verifier.{Environment, Verifier}
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Naming._
 import viper.silver.ast.utility._
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState, ExhaleComponent, InhaleComponent}
 import viper.silver.verifier.{NullPartialVerificationError, PartialVerificationError, errors}
@@ -43,6 +45,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   import permModule._
 
 /*
+*/
   implicit val fpNamespace = verifier.freshNamespace("funcpred")
 
   /* Maps function names to their height.
@@ -53,10 +56,12 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   private var heights: Map[String, Int] = null
   private var checkingDefinednessOfFunction: Option[String] = None // used to flag special behaviour when checking function definitions
 
+/*
   private val assumeFunctionsAboveName = Identifier("AssumeFunctionsAbove")
   private val assumeFunctionsAbove: Const = Const(assumeFunctionsAboveName)
   private val specialRefName = Identifier("special_ref")
   private val specialRef = Const(specialRefName)
+*/
 
   /* limitedPostfix is appended to the actual function name to get the name of the limited function.
    * It must be a string that cannot appear in Viper identifiers to ensure that we can easily check if a given identifier
@@ -69,7 +74,9 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   private val frameTypeName = "FrameType"
   private val frameType = NamedType(frameTypeName)
   private val emptyFrameName = Identifier("EmptyFrame")
+/*
   private val emptyFrame = Const(emptyFrameName)
+*/
   private val combineFramesName = Identifier("CombineFrames")
   private val frameFirstName = Identifier("FrameFirst")
   private val frameSecondName = Identifier("FrameSecond")
@@ -82,14 +89,13 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
   private val qpCondPostfix = "#condqp"
   private var qpPrecondId = 0
-  private var qpCondFuncs: ListBuffer[(Func,sil.Forall)] = new ListBuffer[(Func, sil.Forall)]();
+  private var qpCondFuncs: ListBuffer[(Function,sil.Forall)] = new ListBuffer[(Function, sil.Forall)]();
 
-  type FrameInfos = collection.mutable.HashMap[String,(Exp, StateSnapshot, Seq[LocalVarDecl], Seq[(Func, sil.Forall)])]
+  type FrameInfos = collection.mutable.HashMap[String,(Expr, StateSnapshot, Seq[LocalVarDecl], Seq[(Function, sil.Forall)])]
   val FrameInfos = collection.mutable.HashMap
 
   private var functionFrames : FrameInfos = FrameInfos();
   private var predicateFrames: FrameInfos = FrameInfos();
-*/
 
   override def preamble = {
     Seq() //B3 TODO
@@ -198,6 +204,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     inhaleModule.register(this, before = Seq(verifier.inhaleModule)) // this is because of inhaleExp definition, which tries to add extra information from executing the unfolding first
     exhaleModule.register(this, before = Seq(verifier.exhaleModule)) // this is because of exhaleExp definition, which tries to add extra information from executing the unfolding first
   }
+*/
 
   def reset() = {
     heights = Functions.heights(verifier.program)
@@ -214,6 +221,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     predicateFrames = FrameInfos()
   }
 
+/*
     override def translateFunction(f: sil.Function, names: Option[mutable.Map[String, String]]): Seq[Decl] = {
     env = Environment(verifier, f)
     ErrorMemberMapping.currentMember = f
@@ -351,15 +359,16 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         (precondition ==> (fapp === body))
     ))
   }
+*/
 
-  private def transformFuncAppsToLimitedForm(exp: Exp, heightToSkip : Int = -1): Exp =  transformFuncAppsToLimitedOrTriggerForm(exp, heightToSkip, false)
+  private def transformFuncAppsToLimitedForm(exp: Expr, heightToSkip : Int = -1): Expr =  transformFuncAppsToLimitedOrTriggerForm(exp, heightToSkip, false)
   /**
    * Transform all function applications to their limited form (or form used in triggers, if the "triggerForm" Boolean is passed as true.
    * If height is provided (i.e., non-negative), functions of above that height need not have their applications replaced with the limited form.
    */
-  private def transformFuncAppsToLimitedOrTriggerForm(exp: Exp, heightToSkip : Int = -1, triggerForm: Boolean = false): Exp = {
-    def transformer: PartialFunction[Exp, Option[Exp]] = {
-      case FuncApp(recf, recargs, t) if recf.namespace == fpNamespace &&
+  private def transformFuncAppsToLimitedOrTriggerForm(exp: Expr, heightToSkip : Int = -1, triggerForm: Boolean = false): Expr = {
+    def transformer: PartialFunction[Expr, Option[Expr]] = {
+      case FunctionCallExpr(recf, recargs, t) if recf.namespace == fpNamespace &&
         // recf might refer to a limited function already if the function was marked as opaque.
         // In that case, we have to drop the limited postfix, since heights contains only the original function names.
         // We assume that any name that ends with limitedPostfix refers to a limited function (see limitedPostfix above).
@@ -379,12 +388,12 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
             // Some(triggerFuncApp(func , (recargs.tail map (_.transform(transformer)))))
             //
             // instead, we use the function frame function as the trigger:
-            val frameExp : Exp = {
+            val frameExp : Expr = {
               getFunctionFrame(func, recargs)._1 // the declarations will be taken care of when the function is translated
             }
-            Some(FuncApp(Identifier(baseName + framePostfix), Seq(frameExp) ++ (recargs.tail /* drop Heap argument */ map (_.transform(transformer))), t))
+            Some(FunctionCallExpr(Identifier(baseName + framePostfix), Seq(frameExp) ++ (recargs.tail /* drop Heap argument */ map (_.transform(transformer))), t))
 
-          } else Some(FuncApp(Identifier(baseName + limitedPostfix), recargs map (_.transform(transformer)), t))
+          } else Some(FunctionCallExpr(Identifier(baseName + limitedPostfix), recargs map (_.transform(transformer)), t))
 
       case Forall(vs,ts,e,tvs,w) => Some(Forall(vs,ts,e.transform(transformer),tvs,w)) // avoid recursing into the triggers of nested foralls (which will typically get translated via another call to this anyway)
       case Exists(vs,ts,e,w) => Some(Exists(vs,ts,e.transform(transformer),w)) // avoid recursing into the triggers of nested exists (which will typically get translated via another call to this anyway)
@@ -393,6 +402,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     res
   }
 
+/*
   private def postconditionAxiom(f: sil.Function): Seq[Decl] = {
     val height = heights(f.name)
     val heap = heapModule.staticStateContributions(true, true)
@@ -483,6 +493,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   private def getPredicateFrame(pred: sil.Predicate, args: Seq[Exp]): (Exp, Seq[(Func, sil.Forall)]) = {
     getFrame(pred.name, pred.formalArgs, pred.body.get.whenExhaling, predicateFrames, args, false)
   }
+*/
 
 
   /** Generate an expression that represents the state a function can depend on
@@ -494,11 +505,15 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     *
     * The generated frame includes freshly-generated variables
     */
-  private def getFunctionFrame(fun: sil.Function, args: Seq[Exp]): (Exp, Seq[(Func, sil.Forall)]) = {
+  private def getFunctionFrame(fun: sil.Function, args: Seq[Expr]): (Expr, Seq[(Function, sil.Forall)]) = {
+    (TODO_Expr_bool("DefaultFuncPredModule", "getFunctionFrame"), Seq())
+/*
   val res =     getFrame(fun.name, fun.formalArgs, fun.pres map whenExhaling, functionFrames, args, true)
     res
+*/
   }
 
+/*
   /** Generate an expression that represents the state depended on by conjoined assertions,
     * as a "snapshot", used for framing.
     *
@@ -508,8 +523,8 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     *
     * The generated frame includes freshly-generated variables
     */
-  private def getFrame(name: String, formalArgs:Seq[sil.LocalVarDecl], assertions:Seq[sil.Exp], info: FrameInfos, args: Seq[Exp], argsIncludeHeap : Boolean): (Exp, Seq[(Func, sil.Forall)]) = {
-    qpCondFuncs = new ListBuffer[(Func, sil.Forall)]
+  private def getFrame(name: String, formalArgs:Seq[sil.LocalVarDecl], assertions:Seq[sil.Exp], info: FrameInfos, args: Seq[Expr], argsIncludeHeap : Boolean): (Expr, Seq[(Function, sil.Forall)]) = {
+    qpCondFuncs = new ListBuffer[(Function, sil.Forall)]
     (info.get(name) match {
       case Some(frameInfo) => frameInfo
       case None => {
@@ -855,8 +870,10 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
     (initStmt ++ unfoldStmt, () => defState.setDefState = setDefStateBeforeUnfolding)
   }
+*/
 
   private var tmpStateId = -1
+/*
   override def partialCheckDefinedness(e: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): (() => Stmt, () => Stmt) = {
     e match {
       case sil.Unfolding(acc@sil.PredicateAccessPredicate(_, _), _) =>
@@ -937,8 +954,9 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         )
     }
   }
+*/
 
-  override def toExpressionsUsedInTriggers(inputs: Seq[Exp]): Seq[Seq[Exp]] = {
+  override def toExpressionsUsedInTriggers(inputs: Seq[Expr]): Seq[Seq[Expr]] = {
     val res = if (inputs.isEmpty) Seq()
       else if (inputs.size == 1) toExpressionsUsedInTriggers(inputs.head) map (Seq(_))
       else
@@ -947,16 +965,16 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     res
   }
 
-  override def toExpressionsUsedInTriggers(e: Exp): Seq[Exp] = {
+  override def toExpressionsUsedInTriggers(e: Expr): Seq[Expr] = {
     val inter = transformFuncAppsToLimitedOrTriggerForm(e,-1,true)
-    val seqsDone = seqModule.rewriteToTermsInTriggers(inter)
+    val seqsDone = inter //B3 LATER: I think this supports Seqs:  seqModule.rewriteToTermsInTriggers(inter)
     val res = if (seqsDone != inter)
       (flattenConditionalsInTriggers(seqsDone) ++ flattenConditionalsInTriggers(inter)).distinct
       else flattenConditionalsInTriggers(seqsDone)
     res
   }
 
-  private def flattenConditionalsInTriggers(e: Exp) : Seq[Exp] =
+  private def flattenConditionalsInTriggers(e: Expr) : Seq[Expr] =
   {
     DuplicatingTransformer.transform(node = e)(post = (_ match {
       case CondExp(cond,thn,els) => Seq(thn,els)
@@ -966,6 +984,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
   // --------------------------------------------
 
+/*
   override def translatePredicate(p: sil.Predicate, names: Option[mutable.Map[String, String]]): Seq[Decl] = {
 
     env = Environment(verifier, p)
@@ -1013,9 +1032,11 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       }
     }
   }
+*/
 
   private var duringFold = false
   private var foldInfo: sil.PredicateAccessPredicate = null
+/*
   private def foldPredicate(acc: sil.PredicateAccessPredicate, error: PartialVerificationError
                            , statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): (Stmt,Stmt) = {
     duringFold = true
@@ -1035,11 +1056,13 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     duringFold = false
     (stmt,stmtLast)
   }
+*/
 
   private var duringUnfold = false
   private var duringUnfolding = false
   private var duringUnfoldingExtraUnfold = false // are we executing an extra unfold, to reflect the meaning of inhaling or exhaling an unfolding expression?
   private var unfoldInfo: sil.PredicateAccessPredicate = null
+/*
   override def translateUnfold(unfold: sil.Unfold, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt = {
     unfold match {
       case sil.Unfold(acc@sil.PredicateAccessPredicate(pa@sil.PredicateAccess(_, _), perm)) =>
@@ -1158,10 +1181,13 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     Assume(FuncApp(insidePredicateName,Seq(translateLocation(verifier.program.findPredicate(p1.loc.predicateName), p1.loc.args.map(translateExp(_))),translateExp(p1.loc),translateLocation(verifier.program.findPredicate(p2.loc.predicateName), p2.loc.args.map(translateExp(_))),translateExp(p2.loc)),
       Bool))
   }
+*/
 
   var exhaleTmpStateId = -1
   var extraUnfolding = false
   override def inhaleExp(e: sil.Exp, error: PartialVerificationError): Stmt = {
+    TODO_Stmt("DefaultFuncPredModule", "inhaleExp (B3 TODO1/TODO2)")
+/*
     e match {
       case sil.Unfolding(acc, _) =>
         if (duringUnfoldingExtraUnfold) {
@@ -1196,8 +1222,10 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
           res ++ (if (duringUnfold) insidePredicate(unfoldInfo, pap) else Nil))
       case _ => Nil
     }
+*/
   }
 
+/*
   def translateBackendFuncApp(fa: sil.BackendFuncApp): Exp = {
     // Do not use funcpred namespace, see translateSMTFunc.
     val funcIdent = Identifier(fa.backendFuncName)(silVarNamespace)

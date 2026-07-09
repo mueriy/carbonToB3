@@ -44,29 +44,36 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     nestedExhaleId += 1
 
     // create a definedness state that matches the state before the exhale
+/*B3 TODO2
     val wellDefState = stateModule.freshTempStateKeepCurrent(s"ExhaleWellDef${nestedExhaleId - 1}")
     val wellDefStateInitStmt = stateModule.initToCurrentStmt(wellDefState)
+*/
 
     // creating a new temp state if we are inside a package statement
     val curState = stateModule.state
     var initStmtWand: Seq[Stmt] = Seq()
-    // B3 ADVANCED:
-    // if(insidePackageStmt){ 
-    //   val StateSetup(tempState, initStmt) = wandModule.createAndSetState(None)
-    //   wandModule.tempCurState = tempState
-    //   initStmtWand = initStmt
-    // }
+/* B3 ADVANCED (wand)
+    if(insidePackageStmt){ 
+      val StateSetup(tempState, initStmt) = wandModule.createAndSetState(None)
+      wandModule.tempCurState = tempState
+      initStmtWand = initStmt
+    }
+*/
+/* B3 LATER
     val tempState: StateRep = wandModule.tempCurState.asInstanceOf[StateRep]
+*/
 
     val exhaleStmt = exps map (e =>
         {
+          TODO_Stmt("exhale", "exhaleConnective")
+/*B3 TODO2
           val defCheckData =
                 DefinednessCheckData(
                   e._3,
                   Some(DefinednessState(() => stateModule.replaceState(wellDefState)))
                 )
-
-          TODO_Stmt("exhale", "exhaleConnective") //exhaleConnective(e._1.whenExhaling, e._2, defCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert = isAssert, currentStateForPackage = tempState)
+           exhaleConnective(e._1.whenExhaling, e._2, defCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert = isAssert, currentStateForPackage = tempState)
+*/
         }
       )
 
@@ -78,7 +85,9 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     nestedExhaleId -= 1
 
     //only emit initialization of the well-definedness state if the exhale is non-empty
+/*B3 TODO2
     val wellDefStateInitStmtOpt : Stmt = if(exhaleStmt.flatten.isEmpty) { Nil } else { wellDefStateInitStmt }
+*/
 
     if ((exps map (_._1.isPure) forall identity) || !havocHeap || isAssert) {
       // if all expressions are pure, then there is no need for heap copies
@@ -90,13 +99,17 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
       // wellDefStateInitStmtOpt ++ //[[B3 temp: Remove ExhaleWellDef#Heap lines]]
       initStmtWand ++ exhaleStmt ++ assumptions
     } else {
+/*B3 TODO2
       beginExhale ++
       wellDefStateInitStmtOpt ++
+*/
       initStmtWand ++
         exhaleStmt ++
-        assumptions ++
+        assumptions //B3 TODO2 (re-add:) ++
         //"Finish exhale"
+/*B3 TODO2
         endExhale
+*/
     }
 
   }

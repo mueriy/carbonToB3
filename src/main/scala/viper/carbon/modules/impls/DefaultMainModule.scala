@@ -44,15 +44,17 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   override val silVarNamespace = verifier.freshNamespace("main.silver")
   implicit val mainNamespace = verifier.freshNamespace("main")
 
-  override def translateLocalVarSig(typ: sil.Type, v: sil.LocalVar, isMutable: Boolean = true): Variable = {
-    Variable(env.get(v).name, translateType(typ), isMutable)
+  override def translateLocalVarSigToBinding(typ: sil.Type, v: sil.LocalVar): Binding = {
+    Binding(env.get(v).name, translateType(typ))
   }
-  override def translateLocalVarSigMethodParam(typ:sil.Type, v:sil.LocalVar, inoutMode: RawAst.ParameterMode = IN): PParameter = {
+  override def translateLocalVarSigToPParameter(typ:sil.Type, v:sil.LocalVar, inoutMode: RawAst.ParameterMode = IN): PParameter = {
     PParameter(env.get(v).name, translateType(typ), inoutMode)
   }
-
-  override def translateLocalVarSigFuncParam(typ:sil.Type, v:sil.LocalVar, isInjective: Boolean = false): FParameter = {
+  override def translateLocalVarSigToFParameter(typ:sil.Type, v:sil.LocalVar, isInjective: Boolean = false): FParameter = {
     FParameter(env.get(v).name, translateType(typ), isInjective)
+  }
+  override def translateLocalVarSigToVarDecl(typ:sil.Type, v:sil.LocalVar, isInjective: Boolean = false): VarDecl = {
+    VarDecl(env.get(v).name, EmptyStmt, translateType(typ), isInjective)
   }
   // override def translateLocalVarSig(typ:sil.Type, v:sil.LocalVar): LocalVarDecl = {
   //   val t: Type = translateType(typ)
@@ -102,14 +104,20 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
 
         // important to convert Seq to List to force the methods to be translated, otherwise it's possible that
         // evaluation happens lazily, which can lead to incorrect behaviour (evaluation order is important here)
+/* B3 TODO2
         val translatedFields = (fields flatMap translateField).toList
+*/
         nameMaps = (methods ++ functions ++ predicates).map(_.name -> new mutable.HashMap[String, String]()).toMap
         val members = // (domains flatMap translateDomainDecl) ++ //B3 TODO
+/* B3 TODO2
           translatedFields ++
           (functions flatMap (f => translateFunction(f, nameMaps.get(f.name)))) ++
           (predicates flatMap (p => translatePredicate(p, nameMaps.get(p.name)))) ++
-          (methods flatMap (m => translateMethodDecl(m, nameMaps.get(m.name)))) ++
+*/
+          (methods flatMap (m => translateMethodDecl(m, nameMaps.get(m.name)))) //++
+/* B3 TODO: What is a backend function?
           (backendFuncs flatMap translateBackendFunc)
+*/
 
         // get the preambles (only at the end, even if we add it at the beginning)
         val preambles = verifier.allModules flatMap {
@@ -148,6 +156,10 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         // Translate Parameters
         val ins: Seq[PParameter] = formalArgs map {translateLocalVarDeclToPParameter(_, IN)}
         val outs: Seq[PParameter] = formalReturns map {translateLocalVarDeclToPParameter(_, OUT)}
+        //B3 INFO: Viper does not have inout parameters. However, for our heap and permission 
+        // implementation we need variables that can be some value at the start and then can be modified.
+        //(B3 TODO: since we don't actually call any procedures, we could also just use a vardecl? 
+        //  What are the (dis)advantages of these two options?)
         val inouts: Seq[PParameter] = Seq() //B3 TODO: add global variables here!
 
         // Translate individual parts for the procedure body
@@ -173,12 +185,31 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
           /* TODO: Might be worth special-casing on methods with empty bodies */
         
         val body = Block(init ++ paramAssumptions ++ inhalePre ++ initOld ++ checkPost ++ mainBody ++ exhalePost)
-        val proc = Procedure(name = Identifier(name), 
-                             parameters = ins ++ outs ++ inouts,
-                             pre = Seq(), post = Seq(),
-                             body = Some(body))
+
+        /* B3 INFO: In the case of boogie, the variable declarations where added by PrettyPrinter at the end, simply 
+        printing all of them at the start of the procedure body. We will use the same approach for now. VarDecl nodes 
+        in B3 have a body that is a Stmt (e.g. a Block-Stmt). The scope of the declared variable is ONLY in that body! 
+        Even if another statement is in the same Body-Stmt, coming just after the VarDecl-Stmt, it CANNOT use that 
+        variable (since it is out of scope). Therefore we pack the body inside multiple layers of VarDecl's, until
+        we declared all undeclared variables in the procedure body.*/
+        /* B3 QUEST: Theoretically we could make the scope of variables smaller by declaring them more locally. 
+        This could decrease the nr of variables in the context, making the SMT solver a bit more efficient. However,
+        we would have to be very carefull with the scopes. (The scope of a VarDecl inside another is necessarily
+        a subset of the outer VarDecl's scope, so the outer VarDecl's scope must go at least as far as needed for
+        the inner VarDecls.) Maybe this is possible; at least in some situations? */
+        /* B3 INFO: (ADVANCED) In PrettyPrinter we also see handling of LocalVarWhereDecl's. B3 doesn't have "where", 
+        so if we need tha twe would likely have to handle that somewhere else. But this is why it is missing here. */
+
+        // collect all variables that are not declared in the body or by a parameter
+        val undecl = body.undeclLocalVars filter (v1 => (ins ++ outs ++ inouts).forall(v2 => v2.name != v1.name))
+        // pack procedure body in layers of VarDecls (one layer per undeclared variable)
+        val bodyWithDecls = undecl.foldRight(body.asInstanceOf[Stmt])((l, r) => VarDecl(l.name, r, l.typ)) 
+      
         //s"Translation of method $name"
-        proc
+        Procedure(name = Identifier(name), 
+                  parameters = ins ++ outs ++ inouts,
+                  pre = Seq(), post = Seq(),
+                  body = Some(bodyWithDecls))
     }
 
     if (names.isDefined){
@@ -270,9 +301,8 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   }
 */
 
-  // B3 TODO
-  override def allAssumptionsAboutValue(typ:sil.Type, arg: Variable, isParameter:Boolean): Stmt = {
-    val tmp = verifier.allModules map (_.validValue(typ, arg.varId, isParameter))
+  override def allAssumptionsAboutValue(typ:sil.Type, arg: LocalVarDecl, isParameter:Boolean): Stmt = {
+    val tmp = verifier.allModules map (_.validValue(typ, arg.l, isParameter))
     val assumptions = tmp.filter(_.isDefined).map(_.get)
     assumptions.allOption match {
       case None => Nil

@@ -15,6 +15,8 @@ import viper.carbon.b3.B3Nodes.{Expr, Type}
  */
 trait SeqModule extends Module {
   def translateSeqExp(exp: sil.Exp): Expr
+/*
   def translateSeqType(seqType: sil.SeqType): Type
   def rewriteToTermsInTriggers(e: Expr) : Expr
+*/
 }

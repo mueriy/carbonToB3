@@ -12,6 +12,7 @@ import viper.silver.ast.utility.Expressions
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 import viper.carbon.verifier.Verifier
 import viper.carbon.utility.{PolyMapDesugarHelper, PolyMapRep}
 import viper.silver.ast.utility.QuantifiedPermissions.QuantifiedPermissionAssertion
@@ -434,9 +435,10 @@ class DefaultHeapModule(val verifier: Verifier)
 
   override def translateField(f: sil.Field) = {
     val field = locationIdentifier(f)
-    ConstDecl(field, NamedType(fieldTypeName, Seq(normalFieldType, translateType(f.typ))), unique = true) ++
-      Axiom(UnExp(Not, isPredicateField(Const(field)))) ++
-      Axiom(UnExp(Not, isWandField(Const(field))))
+    val funcTyp = NamedType(fieldTypeName, Seq(normalFieldType, translateType(f.typ)))
+    Function(field, Seq(), funcTyp, fieldTagName) ++
+      Axiom(Seq(), isPredicateField(FunctionCallExpr(field, Seq(), funcTyp)).not) ++
+      Axiom(Seq(), isWandField(FunctionCallExpr(field, Seq(), funcTyp)).not)
   }
 
 
@@ -621,9 +623,12 @@ class DefaultHeapModule(val verifier: Verifier)
     val t = predicateMetaTypeOf(pred)
     FuncApp(locationIdentifier(pred), args, t)
   }
+*/
 
-  override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false) : (Seqn => Seqn) = {
+  override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
+    stmts => TODO_Stmt("DefaultheapModule", "handleStmt")++stmts
 
+/*
       stmt => (
         s match {
           case sil.MethodCall(_, _, targets) if enableAllocationEncoding =>
@@ -647,10 +652,13 @@ class DefaultHeapModule(val verifier: Verifier)
           case _ => simpleHandleStmt(s) ++ stmt
         }
       )
+*/
 
   }
 
-  override def simpleHandleStmt(stmt: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false): Stmt = {
+  override def simpleHandleStmt(stmt: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): Stmt = {
+    TODO_Stmt("DefaultheapModule", "simpleHandleStmt")
+/*
     stmt match {
       case sil.NewStmt(target,fields) =>
         Havoc(freshObjectVar) ::
@@ -665,8 +673,10 @@ class DefaultHeapModule(val verifier: Verifier)
           (if(enableAllocationEncoding) allocUpdateRef(freshObjectVar) :: (translateExp(target) := freshObjectVar) :: Nil else (translateExp(target) := freshObjectVar) :: Nil)
       case _ => Statements.EmptyStmt
     }
+*/
   }
 
+/*
   override def freeAssumptions(e: sil.Exp): Stmt = {
     e match {
       case sil.Unfolding(sil.PredicateAccessPredicate(loc, _), _) if !usingOldState =>
@@ -792,7 +802,6 @@ class DefaultHeapModule(val verifier: Verifier)
   override def restoreState(s: Seq[Var]): Unit = {
     heap = s(0) // note: this should be accessed via heapVar or heapExp as appropriate (whether a variable is essential or not)
   }
-*/
 
   def equateWithCurrentHeap(s: Seq[IdExpr]): Stmt = {
     LATER_Stmt("equateWithCurrentHeap", "need to implement Heap") //Assume(heap === s(0))
@@ -807,23 +816,27 @@ class DefaultHeapModule(val verifier: Verifier)
     EmptyStmt
   }
 
-/*
   override def endExhale: Stmt = {
     if (!usingOldState) Havoc(exhaleHeap) ++ Assume(FuncApp(identicalOnKnownLocsName, Seq(heapExp, exhaleHeap) ++ currentMask, Bool)) ++
       (heapVar := exhaleHeap)
     else Nil
   }
+*/
 
   /**
    * Reset the state of this module so that it can be used for new program. This method is called
    * after verifier gets a new program.
    */
   override def reset = {
+    addADVANCED("DefaultHeapModule", "reset")
+/*
     PredIdMap = Map()
     NextPredicateId = 0
     heap = originalHeap
+*/
   }
 
+/*
   override def currentHeap = Seq(heap)
 
   override def identicalOnKnownLocations(otherHeap:Seq[Exp],otherMask:Seq[Exp]):Exp =

@@ -13,6 +13,8 @@ trait LoopModule extends Module {
   // Return true iff the statement is solely used for the loop module itself and is irrelevant otherwise.
   def isLoopDummyStmt(s: sil.Stmt) : Boolean
 
+/*
   // Return true iff the axioms to sum states is required.
   def sumOfStatesAxiomRequired : Boolean
+*/
 }

@@ -98,7 +98,6 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
     * For more details see the general node in 'wandModule'
     */
   override def handleStmt(s: sil.Stmt, statesStackForPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    // stmts => bef ++ stmts ++ aft
     s match {
       case s: sil.Fold => 
         val (bef, aft) = (TODO_Stmt("handleStmt: sil.Fold"), TODO_Stmt())//translateFold(s, statesStackForPackageStmt, insidePackageStmt)
@@ -159,12 +158,15 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           // if e is pure, then assert and exhale are the same
           exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
         } else {
+          TODO_Stmt("simpleHandleStmt", "sil.Assert")
+/*
           // we create a temporary state to ignore the side-effects
           val (backup, snapshot) = freshTempState("Assert")
           val exhaleStmt = exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), isAssert =  true, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt, havocHeap = false)
           replaceState(snapshot)
           // B3 TODO: freshTempState must return a B3 backup Stmt! 
           exhaleStmt //backup :: exhaleStmt :: Nil
+*/
         }
       case mc@sil.MethodCall(methodName, args, targets) =>
         val method = verifier.program.findMethod(methodName)
@@ -212,7 +214,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           //B3 LATER: unfolding: executeUnfoldings(pres, (pre => errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))) ++
             exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt) ++
           //"Havocing target variables"
-          Reinit(Seq()) ++ //B3 TODO: correct var name list // Havoc((targets map translateExp).asInstanceOf[Seq[Var]]) ++
+          Reinit(Seq()) ++ //B3 TODO: correct var name list; was previously: "Havoc((targets map translateExp).asInstanceOf[Seq[Var]]) ++"
           {
             stateModule.replaceOldState(preCallState)
             //"Inhaling postcondition"
@@ -278,45 +280,50 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
     * For more details see the general node in 'wandModule'
     */
   override def translateStmt(stmt: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), duringPackage: Boolean = false): Stmt = {
+/* B3 ADVANCED (wand)
     if(duringPackage) {
         wandModule.translatingStmtsInWandInit()
     }
+*/
 
     // Seqn (sequence of stmts) => handle each Stmt individually, then return. Declare all local variables first
     stmt match {
       case sil.Seqn(ss, scopedDecls) =>
         val locals = scopedDecls.collect {case l: sil.LocalVarDecl => l}
-        /* B3 CHANGE: Originally (booge-carbon) would have added all locals to environment, translated each stmt in ss 
-        individually, and then removed them from locals again. In the end they would be added at the start of the method 
-        (or declared in some other way) by PrettyPrinter printing the boogie code. Also, variable are renamed. However, in 
-        B3 we have the same scope/shadowing system as in Viper, so we dont need that. Since Silver's PrettyPrinter prints Seqn
-        as "{" + [1: declare all var's in local] + [2: print stmts in locals] + "}", we know that the variables in locals
-        are the Vars used in the WHOLE Seqn (i.e. there is no "var x: Int := 1; {var y: Int := **x**; var x: Int ... }").
-        Therefore we declare the variables here, instead of at the start of the body later. This also means that we don't
-        have to rename any variables => we can directly transform sil.LocalVar(name: String, typ: Type) to (B3's)
-        CustomLiteral(s: string, typ: TypeName); no need for a special "which name to use" system.
-        B3 TODO: the above is not quite correct, since we for example dont convert While -> While and instead make it "flat", 
-        which means that the while variable is now in the same context as the outside-of-While-variable. We should therefore
-        still rename the variable just to be sure, even if we are able to create the VarDecl around the "flat" While. */
+        /* B3 INFO: In Boogie, VarDecl's were added by PrettyPrinter when printing the Procedure. In B3, VarDecl's have
+        a Body, which defines its scope. Outside of this they are NOT declared. Because e.g. the while statement is replaced
+        with a special non-while construction, getting the scope of LocalVarDecl's in a sil.Seqn correctly is not that 
+        straightforward. (Since the variables could be also used in the parts added before and after the (translated) while body.)
+        This means that it would be safer for now to rename the variables in e.g. while stmts as before and declaring all 
+        variables "at the start" of the procedure. We should try to keep track of all "special locations" (like While), to
+        then find a way to decrease the VarDecl scope wherever possible. I believe B3 does it like that because they think it
+        is more efficient that way, although that would only be true if B3 parses written B3 code in a way that keeps the
+        scopes actually small (<-- TODO: check this) 
+        For now we do not declare the vars here and leave that to the Method->Procedure transformer.
+        Special Stmts:
+          - While
+          - (probably) Wand (ADVANCED)
+          - TODO: collect and add all here
+        */
 
+        // B3 TODO: check again if this really works. Saver option would be to just "VarDecl" the whole Procedure body)
+        val localVars = locals map (v => mainModule.env.define(v.localVar)) // add local variables to environment
         //"Assumptions about local variables"
-        // B3 TODO: combine this vvv ...
-        // locals map (v => mainModule.env.define(v.localVar)) // add local variables to environment
-        // val localVarsAssumptions = locals map (a => mainModule.allAssumptionsAboutValue(a.typ, mainModule.translateLocalVarDecl(a), true))
-        // val s = Block(localVarsAssumptions ++ Block(ss map (st => translateStmt(st, statesStack, allStateAssms, duringPackage))))
-        // locals map (v => mainModule.env.undefine(v.localVar)) // remove local variables from environment
-        // return to avoid adding a comment, and to avoid the extra 'assumeGoodState'
-        // return s
-        // B3 TODO: ... with this vvv (but fix vvv first; also check again if this really works. Saver option would be to just "VarDecl" the whole Procedure body)
-        val translatedStmt = (ss map (st => translateStmt(st, statesStack, allStateAssms, duringPackage))) match {
+        val localVarsAssumptions = locals map (a => mainModule.allAssumptionsAboutValue(a.typ, mainModule.translateLocalVarDeclToVarDecl(a), true)) // B3 TODO: we need to find out what local variables are included here; theoretically this should only include VarDecl's, but what if Bindings are also included?
+        val translatedStmts = (ss map (st => translateStmt(st, statesStack, allStateAssms, duringPackage)))
+        val seqOfAllStmts = localVarsAssumptions ++ translatedStmts
+        
+        // In B3, VarDecl have a body and the scope of the Var is only in that body => need to nest all vardecls and place 
+        //  the actual statement in the innermost place (body).
+        val translatedStmt = seqOfAllStmts match {
           case Seq(oneStmt) => oneStmt
           case moreStmts => Block(moreStmts)
         }
-        // In B3, VarDecl have a body and the scope of the Var is only in that body => need to nest all vardecls and place 
-        // the actual statement in the middle.
-        val translatedStmtWithVarDecls = locals.foldRight(translatedStmt)((l, r) => VarDecl(l.name, r, translateType(l.typ))) 
-        // return to avoid adding a comment, and to avoid the extra 'assumeGoodState'
-        return translatedStmtWithVarDecls
+        val translatedStmtWithVarDecls = localVars.foldRight(translatedStmt)((l, r) => VarDecl(l.name, r, l.typ)) 
+        
+        locals map (v => mainModule.env.undefine(v.localVar)) // remove local variables from environment
+        // return to avoid the extra 'assumeGoodState'
+        return seqOfAllStmts // (use "return translatedStmtWithVarDecls" instead to do the VarDecl here.)
       case _ =>
     }
 

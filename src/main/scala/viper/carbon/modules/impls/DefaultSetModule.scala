@@ -57,8 +57,9 @@ class DefaultSetModule(val verifier: Verifier)
     */
   }
 
-/*
-  override def translateSetExp(e: sil.Exp): Exp = {
+  override def translateSetExp(e: sil.Exp): Expr = {
+    TODO_Expr_bool("translateSetExp", "some set expr")
+/*      
     def t(e: sil.Exp) = translateExp(e)
     val isMultiset = ((x:sil.Exp) => x.typ match {
       case _: sil.MultisetType => true
@@ -127,8 +128,8 @@ class DefaultSetModule(val verifier: Verifier)
         else UnExp(Not, FuncApp(Identifier("Set#Equal"), List(t(left), t(right)), Bool))
       case _ => sys.error("not a set expression")
     }
-  }
 */
+  }
 
   override def translateSetType(setType: sil.SetType): Type = {
     used = true
@@ -140,6 +141,7 @@ class DefaultSetModule(val verifier: Verifier)
     used = true
     NamedType("MultiSet", translateType(setType.elementType))
   }
+*/
 
   /**
    * Reset the state of this module so that it can be used for new program. This method is called
@@ -148,5 +150,4 @@ class DefaultSetModule(val verifier: Verifier)
   override def reset(): Unit = {
     used = false
   }
-*/
 }

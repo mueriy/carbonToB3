@@ -4,7 +4,8 @@
 //
 // Copyright (c) 2011-2021 ETH Zurich.
 
-package viper.carbon.boogie
+package viper.carbon.b3
+import viper.carbon.b3.B3Nodes._
 
 /**
  * An implementation for visitors of the Boogie AST.

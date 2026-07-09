@@ -49,11 +49,13 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   private var nodeToCondLoopInfoOutput : Map[Int, Seq[LoopGenKind]] = Map.empty
   private var nodeToLoopInfoOutput : Map[Int, Seq[LoopGenKind]] = Map.empty
 
+/* B3 TODO2
   private val sumMaskName : Identifier = Identifier("LoopSumMask")(namespace)
   private val sumMask = IdExpr(sumMaskName, maskType)
 
   private val sumHeapName : Identifier = Identifier("LoopSumHeap")(namespace)
   private val sumHeap = IdExpr(sumHeapName, heapType)
+*/
 
   private var currentMethodIsAbstract = false;
   private var usedLoopDetectorOnce = false;
@@ -67,7 +69,6 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
     stmtModule.register(this, after = Seq(verifier.wandModule,verifier.heapModule,verifier.permModule, verifier.stmtModule))
   }
 
-/*
   override def initializeMethod(m: sil.Method): sil.Method = {
     reset()
 
@@ -80,15 +81,19 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
       ))
 
     if(hasGotos) {
+      sys.error("initializeMethod -> has goto stms!?!?")
+/*
       usedLoopDetectorOnce = true
       useLoopDetector = true
       initializeMethodWithGotos(m)
+*/
     } else {
       useLoopDetector = false
       m
     }
   }
 
+/*
   private def initializeMethodWithGotos(m: sil.Method): sil.Method = {
     def isComposite(s: sil.Stmt): Boolean = {
       s match {
@@ -285,10 +290,12 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
 
     result
   }
+*/
 
   override def isLoopDummyStmt(stmt: sil.Stmt): Boolean =
     stmt.info.getUniqueInfo[LoopDummyStmtInfo].nonEmpty
 
+/*
   override def sumOfStatesAxiomRequired(): Boolean = usedLoopDetectorOnce
 
   private def relevantForLoops(s: sil.Stmt) : Boolean = {
@@ -462,8 +469,9 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
 */
   }
 
+  override def handleStmt(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): (Block => Block) = {
+    stmts => TODO_Stmt("DefaultLoopModule", "handleStmt")++stmts
 /*
-  override def handleStmt(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false): (Seqn => Seqn) = {
     if(useLoopDetector) {
       handleStmtLoopDetector(s, statesStackOfPackageStmt, allStateAssms,insidePackageStmt)
     } else {
@@ -474,8 +482,10 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
           case _ => inner
         }
     }
+*/
   }
 
+/*
   private def handleStmtLoopDetector(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Exp = TrueLit(), insidePackageStmt: Boolean = false): (Seqn => Seqn) = {
     inner => {
       if (relevantForLoops(s)) {

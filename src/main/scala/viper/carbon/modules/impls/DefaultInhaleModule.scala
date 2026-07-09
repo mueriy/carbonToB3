@@ -139,9 +139,13 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
 
           //do not transform definednessChecks inside package (backwards compatible with older version)
           val retStmt =
+/*B3 TODO2
             transformStmtInsidePackage(if (containsFunc(e)) Seq(assumeGoodState) else Seq()) ++
+*/
             definednessChecks ++
+/*B3 TODO2
             transformStmtInsidePackage(stmt ++ (if (e.isPure) Seq() else Seq(assumeGoodState))) ++
+*/
             freeAssms
           //(if (containsFunc(e)) assumeGoodState else Seq[Stmt]()) ++ stmt ++ (if (e.isPure) Seq[Stmt]() else assumeGoodState)
 

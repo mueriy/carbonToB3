@@ -16,6 +16,7 @@ import viper.carbon.b3.B3Nodes._
  */
 trait CarbonStateComponent extends Component {
 
+/*
   /**
    * The statements necessary to initialize the part of the state belonging to this module.
    */
@@ -75,4 +76,5 @@ trait CarbonStateComponent extends Component {
     * Are we currently using a pure state without a heap (i.e., translating a domain)?
     */
   def usingPureState: Boolean
+*/
 }

@@ -337,7 +337,7 @@ class BoogieToB3Transformer(verifier: Verifier) {
     * @return The corresponding raw B3 node. 
     */
   private def transformFunction(fct: Func): RawAst.Function = {
-    // TODO: Func also has .attributes, which is a Map that seems to be usually empty. Only translateBackendFunc 
+    // B3 TODO: Func also has .attributes, which is a Map that seems to be usually empty. Only translateBackendFunc 
     // in DefaultFuncPredModule creates a mapping there ("builtin" -> ...). Boogie's manual only has ":bvBuiltin". 
     // Find out what "builtin" does in Boogie, in what cases this is used, and then support it (if necessairy). 
     if (!fct.attributes.isEmpty) {

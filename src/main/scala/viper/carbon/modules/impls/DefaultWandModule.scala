@@ -10,6 +10,7 @@ package viper.carbon.modules.impls
 import viper.carbon.modules._
 import viper.carbon.verifier.Verifier
 import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Development._
 import viper.carbon.b3.B3Implicits._
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState, StmtComponent}
 import viper.silver.ast.utility.Expressions
@@ -76,9 +77,11 @@ DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent 
   var OPS: StateRep = null
   tempCurState = null
   nestingDepth = 0
+*/
 
   def name = "Wand Module"
 
+/*
   def wandToShapes: Map[MagicWandStructure.MagicWandStructure, DefaultWandModule.this.WandShape] = {
     val result = lazyWandToShapes match {
       case Some(m) => m
@@ -105,11 +108,13 @@ DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent 
     lazyWandToShapes = Some(result)
     result
   }
+*/
 
   override def reset() = {
     lazyWandToShapes = None
   }
 
+/*
   override def preamble = wandToShapes.values.collect({
     case fun@Func(name,args,typ,_) =>
       val vars = args.map(decl => decl.l)
@@ -673,24 +678,31 @@ case class PackageSetup(hypState: StateRep, usedState: StateRep, initStmt: Stmt)
     stateModule.replaceState(oldCurState)
     unionStatement ++ (OPS.boolVar := OPS.boolVar && resultState.boolVar)
   }
+*/
 
   /**
     * Wraps all statements inside package statement inside If condition depending on the state variables.
     */
-  override  def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Exp = TrueLit(), inWand: Boolean = false): (Seqn => Seqn) = {
+  override  def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), inWand: Boolean = false): (Block => Block) = {
+/*
     if(wandModule.nestingDepth > 0) // if 's' is inside a package statement
       stmt => If(allStateAssms, modifyAssert(stmt, OPS.boolVar), Statements.EmptyStmt)::Nil
     else
+*/
       stmt => stmt
   }
 
 
   override def start(): Unit = {
+    addADVANCED("DefaultWandModule", "start")
+/*
     stmtModule.register(this, before = Seq(verifier.heapModule,verifier.permModule, verifier.stmtModule)) // checks for field assignment should be made before the assignment itself
     expModule.register(this)
+*/
   }
 
 
+/*
   // Prepares translating a statement during a package statement by setting the unionState to opsState and setting opsState as the current state.
   override def translatingStmtsInWandInit(): Unit ={
     UNIONState = OPS

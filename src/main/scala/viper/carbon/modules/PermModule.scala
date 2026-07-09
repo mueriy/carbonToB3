@@ -19,6 +19,7 @@ case class PMaskDesugaredRep(selectId: Identifier, storeId: Identifier)
  */
 trait PermModule extends Module with CarbonStateComponent {
 
+/*
   /**
    * The type used to represent permissions.
    */
@@ -79,12 +80,14 @@ trait PermModule extends Module with CarbonStateComponent {
     * The wand mask field of a given wand (as its ghost location).
     */
   def wandMaskField(wand: Expr): Expr
+*/
 
   /**
     * The type used for masks.
     */
   def maskType: Type
 
+/*
   /**
    * The type used to for predicate masks.
    */
@@ -162,5 +165,6 @@ trait PermModule extends Module with CarbonStateComponent {
   def setCheckReadPermissionOnly(readOnly: Boolean): Boolean
 
   def assumePermUpperBounds(doAssume: Boolean): Stmt
+*/
 
 }

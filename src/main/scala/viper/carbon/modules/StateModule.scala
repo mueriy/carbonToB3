@@ -18,6 +18,7 @@ import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Stmt, LocalVarDecl}
  */
 trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] with StatefulComponent {
 
+/*
   /**
    * Returns an assumption that the current state is 'good', or well-formed.
    */
@@ -73,6 +74,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   }
 
   def stateContributionValues(snap : StateSnapshot): Seq[Expr]
+*/
 
   type StateSnapshot// used to abstractly capture the Boogie variables, old expressions etc. used to represent a current state in the translation
 
@@ -93,6 +95,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    */
   def freshTempState(name: String, discardCurrent: Boolean = false, initialise: Boolean = false): (Stmt, StateSnapshot)
 
+/*
   /**
     * Returns a fresh state that is not an old state. This method has no side-effects on the current state.
     */
@@ -113,6 +116,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    * ALEX: to get rid of - this seems redundant
    */
   def freshEmptyState(name: String,init:Boolean): (Stmt, StateSnapshot)
+*/
 
   /**
    * Restore the state to a given snapshot.
@@ -125,10 +129,12 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   def oldState: StateSnapshot
 
 
+/*
   /**
     * Get a pure state without a heap.
     */
   def pureState: StateSnapshot
+*/
 
   /**
    * Replace the old state with a given snapshot.
@@ -140,6 +146,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    */
   def state: StateSnapshot
 
+/*
   /**
    * Get a copy of the current state's snapshot. Should guarantee that if the current state changes then the
    * returned copy is not affected.
@@ -188,4 +195,5 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   case class StateRep(state: StateSnapshot, boolVar: IdExpr)
 
   case class StateSetup(usedState: StateRep, initStmt: Stmt)
+*/
 }

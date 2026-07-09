@@ -7,7 +7,7 @@
 package viper.carbon.verifier
 
 import RawAst.Program // import viper.carbon.boogie.{Assert, Program}
-import viper.carbon.b3.B3Adapter.runB3
+import viper.carbon.b3.B3Adapter.{runB3, printRawAst}
 import viper.carbon.b3.B3Development
 // import viper.silver.reporter.BackendSubProcessStages._
 import viper.silver.reporter.Reporter // import viper.silver.reporter.{BackendSubProcessReport, Reporter}

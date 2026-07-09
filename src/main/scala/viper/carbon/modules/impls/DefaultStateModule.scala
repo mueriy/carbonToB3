@@ -28,9 +28,11 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
 
   implicit val stateNamespace = verifier.freshNamespace("state")
 
+/*
   override def assumeGoodState = {
     Assume(currentGoodState)
   }
+*/
 
   override def preamble: Seq[Decl] = {
     Seq() // B3 TODO
@@ -57,9 +59,12 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     curState = null
     //usingOldState = false
     //treatOldAsCurrent = false
+/* B3 TODO2
     resetBoogieState
+*/
   }
 
+/*
   def initBoogieState: Stmt = {
     curState = new StateComponentMapping()
     // note: it is important that these are set before calling e.g. initState on components
@@ -112,6 +117,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   }
 
 
+*/
   // Note: For "old" state, these variables should be wrapped in "Old(.)" before use
   type StateComponentMapping = java.util.IdentityHashMap[CarbonStateComponent, Seq[IdExpr]]
   override type StateSnapshot = (StateComponentMapping, Boolean, Boolean) // mapping to vars, using old state, using pure state
@@ -119,6 +125,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   private var curOldState: StateComponentMapping = null
   private var curState: StateComponentMapping = null
 
+/*
   def staticGoodState: Expr = {
     FunctionCallExpr(Identifier(isGoodState), staticStateContributions() map (v => IdExpr(v.name, v.typ)), Bool)
   }
@@ -132,11 +139,14 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   override def stateRepositoryPut(name:String, snapshot: StateSnapshot) = stateRepository.put(name,snapshot)
 
   override def stateRepositoryGet(name:String) : Option[StateSnapshot] = stateRepository.get(name)
+*/
 
   override def freshTempState(name: String, discardCurrent: Boolean = false, initialise: Boolean = false): (Stmt, StateSnapshot) = {
     assert(name != "old")
 
     val previousState = new StateSnapshot(new StateComponentMapping(), usingOldState, usingPureState)
+    (TODO_Stmt("DefaultStateModule", "freshTempState"), previousState)
+/*
 
     curState = new StateComponentMapping() // essentially, the code below "clones" what curState should represent anyway. But, if we omit this line, we inadvertently alias the previous hash map.
 
@@ -152,8 +162,10 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     }
     usingOldState = false // we have now set up a temporary state in terms of "old" - this could happen when an unfolding expression is inside an "old"
     (s, previousState)
+*/
   }
 
+/*
   override def freshTempStateKeepCurrent(name: String) : StateSnapshot = {
     freshTempStateKeepCurrentAux(name, false)
   }
@@ -182,25 +194,31 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   {
     freshTempState(name, true, init)
   }
+*/
 
   override def replaceState(snapshot: StateSnapshot): Unit = {
+/* B3 TODO2
     curState = snapshot._1
         for (c <- components) {
       c.restoreState(snapshot._1.get(c))
     }
     usingOldState = snapshot._2
     usingPureState = snapshot._3
+*/
   }
 
+/*
   override def equateHeaps(snapshot: StateSnapshot, c: CarbonStateComponent): Stmt =
   {
     heapModule.equateWithCurrentHeap(snapshot._1.get(c))
   }
+*/
 
   // initialisation in principle not needed - one should call initState
   var usingOldState = false
   var usingPureState = false
 
+/*
   override def stateModuleIsUsingOldState: Boolean = {
     usingOldState
   }
@@ -208,14 +226,17 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   override def stateModuleIsUsingPureState: Boolean = {
     usingPureState
   }
+*/
 
   override def oldState: StateSnapshot = {
     (curOldState, true, false) // the chosen boolean values here seem sensible, but they probably shouldn't be used anyway
   }
 
+/*
   override def pureState: StateSnapshot = {
     (curState, false, true)
   }
+*/
 
   override def replaceOldState(snapshot: StateSnapshot): Unit = {
     curOldState = snapshot._1
@@ -225,6 +246,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     (curState, usingOldState, usingPureState)
   }
 
+/*
   override def getCopyState:StateSnapshot = {
     val currentCopy = new StateComponentMapping()
     val s = for (c <- components) yield {
@@ -232,4 +254,5 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
             }
     (currentCopy, usingOldState, usingPureState)
   }
+*/
 }

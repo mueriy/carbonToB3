@@ -18,6 +18,7 @@ import viper.silver.ast.{LocationAccess, MagicWand}
  */
 trait HeapModule extends Module with CarbonStateComponent {
 
+/*
   /**
     * The type used for heaps
     */
@@ -187,4 +188,5 @@ trait HeapModule extends Module with CarbonStateComponent {
   // and heap2, where mask2 is defined.
   def sumHeap(resultHeap: Expr, heap1: Expr, mask1: Expr, heap2: Expr, mask2: Expr): Expr
 
+*/
 }

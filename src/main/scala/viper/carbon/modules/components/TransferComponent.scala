@@ -17,6 +17,7 @@ import viper.carbon.modules.TransferableEntity
  *used to handle the transfer operation across different modules
  */
 trait TransferComponent extends Component {
+/* B3 TODO2
   /**
    *
    * @param e
@@ -39,4 +40,5 @@ trait TransferComponent extends Component {
    * @return  statement which removes the expression e to the current state (for example permissions, wand)
    */
   def transferRemove(e:TransferableEntity, cond:Exp): Stmt
+*/
 }
