@@ -234,7 +234,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
         checkDefinedness(cond, errors.IfFailed(cond), insidePackageStmt = insidePackageStmt) ++
         // Assign the condition to a temp var s.t. it's safe to optimize away the following if it's empty without
         // losing triggering expressions in the if-condition (see Carbon issue #420).
-        Assign(condTempVar, condTr) ++ // B3 TODO?: Maybe we will need to make sure to declare this variable somewhere
+        Assign(condTempVar, condTr) ++
         If(condTempVar,
           translateStmt(thn, statesStack, allStateAssms, insidePackageStmt),
           translateStmt(els, statesStack, allStateAssms, insidePackageStmt))

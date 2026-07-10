@@ -210,6 +210,12 @@ object B3Nodes {
      * Returns a list of all direct sub-nodes of this node.
      */
     lazy val subnodes = Nodes.subnodes(this)
+
+    /**
+     * Optimize a program or expression
+     */
+    lazy val optimized: Node = Optimizer.optimize(this)
+
     /**
      * Applies the function `f` to the node and the results of the subnodes.
      */
@@ -223,11 +229,11 @@ object B3Nodes {
     }
     /** 
      * 
-    * This extra level of indirection (not calling transform directly), appears to affect the type-checking. We need to look into this.
-    * The usage of this.type is also "suspect", since we are really casting in a way that can't be caught out at runtime..
-    *
-    * See Silver issue
-    */
+     * This extra level of indirection (not calling transform directly), appears to affect the type-checking. We need to look into this.
+     * The usage of this.type is also "suspect", since we are really casting in a way that can't be caught out at runtime..
+     *
+     * See Silver issue
+     */
     def transform(pre: PartialFunction[Node, Node] = PartialFunction.empty)
                 (recursive: Node => Boolean = !pre.isDefinedAt(_),
                   post: PartialFunction[Node, Node] = PartialFunction.empty)
@@ -556,9 +562,14 @@ object B3Nodes {
 
 
   //Control flow
-  /** Scala representation of a B3 RawAst Choose-Stmt node. (This is basically an "If(*) {} else if (*) {} ... " - Stmt)*/
+  /** 
+   * Scala representation of a B3 RawAst Choose-Stmt node. (This is basically an "If(*) {} else if (*) {} ... "/NondetIf - Stmt)
+   * @param branches If only a single Stmt is given, an empty branch is automatically added as alternative branch-option. 
+   *  (If you want to only use one option, dont use Choose!) 
+   */
   case class Choose(branches: Seq[Stmt]) extends Stmt {
-    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Choose(daf(branches map {_.b3fy}))
+    private def addElse = if (branches.length == 1) {Seq(EmptyStmt.b3fy)} else {Seq()} //If only 1 stmt is given then the idea is ALWAYS
+    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Choose(daf((branches map {_.b3fy}) ++ addElse))
   }
   
   /** Scala representation of a B3 RawAst If-Stmt node. */
@@ -666,8 +677,8 @@ object B3Nodes {
   sealed trait Expr extends Node {
     def b3fy: RawAst.Expr
     
-    def ===(other: Expr) = OperatorExpr(EqCmp, Seq(this, other))
-    def !==(other: Expr) = OperatorExpr(NeCmp, Seq(this, other))
+    def ===(other: Expr) = OpExpr(EqCmp, Seq(this, other))
+    def !==(other: Expr) = OpExpr(NeCmp, Seq(this, other))
     def :=(rhs: Expr) = this match {
       case fst: IdExpr => Assign(fst, rhs)
       case fst => sys.error("FAIL: Using Expr.':=' operator, which expects lhs to be an IdExpr, but it was " + fst.getClass.getName)
@@ -680,26 +691,26 @@ object B3Nodes {
       case fst: IdExpr => Assign(fst, fst - rhs)
       case fst => sys.error("FAIL: Using '-=' operator, which expects lhs to be an IdExpr, but it was " + fst.getClass.getName)
     }
-    def +(other: Expr) = OperatorExpr(Add, Seq(this, other))
-    def -(other: Expr) = OperatorExpr(Sub, Seq(this, other))
-    def *(other: Expr) = OperatorExpr(Mul, Seq(this, other))
-    def /(other: Expr) = OperatorExpr(Div, Seq(this, other))
-    def div(other: Expr) = OperatorExpr(IntDiv, Seq(this, other))
-    def %(other: Expr) = OperatorExpr(Mod, Seq(this, other))
-    def <(other: Expr) = OperatorExpr(LtCmp, Seq(this, other))
-    def >(other: Expr) = OperatorExpr(LtCmp, Seq(other, this)) // this > other => other < this
-    def <=(other: Expr) = OperatorExpr(LeCmp, Seq(this, other))
-    def >=(other: Expr) = OperatorExpr(LeCmp, Seq(other, this)) // this >= other => other <= this
-    def neg = OperatorExpr(Minus, Seq(this))
-    def &&(other: Expr) = OperatorExpr(And, Seq(this, other))
-    def ||(other: Expr) = OperatorExpr(Or, Seq(this, other))
-    def ==>(other: Expr) = OperatorExpr(Implies, Seq(this, other))
-    def <==>(other: Expr) = OperatorExpr(Equiv, Seq(this, other))
+    def +(other: Expr) = OpExpr(Add, Seq(this, other))
+    def -(other: Expr) = OpExpr(Sub, Seq(this, other))
+    def *(other: Expr) = OpExpr(Mul, Seq(this, other))
+    def /(other: Expr) = OpExpr(Div, Seq(this, other))
+    def div(other: Expr) = OpExpr(IntDiv, Seq(this, other))
+    def %(other: Expr) = OpExpr(Mod, Seq(this, other))
+    def <(other: Expr) = OpExpr(LtCmp, Seq(this, other))
+    def >(other: Expr) = OpExpr(LtCmp, Seq(other, this)) // this > other => other < this
+    def <=(other: Expr) = OpExpr(LeCmp, Seq(this, other))
+    def >=(other: Expr) = OpExpr(LeCmp, Seq(other, this)) // this >= other => other <= this
+    def neg = OpExpr(Minus, Seq(this))
+    def &&(other: Expr) = OpExpr(And, Seq(this, other))
+    def ||(other: Expr) = OpExpr(Or, Seq(this, other))
+    def ==>(other: Expr) = OpExpr(Implies, Seq(this, other))
+    def <==>(other: Expr) = OpExpr(Equiv, Seq(this, other))
     def forall(vars: Seq[Binding], triggers: Seq[Pattern]) =
       Forall(vars, triggers, this)
     def exists(vars: Seq[Binding], triggers: Seq[Pattern]) =
       Exists(vars, triggers, this)
-    def not = OperatorExpr(Not, Seq(this))
+    def not = OpExpr(Not, Seq(this))
     def thn(thn: Expr) = new PartialCondExpr(this, thn)
 
     def transform(f: PartialFunction[Expr, Option[Expr]]) = Nodes.transform(this, f)
@@ -739,13 +750,13 @@ object B3Nodes {
     override def b3fy: RawAst.Expr = new RawAst.Expr_IdExpr(daf(name), isOld)
   }
 
-  /** Scala representation of a B3 RawAst OperatorExpr-Expr node. (Replaces BinExp and UnExp; CondExp has its own class)
+  /** Scala representation of a B3 RawAst OpExpr-Expr node. (Replaces BinExp and UnExp; CondExp has its own class)
    * @param op RawAst Operators are provided as values by the current Object (use ObjectName.{Op-name})
    */
-  case class OperatorExpr(op: RawAst.Operator, exprs: Seq[Expr]) extends Expr {
+  case class OpExpr(op: RawAst.Operator, exprs: Seq[Expr]) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_OperatorExpr(op, daf(exprs map {_.b3fy}))
   }
-  /** Scala representation of a B3 RawAst OperatorExpr-Expr node in CondExp-mode. 
+  /** Scala representation of a B3 RawAst OpExpr-Expr node in CondExp-mode. 
    * @param op RawAst Operators are provided as values by the current Object (use ObjectName.{Op-name})
    */
   case class CondExp(cond: Expr, thn: Expr, els: Expr) extends Expr {
@@ -956,8 +967,8 @@ object B3Implicits {
       xss match {
         case Nil => None
         case Seq(x) => Some(x)
-        case Seq(x, y) => Some(OperatorExpr(Or, Seq(x, y)))
-        case x +: xs => Some(OperatorExpr(Or, Seq(x, all(xs).get)))
+        case Seq(x, y) => Some(OpExpr(Or, Seq(x, y)))
+        case x +: xs => Some(OpExpr(Or, Seq(x, all(xs).get)))
       }
     }
 
@@ -965,8 +976,8 @@ object B3Implicits {
       xss match {
         case Nil => None
         case Seq(x) => Some(x)
-        case Seq(x, y) => Some(OperatorExpr(And, Seq(x, y)))
-        case x +: xs => Some(OperatorExpr(And, Seq(x, all(xs).get)))
+        case Seq(x, y) => Some(OpExpr(And, Seq(x, y)))
+        case x +: xs => Some(OpExpr(And, Seq(x, all(xs).get)))
       }
     }
   }

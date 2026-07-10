@@ -284,11 +284,17 @@ class QuantifiedPermModule(val verifier: Verifier)
   private def permAdd(a: Exp, b: Exp): Exp = a + b
   private def permSub(a: Exp, b: Exp): Exp = a - b
   private def permDiv(a: Exp, b: Exp): Exp = a / b
+*/
 
-  override def freshTempState(name: String): Seq[Var] = {
+  override def freshTempState(name: String): Seq[IdExpr] = {
+    addTODO("QuantifiedPermModule", "freshTempState")
+    Seq()
+/*
     Seq(LocalVar(Identifier(s"${name}Mask"), maskType))
+*/
   }
 
+/*
   override def restoreState(s: Seq[Var]): Unit = {
     mask = s(0)
   }

@@ -86,11 +86,13 @@ object Nodes {
   def subnodes(n: Node): Seq[Node] = {
     n match {
       case _: NOT_SUPPORTED => Nil
+      case _: Type => Nil
       case Program(_, doms, typs, tags, fcts, axs, procs) =>
         doms ++ typs ++ tags ++ fcts ++ axs ++ procs
       case _: Variable => Nil
       case lvd:LocalVarDecl => 
         lvd match {
+          case VarDecl(_, body, _, _, optInitVal) => body ++ (optInitVal map {_.toSeq.asInstanceOf[Node]})
           case _: FParameter => Nil
           case _: PParameter => Nil
           case _: Binding => Nil
@@ -102,6 +104,7 @@ object Nodes {
         }
       case d: Decl =>
         d match {
+          case _:Domain => sys.error("Domain is NOT_SUPPORTED, so this should not be reachable") 
           case TypeDecl(_, _) => Nil
           case Tagger(_, _) => Nil
           case Function(_, args, _, _) => args
@@ -110,7 +113,7 @@ object Nodes {
         }
       case ss: Stmt =>
         ss match {
-          case VarDecl(_, body, _, _, optInitVal) => body ++ (optInitVal map {_.toSeq.asInstanceOf[Node]})
+          case _:VarDecl => sys.error("this case should not be reachable (LocalVar is already handled by LocalVarDecl sub-case)")
           case Assign(lhs, rhs) => Seq(lhs, rhs)
           case Reinit(v) => v
           case Block(s) => s
@@ -129,7 +132,7 @@ object Nodes {
           case BoolLit(_) => Nil
           case IntLit(_) => Nil
           case IdExpr(_,_,_) => Nil
-          case OperatorExpr(_, es) => es
+          case OpExpr(_, es) => es
           case CondExp(cond, thn, els) => Seq(cond, thn, els)
           case FunctionCallExpr(_, args, _) => args
           case LabeledExpr(_, e) => e
@@ -150,15 +153,15 @@ object Nodes {
     val func = (e: Expr) => transform(e, f)
     val t = if (f.isDefinedAt(exp)) f(exp) else None
     t match {
-      case Some(ee) => ee
+      case Some(se) => se
       case None =>
         exp match {
-          case IntLit(i) => exp
-          case BoolLit(b) => exp
+          case IntLit(_) => exp
+          case BoolLit(_) => exp
           // case RealLit(b) => exp
           // case RealConv(exp) => RealConv(func(exp))
-          case IdExpr(n, t, b) => exp
-          case OperatorExpr(op, exprs) => OperatorExpr(op, exprs map func)
+          case IdExpr(_, _, _) => exp
+          case OpExpr(op, es) => OpExpr(op, es map func)
           // case Const(i) => exp
           // case MapSelect(map, idxs) => MapSelect(func(map), idxs map func)
           // case MapUpdate(map, idxs, value) => MapUpdate(func(map), idxs map func, func(value))
@@ -168,6 +171,7 @@ object Nodes {
           case LabeledExpr(label, expr) => LabeledExpr(label, func(expr)) 
           case Exists(v, triggers, e, w) => Exists(v, (triggers map (_ match {case (es) => Pattern(es map func)})), func(e), w)
           case Forall(v, triggers, e, tv, w) => Forall(v, (triggers map (_ match {case Pattern(es) => Pattern(es map func)})), func(e), tv, w)
+          case Pattern(es) => Pattern(es map func)
         }
     }
   }

@@ -44,10 +44,10 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
 
   // B3 ADVANCED: (wand)
   override def translateExpInWand(e: sil.Exp): Expr = {
-    ADVANCED_Expr_bool("translateExpInWand")
-/*
     val duringPackageStmt = wandModule.nestingDepth > 0
     if(duringPackageStmt){
+      ADVANCED_Expr_bool("DefaultExpModule", "translateExpInWand")
+/*
       val oldCurState = stateModule.state
       stateModule.replaceState(wandModule.UNIONState.asInstanceOf[StateRep].state)  // state in which 'e' is evaluated
 
@@ -56,10 +56,10 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
       stateModule.replaceState(oldCurState)
 
       stmt
+*/
     }else{
       translateExp(e)
     }
-*/
   }
 
   override def translateExp(e: sil.Exp): Expr = {
@@ -270,9 +270,9 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
             sys.error("Expression translation did not match any cases (should be handled before reaching translateExp code)" + e.getClass())
         }
         if (reverse) {
-          OperatorExpr(bop, Seq(translateExp(right), translateExp(left)))
+          OpExpr(bop, Seq(translateExp(right), translateExp(left)))
         } else {
-          OperatorExpr(bop, Seq(translateExp(left), translateExp(right)))
+          OpExpr(bop, Seq(translateExp(left), translateExp(right)))
         }
       case sil.Minus(exp) =>
         translateExp(exp).neg
@@ -408,7 +408,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
           ) :: Nil
       case sil.Or(e1, e2) =>
         checkDefinednessImpl(e1, error, makeChecks = makeChecks, definednessStateOpt) :: // short-circuiting evaluation:
-          If(OperatorExpr(Not, translateExp(e1)), checkDefinednessImpl(e2, error, makeChecks = makeChecks, definednessStateOpt), EmptyStmt) ::
+          If(OpExpr(Not, translateExp(e1)), checkDefinednessImpl(e2, error, makeChecks = makeChecks, definednessStateOpt), EmptyStmt) ::
           Nil
       case sil.Asserting(assertion, e) =>
         val checkAssDefined = checkDefinedness(assertion, error, makeChecks = makeChecks)

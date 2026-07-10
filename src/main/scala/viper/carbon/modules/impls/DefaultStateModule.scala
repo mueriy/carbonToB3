@@ -165,7 +165,6 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
 */
   }
 
-/*
   override def freshTempStateKeepCurrent(name: String) : StateSnapshot = {
     freshTempStateKeepCurrentAux(name, false)
   }
@@ -183,6 +182,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     (freshState, false, false)
   }
 
+/*
   override def initToCurrentStmt(snapshot: StateSnapshot) : Stmt = {
     for (e <- snapshot._1.entrySet().asScala.toSeq) yield {
       val s: Stmt = (e.getValue zip e.getKey.currentStateExps) map (x => x._1 := x._2)

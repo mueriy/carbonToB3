@@ -54,16 +54,18 @@ trait CarbonStateComponent extends Component {
    * in the list and the types must correspond to the ones given in `stateContributions`.
    */
   def currentStateExps: Seq[Expr]
+*/
 
   /**
    * Set up a fresh temporary state and returns that new state.
    */
-  def freshTempState(name: String): Seq[IdExpr] //B3: maybe just String instead? 
+  def freshTempState(name: String): Seq[IdExpr]
 
+/*
   /**
    * Throw away the current state and go back to a snapshot.
    */
-  def restoreState(previousState: Seq[IdExpr]): Unit //B3: maybe just String instead? 
+  def restoreState(previousState: Seq[IdExpr]): Unit
 
   /**
    * Are we currently using an "old" state? Note: this is mainly as documentation that the states passed to other methods above will need wrapping in "olD2 when *used*, if we are currently using an old state. This method would typically be implemented by querying the corresponding StateModule

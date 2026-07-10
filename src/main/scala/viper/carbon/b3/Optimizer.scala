@@ -1,10 +1,11 @@
-/* // This Source Code Form is subject to the terms of the Mozilla Public
+// This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 //
 // Copyright (c) 2011-2021 ETH Zurich.
 
-package viper.carbon.boogie
+package viper.carbon.b3
+import viper.carbon.b3.B3Nodes._
 
 /**
  * Optimize a given Boogie program or expression.
@@ -13,53 +14,51 @@ package viper.carbon.boogie
 object Optimizer {
 
   /**
-   * Optimizes a Boogie program or expression by performing the following simplifications:
+   * Optimizes a B3 program or expression by performing the following simplifications:
    * - Constant folding for booleans, integers and reals.
    * - Removal of dead branches.
    * - Removal of assertions known to hold.
    *
-   * Constant folding partly taken from  Transformer.simplify from SIL, but added more optimizations.
+   * Taken from boogie-Carbon's Optimizer (where it says: "Constant folding partly taken from 
+   * Transformer.simplify from SIL, but added more optimizations.")
    */
   def optimize(n: Node): Node = {
-    // B3 LATER: can also do these optimisations
-    n
-    /*
     /* Always optimize children first, then treat parent. */
     Transformer.transform(n)(_ => true, {
-      case UnExp(Not, BoolLit(literal)) =>
+      case OpExpr(Not, Seq(BoolLit(literal))) =>
         BoolLit(!literal)
-      case UnExp(Not, UnExp(Not, single)) => single
+      case OpExpr(Not, Seq(OpExpr(Not, Seq(single)))) => single
 
-      case BinExp(TrueLit(), And, right) => right
-      case BinExp(left, And, TrueLit()) => left
-      case BinExp(FalseLit(), And, _) => FalseLit()
-      case BinExp(_, And, FalseLit()) => FalseLit()
+      case OpExpr(And, Seq(TrueLit(), right)) => right
+      case OpExpr(And, Seq(left, TrueLit())) => left
+      case OpExpr(And, Seq(FalseLit(), _)) => FalseLit()
+      case OpExpr(And, Seq(_, FalseLit())) => FalseLit()
 
-      case BinExp(FalseLit(), Or, right) => right
-      case BinExp(left, Or, FalseLit()) => left
-      case BinExp(TrueLit(), Or, _) => TrueLit()
-      case BinExp(_, Or, TrueLit()) => TrueLit()
+      case OpExpr(Or, Seq(FalseLit(), right)) => right
+      case OpExpr(Or, Seq(left, FalseLit())) => left
+      case OpExpr(Or, Seq(TrueLit(), _)) => TrueLit()
+      case OpExpr(Or, Seq(_, TrueLit())) => TrueLit()
 
-      case BinExp(FalseLit(), Implies, _) => TrueLit()
-      case BinExp(_, Implies, TrueLit()) => TrueLit()
-      case BinExp(TrueLit(), Implies, FalseLit()) => FalseLit()
-      case BinExp(TrueLit(), Implies, consequent) => consequent
+      case OpExpr(Implies, Seq(FalseLit(), _)) => TrueLit()
+      case OpExpr(Implies, Seq(_, TrueLit())) => TrueLit()
+      case OpExpr(Implies, Seq(TrueLit(), FalseLit())) => FalseLit()
+      case OpExpr(Implies, Seq(TrueLit(), consequent)) => consequent
 
-      case BinExp(BoolLit(left), EqCmp, BoolLit(right)) => BoolLit(left == right)
-      case BinExp(FalseLit(), EqCmp, right) => UnExp(Not, right)
-      case BinExp(left, EqCmp, FalseLit()) => UnExp(Not, left)
-      case BinExp(TrueLit(), EqCmp, right) => right
-      case BinExp(left, EqCmp, TrueLit()) => left
-      case BinExp(IntLit(left), EqCmp, IntLit(right)) => BoolLit(left == right)
-      case BinExp(RealLit(left), EqCmp, RealLit(right)) => BoolLit(left == right)
+      case OpExpr(EqCmp, Seq(BoolLit(left), BoolLit(right))) => BoolLit(left == right)
+      case OpExpr(EqCmp, Seq(FalseLit(), right)) => OpExpr(Not, Seq(right))
+      case OpExpr(EqCmp, Seq(left, FalseLit())) => OpExpr(Not, Seq(left))
+      case OpExpr(EqCmp, Seq(TrueLit(), right)) => right
+      case OpExpr(EqCmp, Seq(left, TrueLit())) => left
+      case OpExpr(EqCmp, Seq(IntLit(left), IntLit(right))) => BoolLit(left == right)
+//B3 REAL: case OpExpr(EqCmp, Seq(RealLit(left), RealLit(right))) => BoolLit(left == right)
 
-      case BinExp(BoolLit(left), NeCmp, BoolLit(right)) => BoolLit(left != right)
-      case BinExp(FalseLit(), NeCmp, right) => right
-      case BinExp(left, NeCmp, FalseLit()) => left
-      case BinExp(TrueLit(), NeCmp, right) => UnExp(Not, right)
-      case BinExp(left, NeCmp, TrueLit()) => UnExp(Not, left)
-      case BinExp(IntLit(left), NeCmp, IntLit(right)) => BoolLit(left != right)
-      case BinExp(RealLit(left), NeCmp, RealLit(right)) => BoolLit(left != right)
+      case OpExpr(NeCmp, Seq(BoolLit(left), BoolLit(right))) => BoolLit(left != right)
+      case OpExpr(NeCmp, Seq(FalseLit(), right)) => right
+      case OpExpr(NeCmp, Seq(left, FalseLit())) => left
+      case OpExpr(NeCmp, Seq(TrueLit(), right)) => OpExpr(Not, Seq(right))
+      case OpExpr(NeCmp, Seq(left, TrueLit())) => OpExpr(Not, Seq(left))
+      case OpExpr(NeCmp, Seq(IntLit(left), IntLit(right))) => BoolLit(left != right)
+//B3 REAL: case OpExpr(NeCmp, Seq(RealLit(left), RealLit(right))) => BoolLit(left != right)
 
       case CondExp(TrueLit(), ifTrue, _) => ifTrue
       case CondExp(FalseLit(), _, ifFalse) => ifFalse
@@ -68,43 +67,39 @@ object Optimizer {
       case CondExp(_, TrueLit(), TrueLit()) =>
         TrueLit()
       case CondExp(condition, FalseLit(), TrueLit()) =>
-        UnExp(Not, condition)
+        OpExpr(Not, Seq(condition))
       case CondExp(condition, TrueLit(), FalseLit()) => condition
       case CondExp(condition, FalseLit(), ifFalse) =>
-        BinExp(UnExp(Not, condition), And, ifFalse)
+        OpExpr(And, Seq(OpExpr(Not, Seq(condition)), ifFalse))
       case CondExp(condition, TrueLit(), ifFalse) =>
-        BinExp(condition, Or, ifFalse)
+        OpExpr(Or, Seq(condition, ifFalse))
       case CondExp(condition, ifTrue, FalseLit()) =>
-        BinExp(condition, And, ifTrue)
+        OpExpr(And, Seq(condition, ifTrue))
       case CondExp(condition, ifTrue, TrueLit()) =>
-        BinExp(UnExp(Not, condition), Or, ifTrue)
+        OpExpr(Or, Seq(OpExpr(Not, Seq(condition)), ifTrue))
 
       case Forall(_, _, BoolLit(literal), _, _) =>
         BoolLit(literal)
       case Exists(_, _, BoolLit(literal), _) =>
         BoolLit(literal)
 
-      case UnExp(Minus, IntLit(literal)) => IntLit(-literal)
-      case UnExp(Minus, RealLit(literal)) => RealLit(-literal)
-      case UnExp(Minus, UnExp(Minus, single)) => single
+      case OpExpr(Minus, Seq(IntLit(literal))) => IntLit(-literal)
+//B3 REAL: case OpExpr(Minus, Seq(RealLit(literal))) => RealLit(-literal)
+      case OpExpr(Minus, Seq(OpExpr(Minus, Seq(single)))) => single
 
-      case BinExp(IntLit(left), GeCmp, IntLit(right)) =>
-        BoolLit(left >= right)
-      case BinExp(IntLit(left), GtCmp, IntLit(right)) =>
-        BoolLit(left > right)
-      case BinExp(IntLit(left), LeCmp, IntLit(right)) =>
+      case OpExpr(LeCmp, Seq(IntLit(left), IntLit(right))) =>
         BoolLit(left <= right)
-      case BinExp(IntLit(left), LtCmp, IntLit(right)) =>
+      case OpExpr(LtCmp, Seq(IntLit(left), IntLit(right))) =>
         BoolLit(left < right)
 
-      case BinExp(IntLit(left), Add, IntLit(right)) =>
+      case OpExpr(Add, Seq(IntLit(left), IntLit(right))) =>
         IntLit(left + right)
-      case BinExp(IntLit(left), Sub, IntLit(right)) =>
+      case OpExpr(Sub, Seq(IntLit(left), IntLit(right))) =>
         IntLit(left - right)
-      case BinExp(IntLit(left), Mul, IntLit(right)) =>
+      case OpExpr(Mul, Seq(IntLit(left), IntLit(right))) =>
         IntLit(left * right)
      // This case was removed - the evaluation as doubles and translation of RealLit can introduce rounding/precision errors
-     /* case BinExp(IntLit(left), Div, IntLit(right)) if right != 0 =>
+     /* case OpExpr(IntLit(left), Div, IntLit(right)) if right != 0 =>
         RealLit(left.toDouble / right.toDouble)*/
 
       /* In the general case, Carbon uses the SMT division and modulo. Scala's division is not in-sync with SMT division.
@@ -112,30 +107,28 @@ object Optimizer {
          not make any assumptions on the SMT division, division and modulo are simplified only if the dividend and divisor
          are nonnegative.
        */
-      case BinExp(IntLit(left), IntDiv, IntLit(right)) if left >= 0 && right > 0 =>
+      case OpExpr(IntDiv, Seq(IntLit(left), IntLit(right))) if left >= 0 && right > 0 =>
         IntLit(left / right)
-      case BinExp(IntLit(left), Mod, IntLit(right)) if left >= 0 && right > 0 =>
+      case OpExpr(Mod, Seq(IntLit(left), IntLit(right))) if left >= 0 && right > 0 =>
         IntLit(left % right)
 
-      case BinExp(RealLit(left), GeCmp, RealLit(right)) =>
-        BoolLit(left >= right)
-      case BinExp(RealLit(left), GtCmp, RealLit(right)) =>
-        BoolLit(left > right)
-      case BinExp(RealLit(left), LeCmp, RealLit(right)) =>
+/*B3 REAL
+      case OpExpr(LeCmp, Seq(RealLit(left), RealLit(right))) =>
         BoolLit(left <= right)
-      case BinExp(RealLit(left), LtCmp, RealLit(right)) =>
+      case OpExpr(LtCmp, Seq(RealLit(left), RealLit(right))) =>
         BoolLit(left < right)
 
-      case BinExp(RealLit(left), Add, RealLit(right)) =>
+      case OpExpr(Add, Seq(RealLit(left), RealLit(right))) =>
         RealLit(left + right)
-      case BinExp(RealLit(left), Sub, RealLit(right)) =>
+      case OpExpr(Sub, Seq(RealLit(left), RealLit(right))) =>
         RealLit(left - right)
-      case BinExp(RealLit(left), Mul, RealLit(right)) =>
+      case OpExpr(Mul, Seq(RealLit(left), RealLit(right))) =>
         RealLit(left * right)
-      case BinExp(RealLit(left), Div, RealLit(right)) if right != 0 =>
+      case OpExpr(Div, Seq(RealLit(left), RealLit(right))) if right != 0 =>
         RealLit(left / right)
-      case BinExp(RealLit(left), Mod, RealLit(right)) if right != 0 =>
+      case OpExpr(Mod, Seq(RealLit(left), RealLit(right))) if right != 0 =>
         RealLit(left % right)
+*/
 
       case If(TrueLit(), thn, _) => thn
       case If(FalseLit(), _, els) => els
@@ -145,8 +138,35 @@ object Optimizer {
 
       case Assert(TrueLit(), _) => Statements.EmptyStmt
       case Assume(TrueLit()) => Statements.EmptyStmt
+
+      // --- New B3 optimizations ---
+      // Block-Stmt optimization
+      // There is no hard requirement anywhere that we need a Block-Stmt (instead of just any Stmt),
+      // and there is no special functionality provided by Block-stmts, so we can remove Block-Stmts
+      // wherever possible, which will make the AST-printout much more readable without changing its 
+      // function.
+      // For a single Stmt we dont need a Block around it.
+      case Block(Seq(singleStmt)) => singleStmt 
+      // Empty Block-stmts do nothing if they are inside of other Block-stmts.
+      // (In other places, like the thn/els branch of an If-stmt, they are needed as "do nothing here"-Stmts)
+      case Block(stmtSeq) => {
+        val stmtSeqFiltered = stmtSeq filter {
+          case Block(Seq()) => false
+          case _ => true
+        }
+        // If there is only one stmt left, replace the original Block-stmt with that. 
+        // Otherwise we get either an empty Block, or a normal Block-stmt containing multiple stmts. 
+        stmtSeqFiltered match {
+          case Seq(singleStmt) => singleStmt
+          case seqOfStmtsOrEmpty => Block(seqOfStmtsOrEmpty)
+        }
+      }
+
+      // The Choose-Stmt (in contrast to "If(*)..."/"NondetIf") can have more than two options, so lets make use of that.
+      case Choose(Seq(Choose(branches1), Choose(branches2))) => Choose(branches1 ++ branches2) 
+      case Choose(Seq(Choose(branches1), branch2)) => Choose(branches1 ++ Seq(branch2))
+      case Choose(Seq(branch1, Choose(branches2))) => Choose(Seq(branch1) ++ branches2)
+      
     })
-  */
   }
 }
- */

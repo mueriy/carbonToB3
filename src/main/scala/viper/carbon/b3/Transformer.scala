@@ -9,8 +9,7 @@ import viper.carbon.b3.B3Nodes._
 
 
 /**
- * An implementation for transformers of the Boogie AST.
-
+ * An implementation for transformers of the (internal) B3 AST.
  */
 object Transformer {
 
@@ -25,12 +24,14 @@ object Transformer {
     def recurse(parent: Node): Node = {
       parent match {
         case _: NOT_SUPPORTED => parent
+        case _: Type => parent
         case Program(signatureTypes, domains, types, taggers, functions, axioms, procedures) =>
           Program(signatureTypes, domains map go, types map go, taggers map go, 
                   functions map go, axioms map go, procedures map go)
         case _: Variable => parent
         case lvd:LocalVarDecl => 
           lvd match {
+            case VarDecl(name, body, typ, isMutable, optInitVal) => VarDecl(name, go(body), typ, isMutable, optInitVal map go)
             case _: FParameter => parent
             case _: PParameter => parent
             case _: Binding => parent
@@ -42,6 +43,7 @@ object Transformer {
           }
         case d: Decl =>
           d match {
+            case _:Domain => sys.error("Domain is NOT_SUPPORTED, so this should not be reachable") 
             // case ConstDecl(name, typ, unique) => ConstDecl(name, go(typ), unique)
             case TypeDecl(_, _) => parent
             // case TypeAlias(n, de) => TypeAlias(go(n), go(de))
@@ -56,7 +58,7 @@ object Transformer {
           }
         case ss: Stmt =>
           ss match {
-            case VarDecl(name, body, typ, isMutable, optInitVal) => VarDecl(name, go(body), typ, isMutable, optInitVal map go)
+            case _:VarDecl => sys.error("this case should not be reachable (LocalVar is already handled by LocalVarDecl sub-case)")
             case Assign(lhs, rhs) => Assign(lhs, go(rhs))
             case Reinit(_) => parent            
             case Block(s) => Block(s map go)
@@ -76,7 +78,7 @@ object Transformer {
             case IntLit(_) => parent
             // case RealLit(_) => parent
             case IdExpr(_,_,_) => parent
-            case OperatorExpr(op, es) => OperatorExpr(op, es map go)
+            case OpExpr(op, es) => OpExpr(op, es map go)
             case CondExp(cond, thn, els) => CondExp(go(cond), go(thn), go(els))
             // case MapSelect(map, idxs) => MapSelect(go(map), idxs map go)
             // case MapUpdate(map, idxs, value) => MapUpdate(go(map), idxs map go, go(value))
@@ -124,6 +126,7 @@ object DuplicatingTransformer {
     def recurse(parent: Node): Seq[Node] = {
       parent match {
         case _: NOT_SUPPORTED => Seq(parent)
+        case _: Type => Seq(parent)
         case Program(signatureTypes, domains, types, taggers, functions, axioms, procedures) =>
           for {domainsResult <- goSeq(domains); typesResult <- goSeq(types); 
                taggersResult <- goSeq(taggers); functionsResult <- goSeq(functions); 
@@ -133,6 +136,11 @@ object DuplicatingTransformer {
         case _: Variable => Seq(parent)
         case lvd: LocalVarDecl =>
           lvd match {
+            case VarDecl(name, body, typ, isMutable, optInitVal) => 
+              for {bodyResult <- go(body); initValResult <- {optInitVal match {
+                case None => Seq(None)
+                case Some(expr) => go(expr).map(Some(_))}
+              }} yield VarDecl(name, bodyResult, typ, isMutable, initValResult)
             case _: FParameter => Seq(parent)
             case _: PParameter => Seq(parent)
             case _: Binding => Seq(parent)
@@ -147,9 +155,9 @@ object DuplicatingTransformer {
         //   LocalVarDecl(name, typResult, Some(whereResult))
         // case LocalVarDecl(name, typ, None) =>
         //   go(typ) map (LocalVarDecl(name, _, None))
-        case _: Type => Seq(parent)
         case d: Decl =>
           d match {
+            case _:Domain => sys.error("Domain is NOT_SUPPORTED, so this should not be reachable") 
             // case ConstDecl(name, typ, unique) => go(typ) map (ConstDecl(name, _, unique))
             case TypeDecl(_,_) => Seq(parent)
             case Tagger(_,_) => Seq(parent)
@@ -160,17 +168,13 @@ object DuplicatingTransformer {
             case Procedure(name, args, pre, post, optBody) =>
               for {argsResult <- goSeq(args); preResult <- goSeq(pre); postResult <- goSeq(post); 
               bodyResult <- {optBody match {
-                case None => None
-                case Some(stmt) => go(stmt) map (Some(_))}
+                case None => Seq(None)
+                case Some(stmt) => go(stmt).map({x => Some(x)})}
               }} yield Procedure(name, argsResult, preResult, postResult, bodyResult)
           }
         case ss: Stmt =>
           ss match {
-            case VarDecl(name, body, typ, isMutable, optInitVal) => 
-              for {bodyResult <- go(body); initValResult <- {optInitVal match {
-                case None => None
-                case Some(expr) => go(expr).map(Some(_))}
-              }} yield VarDecl(name, bodyResult, typ, isMutable, initValResult)
+            case _:VarDecl => sys.error("this case should not be reachable (LocalVar is already handled by LocalVarDecl sub-case)")
             case Assign(lhs, rhs) => for {lhsResult <- go(lhs); rhsResult <- go(rhs)} yield Assign(lhsResult, rhsResult)
             case Reinit(es) => goSeq(es) map (Reinit(_))
             case Block(s) => goSeq(s) map (Block(_))
@@ -201,13 +205,14 @@ object DuplicatingTransformer {
             // case MapUpdate(map, idxs, value) =>
             //   for {mapResult <- go(map); idxsResult <- goSeq(idxs); valueResult <- go(value)} yield MapUpdate(mapResult, idxsResult, valueResult)
             // case Old(exp) => go(exp) map (Old(_))
-            case OperatorExpr(op, es) => goSeq(es) map (OperatorExpr(op,_))
+            case OpExpr(op, es) => goSeq(es) map (OpExpr(op,_))
             case CondExp(cond, thn, els) =>
               for {condResult <- go(cond); thnResult <- go(thn); elsResult <- go(els)} yield
                 (CondExp(condResult, thnResult, elsResult))
             case FunctionCallExpr(func, args, typ) => {
               for {argsResult <- goSeq(args); typResult <- go(typ)} yield FunctionCallExpr(func, argsResult, typResult)
             }
+            case LabeledExpr(lbl, e) => go(e) map (LabeledExpr(lbl, _))
             case Exists(v, triggers, exp, w) =>
               for {vResult <- goSeq(v); triggersResult <- goSeq(triggers); expResult <- go(exp)} yield
                 Exists(vResult, triggersResult, expResult, w)

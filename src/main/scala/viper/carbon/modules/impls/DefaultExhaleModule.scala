@@ -44,8 +44,8 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     nestedExhaleId += 1
 
     // create a definedness state that matches the state before the exhale
-/*B3 TODO2
     val wellDefState = stateModule.freshTempStateKeepCurrent(s"ExhaleWellDef${nestedExhaleId - 1}")
+/*B3 TODO2
     val wellDefStateInitStmt = stateModule.initToCurrentStmt(wellDefState)
 */
 
@@ -59,21 +59,18 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
       initStmtWand = initStmt
     }
 */
-/* B3 LATER
+// /* B3 LATER
     val tempState: StateRep = wandModule.tempCurState.asInstanceOf[StateRep]
-*/
+// */
 
     val exhaleStmt = exps map (e =>
         {
-          TODO_Stmt("exhale", "exhaleConnective")
-/*B3 TODO2
           val defCheckData =
                 DefinednessCheckData(
                   e._3,
                   Some(DefinednessState(() => stateModule.replaceState(wellDefState)))
                 )
            exhaleConnective(e._1.whenExhaling, e._2, defCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert = isAssert, currentStateForPackage = tempState)
-*/
         }
       )
 
@@ -118,9 +115,11 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     * Emits a definedness check for the input expression if `defCheckData` demands a check and otherwise returns the
     * empty statement
     */
-/*
   private def maybeDefCheck(e: sil.Exp, defCheckData: DefinednessCheckData): Stmt = {
+    TODO_Stmt("DefaultExhaleModule", "maybeDefCheck")
+/*
     defCheckData.performDefinednessChecks.fold(Statements.EmptyStmt: Stmt)(definednessError => checkDefinedness(e, definednessError, makeChecks = true, Some(defCheckData.definednessStateOpt.get)))
+*/
   }
 
 
@@ -143,6 +142,8 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
         val defCheck = maybeDefCheck(e1, definednessCheckData)
         val exhaleTranslation : Stmt =
           if (insidePackageStmt) {
+            ADVANCED_Stmt("DefaultExhaleModule", "exhaleConnective: sil.Implies (wand)")
+/*
             val res =
               If(wandModule.getCurOpsBoolvar() ==> translateExpInWand(e1),
                 exhaleConnective(e2, error, definednessCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage),
@@ -150,10 +151,11 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
               )
             val unionStmt = wandModule.updateUnion()
             res ++ unionStmt
+*/
           } else {
             If(translateExpInWand(e1),
               exhaleConnective(e2, error, definednessCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage),
-              Statements.EmptyStmt
+              EmptyStmt
             )
           }
         defCheck ++ exhaleTranslation
@@ -161,13 +163,16 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
         val defCheck = maybeDefCheck(c, definednessCheckData)
         val exhaleTranslation : Stmt =
           if(insidePackageStmt) {
+            ADVANCED_Stmt("DefaultExhaleModule", "exhaleConnective: sil.CondExp (wand)")
+/*
             If(wandModule.getCurOpsBoolvar(),
               If(translateExpInWand(c), exhaleConnective(e1, error, definednessCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage),
                 exhaleConnective(e2, error, definednessCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage)),
-              Statements.EmptyStmt) ++
+              EmptyStmt) ++
               // The union state should be updated because the union state calculated inside exhaleExt (let's call it state U') is inside the then part of if(c){}
               // and outside the if condition c is not satisfied we still evaluate expressions and check definedness in U' without knowing any assumption about it
             wandModule.updateUnion()
+*/
           } else {
             If(translateExpInWand(c), exhaleConnective(e1, error, definednessCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage),
               exhaleConnective(e2, error, definednessCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage))
@@ -208,8 +213,8 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
           insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage)
 
         defCheck ++
-        Seqn(Seq (
-          NondetIf(Seqn(Seq(exhaleStmt, Assume(FalseLit())))),
+        Block(Seq(
+          Choose(Block(Seq(exhaleStmt, Assume(FalseLit())))),
           //in the non-deterministic branch we checked the assertion, hence we assume the assertion in the main branch
           Assume(translateExp(e)),
           {
@@ -251,6 +256,8 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
         val defCheck = maybeDefCheck(e, definednessCheckData)
 
         if(insidePackageStmt) {  // handling exhales during packaging a wand
+          ADVANCED_Stmt("DefaultExhaleModule", "exhaleConnective: case _ (wand)")
+/*B3 ADVANCED (wand)
           // currently having wild cards and 'constraining' expressions are not supported during packaging a wand.
           if(!permModule.getCurrentAbstractReads().isEmpty) {
             sys.error("Abstract reads cannot be used during packaging a wand.")  // AG: To be changed to unsupportedFeatureException
@@ -277,6 +284,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
             defCheck ++ exhaleExtStmt ++ addAssumptions ++ equateHps ++ assertTransfer
           else
             defCheck ++ exhaleExtStmt ++ addAssumptions ++ assertTransfer
+*/
         } else {
           /* We propagate the definedness state to the components only if no definedness check was performed to avoid
             exhale components doing the same work as the definedness components do */
@@ -317,7 +325,6 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
       Nil
     }
   } 
-*/
 }
 
 

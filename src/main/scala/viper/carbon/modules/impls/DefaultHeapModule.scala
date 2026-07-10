@@ -626,7 +626,7 @@ class DefaultHeapModule(val verifier: Verifier)
 */
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    stmts => TODO_Stmt("DefaultheapModule", "handleStmt")++stmts
+    stmts => TODO_Stmt("DefaultHeapModule", "handleStmt")++stmts
 
 /*
       stmt => (
@@ -657,7 +657,7 @@ class DefaultHeapModule(val verifier: Verifier)
   }
 
   override def simpleHandleStmt(stmt: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): Stmt = {
-    TODO_Stmt("DefaultheapModule", "simpleHandleStmt")
+    TODO_Stmt("DefaultHeapModule", "simpleHandleStmt")
 /*
     stmt match {
       case sil.NewStmt(target,fields) =>
@@ -794,11 +794,17 @@ class DefaultHeapModule(val verifier: Verifier)
   def currentStateVars: Seq[Var] = Seq(heap)
   def currentStateExps: Seq[Exp] = Seq(heapExp)
 
+*/
 
-  override def freshTempState(name: String): Seq[Var] = {
+  override def freshTempState(name: String): Seq[IdExpr] = {
+    addTODO("DefaultHeapModule", "freshTempState")
+    Seq()
+/*
     Seq(LocalVar(Identifier(s"${name}Heap"), heapTyp))
+*/
   }
 
+/*
   override def restoreState(s: Seq[Var]): Unit = {
     heap = s(0) // note: this should be accessed via heapVar or heapExp as appropriate (whether a variable is essential or not)
   }

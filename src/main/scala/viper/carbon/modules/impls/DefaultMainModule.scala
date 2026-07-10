@@ -141,8 +141,7 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         Program(b3signatureTypes, b3domains, b3types, b3taggers, b3functions, b3axioms, b3procedures)
     }
 
-    (output, nameMaps.map(e => e._1 -> e._2.toMap))
-    // B3 LATER: replace with this after adapting optimizer: (output.optimized.asInstanceOf[Program], nameMaps.map(e => e._1 -> e._2.toMap))
+    (output.optimized.asInstanceOf[Program], nameMaps.map(e => e._1 -> e._2.toMap))
   }
 
   def translateMethodDecl(m: sil.Method, names: Option[mutable.Map[String, String]]): Seq[Decl] = {

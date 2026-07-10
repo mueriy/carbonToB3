@@ -72,6 +72,7 @@ trait B3Interface {
     val outStream = new ByteArrayOutputStream()
     val newOut = new PrintStream(outStream)
     val oldOut = System.out
+    println("=============== NOW RUNNING B3 VERIFIER ===============")
     try {
       System.setOut(newOut)
       runB3(program, b3defaultOptions ++ options) // [B3 todo?: currently no timeout mechanism]

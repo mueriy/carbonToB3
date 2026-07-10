@@ -95,12 +95,12 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    */
   def freshTempState(name: String, discardCurrent: Boolean = false, initialise: Boolean = false): (Stmt, StateSnapshot)
 
-/*
   /**
     * Returns a fresh state that is not an old state. This method has no side-effects on the current state.
     */
   def freshTempStateKeepCurrent(name: String) : StateSnapshot
 
+/*
   /**
     * Returns the statement that initializes the input state to the current state. This method has no side-effects on
     * the current state.
@@ -192,8 +192,8 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   /**
     * Representation of state used in wandModule. Pair of stateSnapshot and boolean variable carrying assumptions about this state.
     */
+*/
   case class StateRep(state: StateSnapshot, boolVar: IdExpr)
 
   case class StateSetup(usedState: StateRep, initStmt: Stmt)
-*/
 }
