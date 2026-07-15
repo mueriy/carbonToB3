@@ -6,7 +6,9 @@
 
 package viper.carbon.b3
 import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Naming._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 
 
 /**
@@ -76,7 +78,6 @@ object Statements {
 
 /**
  * Utility methods for AST nodes.
-
  */
 object Nodes {
 
@@ -108,7 +109,7 @@ object Nodes {
           case TypeDecl(_, _) => Nil
           case Tagger(_, _) => Nil
           case Function(_, args, _, _) => args
-          case Axiom(_, exp) => exp
+          case Axiom(exp, _) => exp
           case Procedure(_, args, pre, post, optBody) => args ++ pre ++ post ++ (optBody map {_.toSeq})
         }
       case ss: Stmt =>

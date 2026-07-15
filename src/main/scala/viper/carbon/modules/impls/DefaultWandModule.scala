@@ -684,11 +684,12 @@ case class PackageSetup(hypState: StateRep, usedState: StateRep, initStmt: Stmt)
     * Wraps all statements inside package statement inside If condition depending on the state variables.
     */
   override  def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), inWand: Boolean = false): (Block => Block) = {
-/*
     if(wandModule.nestingDepth > 0) // if 's' is inside a package statement
+      stmt => ADVANCED_Stmt("DefaultWandModule", "handleStmt (nesting depth > 0)")+++stmt
+/*
       stmt => If(allStateAssms, modifyAssert(stmt, OPS.boolVar), Statements.EmptyStmt)::Nil
-    else
 */
+    else
       stmt => stmt
   }
 

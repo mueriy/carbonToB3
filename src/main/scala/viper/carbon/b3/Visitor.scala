@@ -8,8 +8,7 @@ package viper.carbon.b3
 import viper.carbon.b3.B3Nodes._
 
 /**
- * An implementation for visitors of the Boogie AST.
-
+ * An implementation for visitors of the B3 AST.
  */
 object Visitor {
 

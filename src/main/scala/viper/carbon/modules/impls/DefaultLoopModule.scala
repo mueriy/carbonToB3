@@ -470,7 +470,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   }
 
   override def handleStmt(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): (Block => Block) = {
-    stmts => TODO_Stmt("DefaultLoopModule", "handleStmt")++stmts
+    stmts => TODO_Stmt("DefaultLoopModule", "handleStmt")+++stmts
 /*
     if(useLoopDetector) {
       handleStmtLoopDetector(s, statesStackOfPackageStmt, allStateAssms,insidePackageStmt)

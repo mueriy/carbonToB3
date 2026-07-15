@@ -42,8 +42,8 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
 
 
     val stmt =
-        (exps map (e => inhaleConnective(e._1.whenInhaling, e._2, addDefinednessChecks = addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt = insidePackageStmt))) //++ [B3 temp: until Heap-stuff]
-          // assumeGoodState [B3 temp: until Heap-stuff]
+        (exps map (e => inhaleConnective(e._1.whenInhaling, e._2, addDefinednessChecks = addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt = insidePackageStmt))) ++
+          assumeGoodState
 
     if(insidePackageStmt && !addDefinednessChecks) {
          /* all the assumptions made during packaging a wand (except assumptions about the global state before the package statement)

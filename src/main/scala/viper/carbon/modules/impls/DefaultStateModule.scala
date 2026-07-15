@@ -11,6 +11,7 @@ import viper.carbon.verifier.Verifier
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Naming._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 import viper.carbon.modules.components.CarbonStateComponent
 
 import scala.collection.mutable
@@ -28,30 +29,25 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
 
   implicit val stateNamespace = verifier.freshNamespace("state")
 
-/*
   override def assumeGoodState = {
     Assume(currentGoodState)
   }
-*/
 
   override def preamble: Seq[Decl] = {
-    Seq() // B3 TODO
-/*
-    Func(Identifier(isGoodState), staticStateContributions(), Bool) ++
+    Function(Identifier(isGoodState), staticStateContributions(), Bool) ++
     {
       val prevState = stateModule.state
       stateModule.replaceState(stateModule.pureState)
       // TODO: It would be great if we could use StateModule.currentStateContributionValues, but that will not
       // give us the pure state (see comment there). Once that is fixed, this should be changed accordingly.
       val stateExps = components flatMap (_.currentStateExps)
-      val res = FuncApp(Identifier(isGoodState), stateExps, Bool)
+      val res = FunctionCallExpr(Identifier(isGoodState), stateExps, Bool)
       stateModule.replaceState(prevState)
       // This axiom corresponds to the Boogie expression "state(dummyHeap, emptyMask)",
       // which is necessary since function definitional axioms trigger on "state(heap, mask), f(heap, args)",
       // so without this assumption, function calls with dummyHeap and emptyMask won't trigger the definition.
       Axiom(res)
     }
-*/
   }
 
   override def reset : Unit = {
@@ -59,12 +55,9 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     curState = null
     //usingOldState = false
     //treatOldAsCurrent = false
-/* B3 TODO2
     resetBoogieState
-*/
   }
 
-/*
   def initBoogieState: Stmt = {
     curState = new StateComponentMapping()
     // note: it is important that these are set before calling e.g. initState on components
@@ -99,13 +92,11 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     initToCurrentStmt(freshSnapshot)
   }
 
-
-  def staticStateContributions(withHeap: Boolean = true, withPermissions: Boolean = true): Seq[LocalVarDecl] = components flatMap (_.staticStateContributions(withHeap, withPermissions))
+  def staticStateContributions(withHeap: Boolean = true, withPermissions: Boolean = true): Seq[FParameter] = components flatMap (_.staticStateContributions(withHeap, withPermissions))
   // def currentStateContributions: Seq[LocalVarDecl] = components flatMap (_.currentStateContributions)
+  /** B3 NOTE: returns the variables that contribute to the state (in the given snapshot). */
   def stateContributionValues(snap: StateSnapshot): Seq[Expr] = {
-    TODO_Expr_bool("(MAYBE)", "stateContributionValues; no idea what that does right now")
-/*
-    var res : Seq[Exp] = Seq()
+    var res : Seq[Expr] = Seq()
     val hashMap = snap._1
     for (c <- components) yield {
       if (hashMap.containsKey(c)) {
@@ -113,11 +104,9 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
       }
     }
     res
-*/
   }
 
 
-*/
   // Note: For "old" state, these variables should be wrapped in "Old(.)" before use
   type StateComponentMapping = java.util.IdentityHashMap[CarbonStateComponent, Seq[IdExpr]]
   override type StateSnapshot = (StateComponentMapping, Boolean, Boolean) // mapping to vars, using old state, using pure state
@@ -125,7 +114,6 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   private var curOldState: StateComponentMapping = null
   private var curState: StateComponentMapping = null
 
-/*
   def staticGoodState: Expr = {
     FunctionCallExpr(Identifier(isGoodState), staticStateContributions() map (v => IdExpr(v.name, v.typ)), Bool)
   }
@@ -139,14 +127,11 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   override def stateRepositoryPut(name:String, snapshot: StateSnapshot) = stateRepository.put(name,snapshot)
 
   override def stateRepositoryGet(name:String) : Option[StateSnapshot] = stateRepository.get(name)
-*/
 
   override def freshTempState(name: String, discardCurrent: Boolean = false, initialise: Boolean = false): (Stmt, StateSnapshot) = {
     assert(name != "old")
 
     val previousState = new StateSnapshot(new StateComponentMapping(), usingOldState, usingPureState)
-    (TODO_Stmt("DefaultStateModule", "freshTempState"), previousState)
-/*
 
     curState = new StateComponentMapping() // essentially, the code below "clones" what curState should represent anyway. But, if we omit this line, we inadvertently alias the previous hash map.
 
@@ -158,11 +143,10 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
       curState.put(c, tmpExps) // repopulate current state
       c.restoreState(tmpExps)
 
-      (if (initialise) c.resetBoogieState else stmt)
+      (if (initialise) TODO_Stmt("freshTempState", "replace with c.resetBoogieState")/* c.resetBoogieState */ else stmt)
     }
     usingOldState = false // we have now set up a temporary state in terms of "old" - this could happen when an unfolding expression is inside an "old"
     (s, previousState)
-*/
   }
 
   override def freshTempStateKeepCurrent(name: String) : StateSnapshot = {
@@ -182,7 +166,6 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     (freshState, false, false)
   }
 
-/*
   override def initToCurrentStmt(snapshot: StateSnapshot) : Stmt = {
     for (e <- snapshot._1.entrySet().asScala.toSeq) yield {
       val s: Stmt = (e.getValue zip e.getKey.currentStateExps) map (x => x._1 := x._2)
@@ -194,17 +177,14 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   {
     freshTempState(name, true, init)
   }
-*/
 
   override def replaceState(snapshot: StateSnapshot): Unit = {
-/* B3 TODO2
     curState = snapshot._1
         for (c <- components) {
       c.restoreState(snapshot._1.get(c))
     }
     usingOldState = snapshot._2
     usingPureState = snapshot._3
-*/
   }
 
 /*
@@ -218,7 +198,6 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   var usingOldState = false
   var usingPureState = false
 
-/*
   override def stateModuleIsUsingOldState: Boolean = {
     usingOldState
   }
@@ -226,17 +205,14 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   override def stateModuleIsUsingPureState: Boolean = {
     usingPureState
   }
-*/
 
   override def oldState: StateSnapshot = {
     (curOldState, true, false) // the chosen boolean values here seem sensible, but they probably shouldn't be used anyway
   }
 
-/*
   override def pureState: StateSnapshot = {
     (curState, false, true)
   }
-*/
 
   override def replaceOldState(snapshot: StateSnapshot): Unit = {
     curOldState = snapshot._1

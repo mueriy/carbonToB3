@@ -49,7 +49,7 @@ object Transformer {
             // case TypeAlias(n, de) => TypeAlias(go(n), go(de))
             case Tagger(_,_) => parent
             case Function(name, args, typ, tag) => Function(name, args map go, typ, tag)
-            case Axiom(explains, exp) => Axiom(explains, go(exp))
+            case Axiom(exp, explains) => Axiom(go(exp), explains)
             // case GlobalVarDecl(name, typ) => GlobalVarDecl(name, go(typ))
             case Procedure(name, args, pre, post, optBody) => Procedure(name, args map go, pre map go, post map go, optBody map go)
             // case CommentedDecl(s, ds, a, b) => CommentedDecl(s, ds map go, a, b)
@@ -163,7 +163,7 @@ object DuplicatingTransformer {
             case Tagger(_,_) => Seq(parent)
             // case TypeAlias(n, de) => for {nResult <- go(n); deResult <- go(de)} yield TypeAlias(nResult, deResult)
             case Function(name, args, typ, tag) => for {argsResult <- goSeq(args); typResult <- go(typ)} yield Function(name, argsResult, typResult, tag)
-            case Axiom(explains, exp) => go(exp) map (Axiom(explains, _))
+            case Axiom(exp, explains) => go(exp) map (Axiom(_, explains))
             // case GlobalVarDecl(name, typ) => go(typ) map (GlobalVarDecl(name, _))
             case Procedure(name, args, pre, post, optBody) =>
               for {argsResult <- goSeq(args); preResult <- goSeq(pre); postResult <- goSeq(post); 

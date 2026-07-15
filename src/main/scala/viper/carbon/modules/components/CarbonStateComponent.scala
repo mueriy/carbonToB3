@@ -16,7 +16,6 @@ import viper.carbon.b3.B3Nodes._
  */
 trait CarbonStateComponent extends Component {
 
-/*
   /**
    * The statements necessary to initialize the part of the state belonging to this module.
    */
@@ -29,16 +28,18 @@ trait CarbonStateComponent extends Component {
 
   /**
    * The name and type of the static contribution of this component to the state. The returned value should remain the
-   * same even if the state is changed.
+   * same even if the state is changed. (For Functions; For Axiom use 'output map {_.toQ}')
    */
-  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[LocalVarDecl]
+  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[FParameter]
 
 
+/*
   /**
    * The name and type of the current contribution of this component to the state. The numbers of elements in the list and
    * the types must correspond to the ones given in `staticStateContributions`.
    */
   def currentStateContributions: Seq[LocalVarDecl]
+*/
 
 
   /**
@@ -54,14 +55,12 @@ trait CarbonStateComponent extends Component {
    * in the list and the types must correspond to the ones given in `stateContributions`.
    */
   def currentStateExps: Seq[Expr]
-*/
 
   /**
    * Set up a fresh temporary state and returns that new state.
    */
   def freshTempState(name: String): Seq[IdExpr]
 
-/*
   /**
    * Throw away the current state and go back to a snapshot.
    */
@@ -78,5 +77,4 @@ trait CarbonStateComponent extends Component {
     * Are we currently using a pure state without a heap (i.e., translating a domain)?
     */
   def usingPureState: Boolean
-*/
 }

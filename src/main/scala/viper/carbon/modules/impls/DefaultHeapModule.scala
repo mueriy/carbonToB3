@@ -11,6 +11,7 @@ import viper.carbon.modules.components.{DefinednessComponent, InhaleComponent, S
 import viper.silver.ast.utility.Expressions
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Naming._
 import viper.carbon.b3.B3Implicits._
 import viper.carbon.b3.B3Development._
 import viper.carbon.verifier.Verifier
@@ -72,19 +73,25 @@ class DefaultHeapModule(val verifier: Verifier)
 
   override def wandBasicType(wand: String): Type = NamedType("WandType_" + wand)
   override def wandFieldType(wand: String) : Type = NamedType(fieldTypeName, Seq(wandBasicType(wand),Int))
+*/
   private val heapTyp = NamedType("HeapType")
   private val heapName = Identifier("Heap")
   private val heap0Name = Identifier("Heap0")
   private val heap1Name = Identifier("Heap1")
   private val heap2Name = Identifier("Heap2")
+/*
   private val exhaleHeapName = Identifier("ExhaleHeap")
   private val exhaleHeap = LocalVar(exhaleHeapName, heapTyp)
-  private val originalHeap = GlobalVar(heapName, heapTyp)
+*/
+  private val originalHeap = IdExpr(heapName, heapTyp)
+/*
   private val qpHeapName = Identifier("QPHeap")
   private val qpHeap = LocalVar(qpHeapName, heapTyp)
-  private var heap: Var = originalHeap
-  private def heapVar: Var = {assert (!usingOldState); heap}
-  private def heapExp: Exp = if (usingPureState) dummyHeap else heap
+*/
+  private var heap: IdExpr = originalHeap
+  private def heapVar: IdExpr = {assert (!usingOldState); heap}
+  private def heapExp: Expr = if (usingPureState) dummyHeap else heap
+/*
   private val nullName = Identifier("null")
   private val nullLit = Const(nullName)
   private val freshObjectName = Identifier("freshObj")
@@ -102,14 +109,20 @@ class DefaultHeapModule(val verifier: Verifier)
   private val sumHeapName = Identifier("SumHeap")
   private val readHeapName = Identifier("readHeap")
   private val updateHeapName = Identifier("updHeap")
+*/
   private val dummyHeapName = Identifier("dummyHeap")
-  private val dummyHeap = Const(dummyHeapName)
+  private val dummyHeap = FunctionCallExpr(dummyHeapName, Seq(), heapTyp)
 
+/*
   override def refType = NamedType("Ref")
 
   override def fieldTypeConstructor = (2, (ts: Seq[Type]) => NamedType(fieldTypeName, ts).asInstanceOf[Type])
+*/
 
   override def preamble = {
+    Function(dummyHeapName, Seq(), heapTyp)
+
+/*B3 TODO
     val obj = LocalVarDecl(Identifier("o")(axiomNamespace), refType)
     val obj2 = LocalVarDecl(Identifier("o2")(axiomNamespace), refType)
     val refField = LocalVarDecl(Identifier("f")(axiomNamespace), fieldTypeOf(refType))
@@ -261,8 +274,10 @@ class DefaultHeapModule(val verifier: Verifier)
           }
         }
       }
+*/
     }
 
+/*
   /* The liberal version does not equate the known-folded permission masks, but instead just propagates the information
    * that known-folded locations remain known-folded (while locations that are not known-folded are underspecified).
    * This permits taking the sum of two heaps that record different known-folded permission masks.
@@ -626,7 +641,7 @@ class DefaultHeapModule(val verifier: Verifier)
 */
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    stmts => TODO_Stmt("DefaultHeapModule", "handleStmt")++stmts
+    stmts => TODO_Stmt("DefaultHeapModule", "handleStmt")+++stmts
 
 /*
       stmt => (
@@ -780,43 +795,43 @@ class DefaultHeapModule(val verifier: Verifier)
   }
 
   override def translateNull: Exp = nullLit
+*/
 
   def initBoogieState: Stmt = {
     heap = originalHeap
     Nil
   }
   def resetBoogieState: Stmt = {
-    Havoc(heapVar)
+    Reinit(heapVar)
   }
 
-  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[LocalVarDecl] = if(withHeap) Seq(LocalVarDecl(heapName, heapTyp)) else Seq()
+  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[FParameter] = if(withHeap) Seq(FParameter(heapName, heapTyp)) else Seq()
+/*
   def currentStateContributions: Seq[LocalVarDecl] = Seq(LocalVarDecl(heap.name, heapTyp))
-  def currentStateVars: Seq[Var] = Seq(heap)
-  def currentStateExps: Seq[Exp] = Seq(heapExp)
-
 */
+  def currentStateVars: Seq[IdExpr] = Seq(heap)
+  def currentStateExps: Seq[Expr] = Seq(heapExp)
+
 
   override def freshTempState(name: String): Seq[IdExpr] = {
-    addTODO("DefaultHeapModule", "freshTempState")
-    Seq()
-/*
-    Seq(LocalVar(Identifier(s"${name}Heap"), heapTyp))
-*/
+    Seq(IdExpr(Identifier(s"${name}Heap"), heapTyp))
   }
 
-/*
-  override def restoreState(s: Seq[Var]): Unit = {
+  override def restoreState(s: Seq[IdExpr]): Unit = {
     heap = s(0) // note: this should be accessed via heapVar or heapExp as appropriate (whether a variable is essential or not)
   }
 
+/*
   def equateWithCurrentHeap(s: Seq[IdExpr]): Stmt = {
     LATER_Stmt("equateWithCurrentHeap", "need to implement Heap") //Assume(heap === s(0))
   }
+*/
 
   override def usingOldState = stateModuleIsUsingOldState
 
   override def usingPureState = stateModuleIsUsingPureState
 
+/*
   override def beginExhale: Stmt = {
 //    Havoc(exhaleHeap)
     EmptyStmt

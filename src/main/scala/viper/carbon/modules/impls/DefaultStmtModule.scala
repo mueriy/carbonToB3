@@ -338,13 +338,14 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
       assert(assertion = false, "Translation of " + stmt + " is not defined")
     }
     val translation = stmts ::
-/*
       (if(duringPackage){  //[[B3 temp: remove heap-state assumptions after statements]]
+        ADVANCED_Stmt("DefaultStmtModule", "translateStmt -> good state if Wand")
+/*
         exchangeAssumesWithBoolean(assumeGoodState, statesStack.head.asInstanceOf[StateRep].boolVar)
+*/
       }else{
         assumeGoodState
       }) ::
-*/
       Nil
 
     translation

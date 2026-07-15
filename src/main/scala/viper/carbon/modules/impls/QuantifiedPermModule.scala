@@ -11,6 +11,7 @@ import viper.carbon.modules.components._
 import viper.silver.ast.utility.Expressions
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Naming._
 import viper.carbon.b3.B3Implicits._
 import viper.carbon.b3.B3Development._
 import viper.silver.verifier._
@@ -62,13 +63,15 @@ class QuantifiedPermModule(val verifier: Verifier)
 /*
   private val pmaskTypeName = "PMaskType"
   override val pmaskType = NamedType(pmaskTypeName)
+*/
   private val maskName = Identifier("Mask")
-  private val originalMask = GlobalVar(maskName, maskType)
-  private var mask: Var = originalMask // When reading, don't use this directly: use either maskVar or maskExp as needed
-  private def maskVar : Var = {assert (!usingOldState); mask}
-  private def maskExp : Exp = if (usingPureState) zeroMask else mask
+  private val originalMask = IdExpr(maskName, maskType)
+  private var mask: IdExpr = originalMask // When reading, don't use this directly: use either maskVar or maskExp as needed
+  private def maskVar : IdExpr = {assert (!usingOldState); mask}
+  private def maskExp : Expr = if (usingPureState) zeroMask else mask
   private val zeroMaskName = Identifier("ZeroMask")
-  private val zeroMask = Const(zeroMaskName)
+  private val zeroMask = FunctionCallExpr(zeroMaskName, Seq(), maskType)
+/*
   private val zeroPMaskName = Identifier("ZeroPMask")
   override val zeroPMask = Const(zeroPMaskName)
   private val noPermName = Identifier("NoPerm")
@@ -115,8 +118,11 @@ class QuantifiedPermModule(val verifier: Verifier)
   private val updatePMaskName = Identifier("updPMask")
 
   override val pmaskTypeDesugared = PMaskDesugaredRep(readPMaskName, updatePMaskName)
+*/
 
   override def preamble = {
+    Function(zeroMaskName, Seq(), maskType)
+/*B3 TODO
     val obj = LocalVarDecl(Identifier("o")(axiomNamespace), refType)
     val field = LocalVarDecl(Identifier("f")(axiomNamespace), fieldType)
     val permInZeroMask = currentPermission(zeroMask, obj.l, field.l)
@@ -223,8 +229,10 @@ class QuantifiedPermModule(val verifier: Verifier)
       MaybeCommentedDecl("Functions used to represent the range of the projection of each QP instance onto its receiver expressions for quantified permissions during inhale and exhale",
         rangeFuncs.toSeq)
     }
+*/
   }
 
+/*
   def permType = NamedType(permTypeName)
 
   override def assumePermUpperBounds(doAssume: Boolean) : Stmt = {
@@ -233,11 +241,14 @@ class QuantifiedPermModule(val verifier: Verifier)
     else
       Assume(assumePermUpperBound.not)
   }
+*/
 
-  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[LocalVarDecl] = if (withPermissions) Seq(LocalVarDecl(maskName, maskType)) else Seq()
+  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[FParameter] = if (withPermissions) Seq(FParameter(maskName, maskType)) else Seq()
+/*
   def currentStateContributions: Seq[LocalVarDecl] = Seq(LocalVarDecl(mask.name, maskType))
-  def currentStateVars : Seq[Var] = Seq(mask)
-  def currentStateExps: Seq[Exp] = Seq(maskExp)
+*/
+  def currentStateVars: Seq[IdExpr] = Seq(mask)
+  def currentStateExps: Seq[Expr] = Seq(maskExp)
 
   def initBoogieState: Stmt = {
     mask = originalMask
@@ -247,7 +258,6 @@ class QuantifiedPermModule(val verifier: Verifier)
     (maskVar := zeroMask)
   }
 
-*/
   override def reset = {
     addADVANCED("QuantifiedPermModule", "reset")
 /*
@@ -266,11 +276,13 @@ class QuantifiedPermModule(val verifier: Verifier)
     assertReadPermOnly = readOnly
     oldValue
   }
+*/
 
   override def usingOldState = stateModuleIsUsingOldState
 
   override def usingPureState: Boolean = stateModuleIsUsingPureState
 
+/*
   override def predicateMaskField(pred: Exp): Exp = {
     FuncApp(predicateMaskFieldName, Seq(pred), pmaskType)
   }
@@ -287,18 +299,14 @@ class QuantifiedPermModule(val verifier: Verifier)
 */
 
   override def freshTempState(name: String): Seq[IdExpr] = {
-    addTODO("QuantifiedPermModule", "freshTempState")
-    Seq()
-/*
-    Seq(LocalVar(Identifier(s"${name}Mask"), maskType))
-*/
+    Seq(IdExpr(Identifier(s"${name}Mask"), maskType))
   }
 
-/*
-  override def restoreState(s: Seq[Var]): Unit = {
+  override def restoreState(s: Seq[IdExpr]): Unit = {
     mask = s(0)
   }
 
+/*
   /**
    * Can a location on a given receiver be read?
    */
@@ -1598,7 +1606,7 @@ class QuantifiedPermModule(val verifier: Verifier)
 */
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    stmts => TODO_Stmt("QuantifiedPermModule", "handleStmt")++stmts
+    stmts => TODO_Stmt("QuantifiedPermModule", "handleStmt")+++stmts
 /*
     stmts =>
       s match {

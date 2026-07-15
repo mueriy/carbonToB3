@@ -8,6 +8,7 @@ package viper.carbon.modules
 
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes.{Decl, Expr, Type, Stmt, Pattern}
+import viper.carbon.b3.B3Naming.Identifier
 
 import scala.collection.mutable
 
@@ -16,12 +17,12 @@ import scala.collection.mutable
 
  */
 trait FuncPredModule extends Module {
-/* °Q+
-  /* Translate a function. If the second parameter is defined, also record the Boogie names of all translated Viper
+  val TODO_REMOVE_assumeFunctionsAboveName: Identifier
+  val TODO_REMOVE_emptyFrameName: Identifier
+  /* Translate a function. If the second parameter is defined, also record the B3 names of all translated Viper
    * variables to the given map.
    */
   def translateFunction(f: sil.Function, names: Option[mutable.Map[String, String]]): Seq[Decl]
-*/
 
   def translateFuncApp(fa: sil.FuncApp): Expr
 
@@ -35,9 +36,11 @@ trait FuncPredModule extends Module {
   def translatePredicate(p: sil.Predicate, names: Option[mutable.Map[String, String]]): Seq[Decl]
 
   def predicateVersionType: Type
+*/
 
   def assumeAllFunctionDefinitions: Stmt
 
+/*
   def translateResult(r: sil.Result): Expr
 
   // code to go first, and code to go last (other modules may contribute in between)

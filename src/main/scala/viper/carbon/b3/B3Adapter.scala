@@ -242,10 +242,18 @@ object B3Nodes {
     //(Taken from boogie.scala -> Node) ^^^
   }
   sealed trait Decl extends Node // Domain, TypeDecl, Tagger, Function, Axiom, and Procedure. (TypeName is String)
-  sealed trait LocalVarDecl extends Node {//Binding, PParameter, FParameter
-  // Binding(name: String, typ: Type)
-  // PParameter(name: String, typ: Type, mode: RawAst.ParameterMode = IN)
-  // FParameter(name: String, typ: Type, isInjective: Boolean = false)
+  sealed trait LocalVarDecl extends Node {//Binding, PParameter, FParameter, VarDecl(also extends Stmt)
+    /* B3 INFO: splitting the LocalVarDecl into the different "B3 versions" makes sense because they have/need different 
+    parameters (see in the following). However, Boogie-Carbon naturally always used LocalVarDecl, and in some cases
+    we need two different variants. Currently this is solved by adding def F/P/Q to the case-classes, which returns the 
+    corresponding FParameter/PParameter/(Quantifier-)Binding, respectively. */
+
+    // Binding(name: Identifier, typ: Type)
+    // PParameter(name: Identifier, typ: Type, mode: RawAst.ParameterMode = IN)
+    // FParameter(name: Identifier, typ: Type, isInjective: Boolean = false)
+    // VarDecl(name: Identifier, body: Stmt, typ: Type, isMutable: Boolean = true, optInitValue: Option[Expr] = None)
+    
+    // Enable use of .name and .typ even if we don't know which specific case-variant of LocalVarDecl we have: 
     def name: Identifier
     def typ: Type
     /* returns the identifier expression of this locally declared variable */
@@ -332,14 +340,14 @@ object B3Nodes {
    * @param domain Optional domain instantiation (CURRENTLY NOT SUPPORTED)
    * @return a B3 RawAst TypeDecl node (If domain is used, this corresponds to "type [name] = [domain(parameters)]". Otherwise simply "type [name]")
    */
-  case class TypeDecl(name: String, domain: Option[DomainInstantiation] = None) extends Decl {
+  case class TypeDecl(name: Type, domain: Option[DomainInstantiation] = None) extends Decl {
     def b3fy: RawAst.TypeDecl = {
       val dom = None
       // val dom = domain match {
-      //   case Some(domIon) => Some(domIon.b3fy)
+      //   case Some(domInst) => Some(domInst.b3fy)
       //   case None => None
       // }
-      new RawAst.TypeDecl(StringToDString(name), daf(dom))
+      new RawAst.TypeDecl(StringToDString(name.b3fy), daf(dom))
     }
   }
 
@@ -359,26 +367,67 @@ object B3Nodes {
     * @param tag The name of a tag (if any; default "" means no tag). 
     * The values returned by different functions with the same tag are disjoint.
     */
-  case class Function(name: Identifier, parameters: Seq[FParameter], resultType: Type, tag: String = "") extends Decl {
+  case class Function(name: Identifier, args: Seq[FParameter], typ: Type, tag: String = "") extends Decl {
+    // Automatically register this function
+    registerFunction(this)
+    
     def b3fy: RawAst.Function = {
       val optB3Tag = if (tag == "") Option_None[DString] else Option_Some[DString](daf(tag))
-      new RawAst.Function(daf(name), 
-                          daf(parameters map {_.b3fy}),
-                          daf(resultType.b3fy),
+      new RawAst.Function(daf(functionName), 
+                          daf(args map {_.b3fy}),
+                          daf(typ.b3fy),
                           optB3Tag,
                           Option_None)  // <- Carbon never uses function bodies/definitions (FunctionDefinition); it defines them using axioms.
     }
+    def functionName: String = funcName(this)
+    def isPure: Boolean = typ.freeTypeVars.size == 0
   }
 
   /** Scala representation of a B3 RawAst FParameter node (a function parameter) */
   case class FParameter(name: Identifier, typ: Type, isInjective: Boolean = false) extends LocalVarDecl {
     def b3fy: RawAst.FParameter = new RawAst.FParameter(daf(name), isInjective, daf(typ.b3fy))
+    def toQ: Binding = Binding(name, typ)
+    def toP(mode: RawAst.ParameterMode = IN): PParameter = PParameter(name, typ, mode)
   }
 
   
-  /** Scala representation of a B3 RawAst Axiom node. */
-  case class Axiom(explains: Seq[Identifier], expr: Expr) extends Decl {
-    def b3fy: RawAst.Axiom = new RawAst.Axiom(daf(explains map idName), expr.b3fy)
+  /** 
+   * Scala representation of a B3 RawAst Axiom node. 
+   * @param explains If an explains is provided, that is used later. If none is provided
+   * it will be (tried to be) created when transforming it to its RawAst form (TODO). 
+   * Technically, every 'explains' that can be manually created should also be able to be
+   * created automatically, so in the future there should be no need to declare it beforehand.
+   * (Although, for preamble-axioms we might know that we use one axiom only when we use another, 
+   * so we might be able to add some "explanations" of the required axiom to the other one, 
+   * which could help if the other axiom has many different pattern variants, making it hard or
+   * impossible to define an 'explains' that works.)
+   * Defining it beforehand can make it more complicated for "parametric" axioms and other 
+   * cases where we will (or might) modify the axiom. Therefore, it might even make sense
+   * to remove this parameter at some point.
+   */
+  case class Axiom(expr: Expr, explains: Seq[Identifier] = Seq()) extends Decl {
+    // Automatic creation of 'explains' is only done at the very end (when b3fy is called),
+    // to ensure that we can generate all function names correctly.
+    def b3fy: RawAst.Axiom = explains match {
+      case Seq() => new RawAst.Axiom(daf(axiomExplanations(this)), expr.b3fy)
+      case seq => new RawAst.Axiom(daf(seq map idName), expr.b3fy)
+    }
+
+    // def isPure: Boolean = typ.freeTypeVars.size == 0
+
+    /** 
+     * Auto-generates "explains"-identifiers for axioms
+     * TODO: support more complicated cases.
+     */
+    def axiomExplanations(ax: Axiom): Seq[String] = {
+      ax.expr match {
+        case Forall(vars, patterns, expr, _, _) => patterns match {
+          case Seq(Pattern(pExprs)) => pExprs map {expr => funcName(expr.asInstanceOf[FunctionCallExpr])}
+          case _ => B3Development.addLATER("axiomExplanations", "multiple (alternative) patterns currently not supported"); Seq()
+        }
+        case _ => B3Development.addLATER("axiomExplanations", "axioms containing not just a forall currently not supported"); Seq()
+      }
+    }
   }
 
 
@@ -428,6 +477,8 @@ object B3Nodes {
     */
   case class PParameter(name: Identifier, typ: Type, mode: RawAst.ParameterMode = IN) extends LocalVarDecl {
     def b3fy: RawAst.PParameter = new RawAst.PParameter(daf(name), mode, daf(typ.b3fy), Option_None)
+    def toQ: Binding = Binding(name, typ)
+    def toF(isInjective: Boolean = false): FParameter = FParameter(name, typ, isInjective) 
   }
   /* All RawAst.ParameterMode versions, for easy use: */
   val IN = new RawAst.ParameterMode_In
@@ -521,7 +572,7 @@ object B3Nodes {
     override def b3fy: RawAst.Stmt_Assign = new RawAst.Stmt_Assign(daf(lhs.name), rhs.b3fy)
   }
 
-  /** Scala representation of a B3 RawAst Reinit-Stmt node. (= havoc) */
+  /** Scala representation of a B3 RawAst Reinit-Stmt node. (= Havoc) */
   case class Reinit(vars: Seq[IdExpr]) extends Stmt {
     override def b3fy: RawAst.Stmt = new RawAst.Stmt_Reinit(daf(vars map {v => idName(v.name)}))
   }
@@ -743,11 +794,21 @@ object B3Nodes {
   /* CustomLiteral  =^=  "|" LiteralIdentifier ":" Type "|"  =>  not what we want; we use nonary functions if we have to. */
   // case class CustomLiteral(name: Identifier, typ: Type) extends Expr
 
-  /** (≃ LocalVar) Scala representation of a B3 RawAst IdExpr-Expr node. 
+  /** 
+   * (≃ LocalVar) Scala representation of a B3 RawAst IdExpr-Expr node. 
+   * Can also be used as placeholder for an undefined LocalVarDecl for basic variables.
+   * Use methods P, F, or Q to create the LocalVarDecl in form of a PParameter, FParameter, or (Quantifier) Binding, respectively.
+   * 
    * @param typ is only there for internal type tracking and is not used by B3
   */
   case class IdExpr(name: Identifier, typ: Type, isOld: Boolean = false) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_IdExpr(daf(name), isOld)
+    /** returns the corresponding PParameter */
+    def P(mode: RawAst.ParameterMode = IN) = PParameter(name, typ, mode)
+    /** returns the corresponding FParameter */
+    def F(isInjective: Boolean = false) = FParameter(name, typ, isInjective)
+    /** returns the corresponding (Quantifier) Binding */
+    def Q = Binding(name, typ)
   }
 
   /** Scala representation of a B3 RawAst OpExpr-Expr node. (Replaces BinExp and UnExp; CondExp has its own class)
@@ -786,7 +847,8 @@ object B3Nodes {
    * The function must be defined in the current Program with matching number of args.
    * @param typ is only for internal purposes */
   case class FunctionCallExpr(name: Identifier, args: Seq[Expr], typ: Type) extends Expr {
-    override def b3fy: RawAst.Expr = new RawAst.Expr_FunctionCallExpr(daf(name), daf(args map {_.b3fy}))
+    override def b3fy: RawAst.Expr = new RawAst.Expr_FunctionCallExpr(daf(functionName), daf(args map {_.b3fy}))
+    def functionName: String = funcName(name, args, typ)
   }
 
   /** Scala representation of a B3 RawAst IdExpr-Expr node.
@@ -839,6 +901,8 @@ object B3Nodes {
   /** Scala representation of a B3 RawAst Binding node. ("VarDecl" for bound variables in exist/forall expressions). */
   case class Binding(name: Identifier, typ: Type) extends LocalVarDecl {
     def b3fy: RawAst.Binding = new RawAst.Binding(daf(name), daf(typ.b3fy))
+    def toP(mode: RawAst.ParameterMode = IN): PParameter = PParameter(name, typ, mode) 
+    def toF(isInjective: Boolean = false): FParameter = FParameter(name, typ, isInjective) 
   }
 
   /** (= Trigger) Scala representation of a B3 RawAst Pattern node. (equivalent to a sil.Trigger; for pattern-matching in forall/exists). 
@@ -871,6 +935,7 @@ object B3Nodes {
 
 /** For development purposes */
 object B3Development {
+  val infos = mutable.Set.empty[(String, String)]
   val todos = mutable.Set.empty[(String, String)]
   val laters = mutable.Set.empty[(String, String)]
   val advanced = mutable.Set.empty[(String, String)]
@@ -878,6 +943,11 @@ object B3Development {
     todos.clear()
     laters.clear()
     advanced.clear()
+  }
+  def info(info1: String = "", info2: String = ""): Unit = {
+    if (info1 != "") {
+      infos.add((info1, info2))
+    }
   }
   def addTODO(info1: String = "", info2: String = ""): Unit = {
     if (info1 != "") {
@@ -894,34 +964,43 @@ object B3Development {
       advanced.add((info1, info2))
     }
   }
-  def printTODO(): Unit = {
-    val grouped = todos.groupMap(_._1)(_._2)
-    println("vvv TODO INFO vvv")
+  def printInfo(): Unit = {
+    val grouped = infos.groupMap(_._1)(_._2)
+    println("=== OTHER INFOS ===")
     grouped.foreach { case (main, detailSet) =>
       println(s"=> $main:\n  ${detailSet.mkString(", ")}")
     }
-    println("^^^ TODO INFO ^^^")
+    println("=================")
+  }
+  def printTODO(): Unit = {
+    val grouped = todos.groupMap(_._1)(_._2)
+    println("=== TODO INFO ===")
+    grouped.foreach { case (main, detailSet) =>
+      println(s"=> $main:\n  ${detailSet.mkString(", ")}")
+    }
+    println("=================")
   }
   def printLATER(): Unit = {
     val grouped = laters.groupMap(_._1)(_._2)
-    println("vvv LATER INFO vvv")
+    println("=== LATER INFO ===")
     grouped.foreach { case (main, detailSet) =>
       println(s"=> $main:\n  ${detailSet.mkString(", ")}")
     }
-    println("^^^ LATER INFO ^^^")
+    println("=================")
   }
   def printADVANCED(): Unit = {
     val grouped = advanced.groupMap(_._1)(_._2)
-    println("vvv ADVANCED INFO vvv")
+    println("=== ADVANCED INFO ===")
     grouped.foreach { case (main, detailSet) =>
       println(s"=> $main:\n  ${detailSet.mkString(", ")}")
     }
-    println("^^^ ADVANCED INFO ^^^")
+    println("=================")
   }
   def printALL(): Unit = {
     printTODO()
     printLATER()
     printADVANCED()
+    printInfo()
   }
 }
 
@@ -1012,6 +1091,22 @@ object B3Implicits {
 
 
 object B3Naming {
+  // Currently, only ONE Program is allowed to be translated, since there is no reset yet.
+  import viper.carbon.b3.B3Development._
+  import viper.carbon.b3.DafnyHelper._
+  import viper.carbon.b3.B3Nodes._
+
+  // --- Namespace ---
+  /**
+   * A namespace to make it easier to avoid duplicated Identities.
+   *
+   * @param name The name of the namespace; only used for debugging purposes.
+   * @param id The ID of this namespace; used to identify the namespace.
+   */
+  case class Namespace(name: String, id: Int)
+  
+  
+  // --- Identifier ---
   /**
    * An identifier of a Boogie program.  Creators of identifiers must make sure that
    * names from the same category are unique in any given program (otherwise, the two
@@ -1059,13 +1154,113 @@ object B3Naming {
     }
   }
 
-  /**
-   * A namespace to make it easier to avoid duplicated Identities.
-   *
-   * @param name The name of the namespace; only used for debugging purposes.
-   * @param id The ID of this namespace; used to identify the namespace.
+
+  // --- Function names ---
+  // Function names can only be created after registering the function, which happens when its Function(-Decl)
+  // is created. Therefore, any operation that needs the name from a function call expression must ensure that 
+  // the corresponding function has already been declared. For parametric functions this means the parametric 
+  // version!
+
+  /** 
+   * Stores all in/output combos of functions that were used somewhere and have not yet been declared.
+   * These all need to be declared! Don't add any already declared function here (see declaredFuncs).
+   * A combo for some functionName is of the form: Seq(inTyp1Name,...,inTypNName, outTypName) 
    */
-  case class Namespace(name: String, id: Int)
+  private val usedButUndeclaredFuncs = collection.mutable.MultiDict.empty[String, Seq[String]]
+  /** Collection of all functions that have been declared. */
+  private val declaredFuncs = collection.mutable.Set[(String, Seq[String])]()
+
+  /** 
+   * Maps Identifiers to an Int sequence. Each value x in the sequence says: "the x'th parameter's type should be used 
+   * for naming" (the output type counts as the "last parameter", so if there are n parameters, then value n means the 
+   * output type should be used for naming (since we start at index 0).
+   */
+  private val paramFuctionMap = collection.mutable.HashMap[Identifier, Seq[Int]]()
+
+  /** 
+   * Returns the correct name to use for the given Identifier, parameterTypeNames and outputTypeName. 
+   * For non-parametric functions, this corresponds to the name defined by the Identifier.
+   */
+  def funcName(name: Identifier, parameterTypeNames: Seq[String], outputTypeName: String): String = {
+    paramFuctionMap.get(name) match {
+      case Some(paramFuctionHandler) => 
+        info("FunctionName: ", "("+name.name+", "+(parameterTypeNames ++ Seq(outputTypeName))+", "+paramFuctionHandler+")")
+        name+"%F"+paramFuctionHandler.collect(parameterTypeNames ++ Seq(outputTypeName)).mkString("%%")
+      case None => name
+    } 
+  }
+  /** 
+   * Returns the correct name to use for the given Identifier, args, and output Type. 
+   * For non-parametric functions, this corresponds to the name defined by the Identifier.
+   */
+  def funcName(name: Identifier, args: Seq[Expr], typ: Type): String = {
+    val argTypeNames = args map {getTypeOfExpr(_).b3fy}
+    val outputTypeName = typ.b3fy
+    funcName(name, argTypeNames, outputTypeName)
+  }
+  /** 
+   * Returns the correct name to use for the given FunctionCallExpr. 
+   * For non-parametric functions, this corresponds to the name defined by the Identifier.
+   */
+  def funcName(fc: FunctionCallExpr): String = {
+    funcName(fc.name, fc.args, fc.typ)
+  }
+  /** 
+   * Returns the correct name to use for the given Function. 
+   * For non-parametric functions, this corresponds to the name defined by the Identifier.
+   * Do not call this on parametric Function's
+   */
+  def funcName(f: Function): String = {FParameter
+    val argTypeNames = f.args map {_.typ.b3fy}
+    val outputTypeName = f.typ.b3fy
+    funcName(f.name, argTypeNames, outputTypeName)
+  }
+
+  /** 
+   * (This function is automatically called when creating a new Function instance, no need to call it anywhere else.) 
+   * 
+   * Registers the given Function. This creates an entry in paramFuctionMap for this function (or rather, its Identifier). 
+   * The entry corresponds to the sequence of indexes of all parameters(*) whose type contains any free type vars.
+   * (If there are no free type vars we can later use the normal name, otherwise we will have to modify it.)
+   * If the function is already registered (this happens e.g. when parametric functions are replaced by their concrete 
+   * versions), then 'registerFunction' does nothing.
+   * 
+   * (*) the function output is treated as if it was the last function parameter
+   */
+  def registerFunction(func: Function): Unit = {
+    val inAndOutTypsWithIndexes = ((func.args map (_.typ)) ++ Seq(func.typ)).zipWithIndex
+    val freeTypVarIndexes = inAndOutTypsWithIndexes.collect({
+      case (arg, idx) if !arg.freeTypeVars.isEmpty => idx
+    })
+    if (!freeTypVarIndexes.isEmpty) {
+      paramFuctionMap.getOrElseUpdate(func.name, freeTypVarIndexes)
+    }
+  }
+
+
+  // Expression types
+  /** returns the type of the expression (as Type) */
+  def getTypeOfExpr(exp: Expr): Type = {
+    exp match {
+      case BoolLit(_) => Bool
+      case IntLit(_) => Int
+      case IdExpr(_, typ, _) => typ
+      case OpExpr(binop, _) =>
+        binop match {
+          case LtCmp|LeCmp|EqCmp|NeCmp => Bool
+          case And|Equiv|Implies|Or => Bool
+          case Div => Real
+          case IntDiv => Int
+          case Add|Sub|Mul|Mod => Int //B3 LATER (real): could also be Real, I think?
+        }
+      case CondExp(cond, thn, els) => getTypeOfExpr(thn)
+      case FunctionCallExpr(_, _, typ) => typ
+      case LabeledExpr(_, expr) => getTypeOfExpr(expr)
+      case Forall(_, _, _, _, _) => Bool
+      case Exists(_, _, _, _) => Bool
+      case Pattern(_) => sys.error("Patterns don't have a type that you want to know.")
+    }
+  } 
 }
 
 object ErrorMemberMapping {

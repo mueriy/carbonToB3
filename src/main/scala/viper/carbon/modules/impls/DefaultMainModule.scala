@@ -12,6 +12,7 @@ import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Implicits._
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Naming._
+import viper.carbon.b3.B3Development._
 import viper.carbon.b3.ErrorMemberMapping
 
 import java.text.SimpleDateFormat
@@ -38,6 +39,8 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   import funcPredModule._
   import domainModule._
   import expModule._
+
+  import stateModule._
 
   def name = "Main module"
 
@@ -111,7 +114,9 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         val members = // (domains flatMap translateDomainDecl) ++ //B3 TODO
 /* B3 TODO2
           translatedFields ++
+*/
           (functions flatMap (f => translateFunction(f, nameMaps.get(f.name)))) ++
+/* B3 TODO2
           (predicates flatMap (p => translatePredicate(p, nameMaps.get(p.name)))) ++
 */
           (methods flatMap (m => translateMethodDecl(m, nameMaps.get(m.name)))) //++
@@ -120,24 +125,53 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
 */
 
         // get the preambles (only at the end, even if we add it at the beginning)
-        val preambles = verifier.allModules flatMap {
+        val preambles: Seq[Decl] = verifier.allModules flatMap {
           m =>
             //"Preamble of ${m.name}."
-            if (m.preamble.size > 0) Seq(m.preamble)
+            if (m.preamble.size > 0) m.preamble
             else Nil
         }
         
-        // B3: Removed header information for debugging, because we cannot add that to a B3-AST
-        
-        // B3 TODO: add preamble-stuff to the values below.
+        // B3: Removed the header information for debugging, because we cannot add that to a B3-AST
+
+        val declCollection = members ++ preambles
+
         // We need to split the "Decl"s into their own groups, because there is no overarching Decl type in the B3 AST 
         val b3signatureTypes: Seq[String] = Seq() // Not sure what this is. Is a new, unexplained feature.
-        val b3domains: Seq[Domain] = members collect {case m: Domain => m} 
-        val b3types: Seq[TypeDecl] = members collect {case m: TypeDecl => m} 
-        val b3taggers: Seq[Tagger] = members collect {case m: Tagger => m} 
-        val b3functions: Seq[Function] = members collect {case m: Function => m} 
-        val b3axioms: Seq[Axiom] = members collect {case m: Axiom => m} 
-        val b3procedures: Seq[Procedure] = members collect {case m: Procedure => m} 
+        val b3domains: Seq[Domain] = declCollection collect {case m: Domain => m} 
+        var b3types: Seq[TypeDecl] = declCollection collect {case m: TypeDecl => m} 
+        val b3taggers: Seq[Tagger] = declCollection collect {case m: Tagger => m} 
+        var b3functions: Seq[Function] = declCollection collect {case m: Function => m} 
+        val b3axioms: Seq[Axiom] = declCollection collect {case m: Axiom => m} 
+        val b3procedures: Seq[Procedure] = declCollection collect {case m: Procedure => m} 
+        
+        if (!(declCollection collect {case m: Seq[Any] => m}).isEmpty) {
+          sys.error("bad declCollection is the bug")
+        }
+
+
+        // ADDING SOME DECLs MANUALLY DURING DEVELOPMENT
+        if (!b3types.contains(TypeDecl(NamedType("HeapType")))) {
+          b3types = b3types ++ TypeDecl(NamedType("HeapType"))
+        }
+        if (!b3types.contains(TypeDecl(NamedType("MaskType")))) {
+          b3types = b3types ++ TypeDecl(NamedType("MaskType"))
+        }
+        if (!b3types.contains(TypeDecl(NamedType("FrameType")))) {
+          b3types = b3types ++ TypeDecl(NamedType("FrameType"))
+        }
+        val stateFunc = Function(stateModule.staticGoodState.asInstanceOf[FunctionCallExpr].name, stateModule.staticStateContributions(), Bool)
+        if (!b3functions.contains(stateFunc)) {
+          b3functions = b3functions ++ stateFunc
+        }
+        val AssumeFunctionsAbove = Function(funcPredModule.TODO_REMOVE_assumeFunctionsAboveName, Seq(), Int)
+        if (!b3functions.contains(AssumeFunctionsAbove)) {
+          b3functions = b3functions ++ AssumeFunctionsAbove
+        }
+        val emptyFrame = Function(funcPredModule.TODO_REMOVE_emptyFrameName, Seq(), NamedType("FrameType"))
+        if (!b3functions.contains(emptyFrame)) {
+          b3functions = b3functions ++ emptyFrame
+        }
         Program(b3signatureTypes, b3domains, b3types, b3taggers, b3functions, b3axioms, b3procedures)
     }
 
@@ -163,8 +197,10 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
 
         // Translate individual parts for the procedure body
         // "Initializing the state"
-        val init = TODO_Stmt("translateMethodDecl", "init")//stateModule.initBoogieState ++ assumeAllFunctionDefinitions ++
-          // (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(true)) ++ stmtModule.initStmt(method.bodyOrAssumeFalse)
+        val init = stateModule.initBoogieState ++ assumeAllFunctionDefinitions 
+/* B3 TODO2 (perm): ++
+          (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(true)) ++ stmtModule.initStmt(method.bodyOrAssumeFalse)
+*/
         //"Initializing the old state"
         val initOld = TODO_Stmt("translateMethodDecl", "initOld")//stateModule.initOldState
         //"Assumptions about method arguments"

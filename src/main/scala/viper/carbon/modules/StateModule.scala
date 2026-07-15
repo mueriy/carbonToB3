@@ -8,7 +8,7 @@ package viper.carbon.modules
 
 import components.{CarbonStateComponent, ComponentRegistry}
 import viper.silver.components.StatefulComponent
-import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Stmt, LocalVarDecl}
+import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Stmt, Binding, FParameter}
 
 /**
  * A module for dealing with the state of a program during execution.  Allows other modules
@@ -18,7 +18,6 @@ import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Stmt, LocalVarDecl}
  */
 trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] with StatefulComponent {
 
-/*
   /**
    * Returns an assumption that the current state is 'good', or well-formed.
    */
@@ -57,9 +56,9 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
 
   /**
    * The name and type of the static contribution of the state components registered with this module to the state. The returned value should remain the
-   * same even if the state is changed.
+   * same even if the state is changed. (For Functions; For Axiom use 'output map {_.toQ}')
    */
-  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true): Seq[LocalVarDecl]
+  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true): Seq[FParameter]
 
   /**
    * The current values for all registered components' state contributions.  The number of elements
@@ -74,7 +73,6 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   }
 
   def stateContributionValues(snap : StateSnapshot): Seq[Expr]
-*/
 
   type StateSnapshot// used to abstractly capture the Boogie variables, old expressions etc. used to represent a current state in the translation
 
@@ -100,13 +98,13 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
     */
   def freshTempStateKeepCurrent(name: String) : StateSnapshot
 
-/*
   /**
     * Returns the statement that initializes the input state to the current state. This method has no side-effects on
     * the current state.
     */
   def initToCurrentStmt(snapshot: StateSnapshot) : Stmt
 
+/*
   /**
    * Create a state without any information and return a snapshot of the created state.
    * if init is true then the Stmt returned will contain the initialization according to the state
@@ -129,12 +127,10 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   def oldState: StateSnapshot
 
 
-/*
   /**
     * Get a pure state without a heap.
     */
   def pureState: StateSnapshot
-*/
 
   /**
    * Replace the old state with a given snapshot.
@@ -156,6 +152,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
     * We could try refactoring this to just be one method (I'm not sure whether the explicit copy is necessary or not).
     */
   def getCopyState:StateSnapshot
+*/
 
   /**
    * Are we currently using an 'old' state? Implies that we should wrap relevant state components in "Old"
@@ -179,6 +176,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    */
   def stateRepositoryGet(name:String) : Option[StateSnapshot]
 
+/*
   /*
    * is used to store relevant blocks needed to use a newly created state in executing package statement
    */
