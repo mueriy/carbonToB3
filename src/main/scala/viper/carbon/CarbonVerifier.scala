@@ -188,6 +188,7 @@ case class CarbonVerifier(override val reporter: Reporter,
       case Some(v) => sys.error("Invalid option: " + v)
     }
 
+    val t = System.currentTimeMillis()
     val (tProg, translatedNames) = mainModule.translate(program, reporter)
     _translated = tProg.b3fy
 
@@ -205,6 +206,9 @@ case class CarbonVerifier(override val reporter: Reporter,
 
 
     val invokeResult = invokeB3(_translated, options, timeout)
+
+    val t2 = System.currentTimeMillis()
+    println(t2-t)
 
     invokeResult match {
       case (version,result) =>

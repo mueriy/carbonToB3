@@ -435,9 +435,9 @@ object B3Nodes {
   /** Scala representation of a B3 RawAst Procedure node */
   case class Procedure(name: Identifier,
                       parameters: Seq[PParameter],
-                      pre: Seq[AExpr],
-                      post: Seq[AExpr],
-                      body: Option[Stmt]) extends Decl {
+                      body: Option[Stmt],
+                      pre: Seq[AExpr] = Seq(),
+                      post: Seq[AExpr] = Seq()) extends Decl {
     def b3fy: RawAst.Procedure = {
       new RawAst.Procedure(daf(name),
                           daf(parameters map {_.b3fy}),
@@ -457,7 +457,7 @@ object B3Nodes {
    * @param isMutable 'var' (true) vs 'val' (false)
    */
   case class Variable(name: Identifier, typ: Type, isMutable: Boolean = true) extends Node {
-    val varId: IdExpr = IdExpr(name, typ)
+    def l: IdExpr = IdExpr(name, typ)
     def b3fy: RawAst.Variable = {
       new RawAst.Variable(daf(name),                  // var name
                           isMutable,                  // "isMutable" => var vs val
@@ -503,23 +503,23 @@ object B3Nodes {
   import viper.silver.ast.{Assert=>SilAssert, TrueLit=>SilTrueLit}
   def fakeError(msg: String) = AssertFailed(SilAssert(SilTrueLit()())(), FeatureUnsupported(SilAssert(SilTrueLit()())(), msg)) 
   // STATEMENT NODES
-  /** Corresponds to the Stmt: "'TODO_Stmt_info1': {check true}". Use this if a Stmt is required, but you dont want to implement it yet. */
+  /** Corresponds to the Stmt: "'TODO_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but you dont want to implement it yet. */
   def TODO_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addTODO(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""}
-    LabeledStmt(s"TODO_Stmt_$info1"+info2inlc, Block(Seq(Check(TrueLit(), fakeError("TODO")))))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
+    LabeledStmt(s"TODO_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
   }
-  /** Corresponds to the Stmt: "'LATER_Stmt_info1': {check true}". Use this if a Stmt is required, but it is actually an advanced feature. */
+  /** Corresponds to the Stmt: "'LATER_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but it is actually an advanced feature. */
   def LATER_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addLATER(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""}
-    LabeledStmt(s"LATER_Stmt_$info1"+info2inlc, Block(Seq(Check(TrueLit(), fakeError("LATER")))))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
+    LabeledStmt(s"LATER_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
   }
-  /** Corresponds to "'ADVANCED_Stmt_info1': {check true}". Use this if a Stmt is required, but it is actually an advanced feature. */
+  /** Corresponds to the Stmt: "'ADVANCED_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but it is actually an advanced feature. */
   def ADVANCED_Stmt(info1: String = "", info2: String = ""): Stmt = {
     B3Development.addADVANCED(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""}
-    LabeledStmt(s"ADVANCED_Stmt_$info1"+info2inlc, Block(Seq(Check(TrueLit(), fakeError("ADVANCED")))))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
+    LabeledStmt(s"ADVANCED_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
   }
 
   /** An empty statement. */
@@ -614,9 +614,12 @@ object B3Nodes {
 
   //Control flow
   /** 
-   * Scala representation of a B3 RawAst Choose-Stmt node. (This is basically an "If(*) {} else if (*) {} ... "/NondetIf - Stmt)
+   * Scala representation of a B3 RawAst Choose-Stmt node. (This is basically an "If(\*) {} else if (\*) {} ... "/NondetIf - Stmt).
+   * 
+   * Careful! Implicit liftSeq (Seq -> Block) does NOT work here (since we expect Seq, not Block!)
+   * 
    * @param branches If only a single Stmt is given, an empty branch is automatically added as alternative branch-option. 
-   *  (If you want to only use one option, dont use Choose!) 
+   *  (If you want to only use one option, then you have no need for Choose!) 
    */
   case class Choose(branches: Seq[Stmt]) extends Stmt {
     private def addElse = if (branches.length == 1) {Seq(EmptyStmt.b3fy)} else {Seq()} //If only 1 stmt is given then the idea is ALWAYS
@@ -685,43 +688,43 @@ object B3Nodes {
    * Use these if a bool expr is required, but you dont want to implement it yet. */
   def TODO_Expr_bool(info1: String = "", info2: String = ""): Expr = {
     B3Development.addTODO(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
-    LabeledExpr(s"TODO_Expr_bool_$info1"+info2inlc, TrueLit())
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+    LabeledExpr(s"TODO_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
   }
   /** Corresponds to the "'TODO_Expr_int_info1': 666" (labeled) int-Expr. 
    * Use these if a int expr is required, but you dont want to implement it yet. */
   def TODO_Expr_int(info1: String = "", info2: String = ""): Expr = {
     B3Development.addTODO(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
-    LabeledExpr(s"TODO_Expr_bool_$info1"+info2inlc, IntLit(666))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+    LabeledExpr(s"TODO_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
   }
   /** Corresponds to the "'LATER_Expr_bool_info1': true" (labeled) bool-Expr. 
    * Use these if a bool expr is required, but you dont want to implement it yet. */
   def LATER_Expr_bool(info1: String = "", info2: String = ""): Expr = {
     B3Development.addLATER(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
-    LabeledExpr(s"LATER_Expr_bool_$info1"+info2inlc, TrueLit())
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+    LabeledExpr(s"LATER_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
   }
   /** Corresponds to the "'LATER_Expr_int_info1': 666" (labeled) int-Expr. 
    * Use these if a int expr is required, but you dont want to implement it yet. */
   def LATER_Expr_int(info1: String = "", info2: String = ""): Expr = {
     B3Development.addLATER(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
-    LabeledExpr(s"LATER_Expr_bool_$info1"+info2inlc, IntLit(666))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+    LabeledExpr(s"LATER_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
   }
   /** Corresponds to the "'ADVANCED_Expr_bool_info1': true" (labeled) bool-Expr. 
    * Use these if a bool expr is required, but you dont want to implement it yet. */
   def ADVANCED_Expr_bool(info1: String = "", info2: String = ""): Expr = {
     B3Development.addADVANCED(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
-    LabeledExpr(s"ADVANCED_Expr_bool_$info1"+info2inlc, TrueLit())
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+    LabeledExpr(s"ADVANCED_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
   }
   /** Corresponds to the "'ADVANCED_Expr_int_info1': 666" (labeled) int-Expr. 
    * Use these if a int expr is required, but you dont want to implement it yet. */
   def ADVANCED_Expr_int(info1: String = "", info2: String = ""): Expr = {
     B3Development.addADVANCED(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s" $info2"} else {""} 
-    LabeledExpr(s"ADVANCED_Expr_bool_$info1"+info2inlc, IntLit(666))
+    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+    LabeledExpr(s"ADVANCED_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
   }
 
 
@@ -968,7 +971,7 @@ object B3Development {
     val grouped = infos.groupMap(_._1)(_._2)
     println("=== OTHER INFOS ===")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n  ${detailSet.mkString(", ")}")
+      println(s"=> $main:\n ${detailSet.mkString(", ")}")
     }
     println("=================")
   }
@@ -976,7 +979,7 @@ object B3Development {
     val grouped = todos.groupMap(_._1)(_._2)
     println("=== TODO INFO ===")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n  ${detailSet.mkString(", ")}")
+      println(s"=> $main:\n ${detailSet.mkString(", ")}")
     }
     println("=================")
   }
@@ -984,7 +987,7 @@ object B3Development {
     val grouped = laters.groupMap(_._1)(_._2)
     println("=== LATER INFO ===")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n  ${detailSet.mkString(", ")}")
+      println(s"=> $main:\n ${detailSet.mkString(", ")}")
     }
     println("=================")
   }
@@ -992,7 +995,7 @@ object B3Development {
     val grouped = advanced.groupMap(_._1)(_._2)
     println("=== ADVANCED INFO ===")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n  ${detailSet.mkString(", ")}")
+      println(s"=> $main:\n ${detailSet.mkString(", ")}")
     }
     println("=================")
   }
@@ -1184,7 +1187,7 @@ object B3Naming {
   def funcName(name: Identifier, parameterTypeNames: Seq[String], outputTypeName: String): String = {
     paramFuctionMap.get(name) match {
       case Some(paramFuctionHandler) => 
-        info("FunctionName: ", "("+name.name+", "+(parameterTypeNames ++ Seq(outputTypeName))+", "+paramFuctionHandler+")")
+        info("funcName of", "(funcName="+name.name+", argTypeNames="+(parameterTypeNames ++ Seq(outputTypeName))+", paramArgIdxs="+paramFuctionHandler+")")
         name+"%F"+paramFuctionHandler.collect(parameterTypeNames ++ Seq(outputTypeName)).mkString("%%")
       case None => name
     } 

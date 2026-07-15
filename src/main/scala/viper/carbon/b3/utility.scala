@@ -110,7 +110,7 @@ object Nodes {
           case Tagger(_, _) => Nil
           case Function(_, args, _, _) => args
           case Axiom(exp, _) => exp
-          case Procedure(_, args, pre, post, optBody) => args ++ pre ++ post ++ (optBody map {_.toSeq})
+          case Procedure(_, args, optBody, pre, post) => args ++ pre ++ post ++ (optBody map {_.toSeq})
         }
       case ss: Stmt =>
         ss match {

@@ -51,7 +51,7 @@ object Transformer {
             case Function(name, args, typ, tag) => Function(name, args map go, typ, tag)
             case Axiom(exp, explains) => Axiom(go(exp), explains)
             // case GlobalVarDecl(name, typ) => GlobalVarDecl(name, go(typ))
-            case Procedure(name, args, pre, post, optBody) => Procedure(name, args map go, pre map go, post map go, optBody map go)
+            case Procedure(name, args, optBody, pre, post) => Procedure(name, args map go, optBody map go, pre map go, post map go)
             // case CommentedDecl(s, ds, a, b) => CommentedDecl(s, ds map go, a, b)
             // case DeclComment(_) => parent
             // case LiteralDecl(_) => parent
@@ -165,12 +165,12 @@ object DuplicatingTransformer {
             case Function(name, args, typ, tag) => for {argsResult <- goSeq(args); typResult <- go(typ)} yield Function(name, argsResult, typResult, tag)
             case Axiom(exp, explains) => go(exp) map (Axiom(_, explains))
             // case GlobalVarDecl(name, typ) => go(typ) map (GlobalVarDecl(name, _))
-            case Procedure(name, args, pre, post, optBody) =>
+            case Procedure(name, args, optBody, pre, post) =>
               for {argsResult <- goSeq(args); preResult <- goSeq(pre); postResult <- goSeq(post); 
               bodyResult <- {optBody match {
                 case None => Seq(None)
                 case Some(stmt) => go(stmt).map({x => Some(x)})}
-              }} yield Procedure(name, argsResult, preResult, postResult, bodyResult)
+              }} yield Procedure(name, argsResult, bodyResult, preResult, postResult)
           }
         case ss: Stmt =>
           ss match {

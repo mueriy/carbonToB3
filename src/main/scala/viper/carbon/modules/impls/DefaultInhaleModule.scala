@@ -10,9 +10,11 @@ import viper.carbon.modules._
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 import viper.carbon.b3.Statements
 import viper.carbon.verifier.Verifier
 import viper.silver.verifier.PartialVerificationError
+import org.scalactic.PrettyMethods
 
 /**
  * The default implementation of a [[viper.carbon.modules.InhaleModule]].
@@ -126,7 +128,9 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
           def transformStmtInsidePackage(s: Stmt): Stmt = {
             if(insidePackageStmt && addDefinednessChecks) {
               ADVANCED_Stmt("inhaleConnective", "only necessairy for wands (1)")
-              // wandModule.exchangeAssumesWithBoolean(s, statesStackForPackageStmt.head.asInstanceOf[StateRep].boolVar)
+/*
+              wandModule.exchangeAssumesWithBoolean(s, statesStackForPackageStmt.head.asInstanceOf[StateRep].boolVar)
+*/
             } else {
               s
             }
@@ -139,22 +143,20 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
 
           //do not transform definednessChecks inside package (backwards compatible with older version)
           val retStmt =
-/*B3 TODO2
             transformStmtInsidePackage(if (containsFunc(e)) Seq(assumeGoodState) else Seq()) ++
-*/
             definednessChecks ++
-/*B3 TODO2
             transformStmtInsidePackage(stmt ++ (if (e.isPure) Seq() else Seq(assumeGoodState))) ++
-*/
             freeAssms
           //(if (containsFunc(e)) assumeGoodState else Seq[Stmt]()) ++ stmt ++ (if (e.isPure) Seq[Stmt]() else assumeGoodState)
 
           // if we are inside package statement, then all assumptions should be replaced with conjinctions with ops.boolVar
-            retStmt
+          retStmt
       }
     if(insidePackageStmt && addDefinednessChecks) {
       ADVANCED_Stmt("inhaleConnective", "only necessairy for wands (2)")
-      // If(wandModule.getCurOpsBoolvar(), res, Statements.EmptyStmt)
+/*
+      If(wandModule.getCurOpsBoolvar(), res, Statements.EmptyStmt)
+*/
     } else {
       res
     }

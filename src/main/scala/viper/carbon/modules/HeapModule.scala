@@ -18,12 +18,12 @@ import viper.silver.ast.{LocationAccess, MagicWand}
  */
 trait HeapModule extends Module with CarbonStateComponent {
 
-/*
   /**
     * The type used for heaps
     */
   def heapType: Type
 
+/*
   /**
    * The type used for references.
    */
@@ -154,9 +154,11 @@ trait HeapModule extends Module with CarbonStateComponent {
   def isWandField(f: Expr): Expr
 
   def predicateTrigger(extras: Seq[Expr], pred: sil.PredicateAccess, anyState: Boolean = false): Expr
+*/
 
-  def currentHeap:Seq[Expr]
+  def currentHeap: Seq[Expr]
 
+/*
   /**
     * store {@code newVal} at {@code loc} in the current heap
     */

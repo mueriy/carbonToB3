@@ -1519,8 +1519,10 @@ class QuantifiedPermModule(val verifier: Verifier)
     else
       FuncApp(updateMaskName, Seq(mask, rcv, field, newPerm), maskType)
   }
+*/
 
   override def currentMask = Seq(maskExp)
+/*
   override def staticMask = Seq(LocalVarDecl(maskName, maskType))
   override def staticPermissionPositive(rcv: Exp, loc: Exp) = {
     hasDirectPerm(staticMask(0).l, rcv, loc)
@@ -1606,7 +1608,7 @@ class QuantifiedPermModule(val verifier: Verifier)
 */
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    stmts => TODO_Stmt("QuantifiedPermModule", "handleStmt")+++stmts
+    stmts => TODO_Stmt("QuantifiedPermModule", s"handleStmt: ${s.toString().take(10)}")+++stmts
 /*
     stmts =>
       s match {

@@ -72,11 +72,8 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         TODO_Expr_bool("translateExp(sil.NullLit)", "TODO2")//translateNull
       case l@sil.LocalVar(_, _) =>
         translateLocalVar(l)
-      case r@sil.Result(_) =>
-        TODO_Expr_bool("translateExp", "sil.Result")
-/*
+      case r@sil.Result(typ) =>
         translateResult(r)
-*/
       case f@sil.FieldAccess(_, _) =>
         TODO_Expr_bool("translateExp", "sil.FieldAccess (TODO2)")//translateResourceAccess(f)
       case sil.InhaleExhaleExp(_, _) =>

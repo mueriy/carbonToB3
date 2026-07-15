@@ -313,7 +313,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
         val translatedStmts = (ss map (st => translateStmt(st, statesStack, allStateAssms, duringPackage)))
         val seqOfAllStmts = localVarsAssumptions ++ translatedStmts
         
-        // In B3, VarDecl have a body and the scope of the Var is only in that body => need to nest all vardecls and place 
+        // In B3, VarDecl have a body and the scope of the Var is only in that body => we need to nest all vardecls and place 
         //  the actual statement in the innermost place (body).
         val translatedStmt = seqOfAllStmts match {
           case Seq(oneStmt) => oneStmt

@@ -80,4 +80,10 @@ trait MainModule extends Module {
     allAssumptionsAboutValue(arg.typ,translateLocalVarDeclToFParameter(arg, isInjective),isParameter)
   }
 
+  /** 
+   * Adds all missing variable declarations for the given body. 
+   * Requires the PParameters ('inOuts') to know that these local vars are already declared. 
+   */
+  def addLocalVarDeclarations(body: Stmt, inOuts: Seq[PParameter]): Stmt
+
 }

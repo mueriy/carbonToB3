@@ -55,12 +55,14 @@ trait PermModule extends Module with CarbonStateComponent {
     * @return the expression representing the fact that the permission is positive
     */
   def isStrictlyPositivePerm(e: sil.Exp): Expr
+*/
 
   /**
    * The current mask.
    */
   def currentMask: Seq[Expr]
 
+/*
   /**
    * A static reference to the mask.
    */

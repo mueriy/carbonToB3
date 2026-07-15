@@ -40,9 +40,9 @@ trait FuncPredModule extends Module {
 
   def assumeAllFunctionDefinitions: Stmt
 
-/*
   def translateResult(r: sil.Result): Expr
 
+/*
   // code to go first, and code to go last (other modules may contribute in between)
   /**
     * statesStackForPackageStmt: stack of states used in translating statements during packaging a wand (carries currentState and LHS of wands)

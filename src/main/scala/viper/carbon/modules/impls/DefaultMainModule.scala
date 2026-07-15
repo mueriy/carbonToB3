@@ -107,6 +107,8 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
 
         // important to convert Seq to List to force the methods to be translated, otherwise it's possible that
         // evaluation happens lazily, which can lead to incorrect behaviour (evaluation order is important here)
+        // B3 INFO: interestingly, the order even seems to be correct to support un-parametrization of type 
+        // and splitting the heap and adding it as procedure inout parameters 
 /* B3 TODO2
         val translatedFields = (fields flatMap translateField).toList
 */
@@ -235,16 +237,13 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         /* B3 INFO: (ADVANCED) In PrettyPrinter we also see handling of LocalVarWhereDecl's. B3 doesn't have "where", 
         so if we need tha twe would likely have to handle that somewhere else. But this is why it is missing here. */
 
-        // collect all variables that are not declared in the body or by a parameter
-        val undecl = body.undeclLocalVars filter (v1 => (ins ++ outs ++ inouts).forall(v2 => v2.name != v1.name))
-        // pack procedure body in layers of VarDecls (one layer per undeclared variable)
-        val bodyWithDecls = undecl.foldRight(body.asInstanceOf[Stmt])((l, r) => VarDecl(l.name, r, l.typ)) 
+        val bodyWithDecls = addLocalVarDeclarations(body, ins ++ outs ++ inouts)
       
         //s"Translation of method $name"
         Procedure(name = Identifier(name), 
                   parameters = ins ++ outs ++ inouts,
-                  pre = Seq(), post = Seq(),
-                  body = Some(bodyWithDecls))
+                  body = Some(bodyWithDecls),
+                  pre = Seq(), post = Seq())
     }
 
     if (names.isDefined){
@@ -256,6 +255,13 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
     env = null
     ErrorMemberMapping.currentMember = null
     res
+  }
+
+  override def addLocalVarDeclarations(body: Stmt, inOuts: Seq[PParameter]): Stmt = {
+    // collect all variables that are not declared in the body or by a parameter
+    val undecl = body.undeclLocalVars filter (v1 => inOuts.forall(v2 => v2.name != v1.name))
+    // pack procedure body in layers of VarDecls (one layer per undeclared variable)
+    undecl.foldRight(body.asInstanceOf[Stmt])((l, r) => VarDecl(l.name, r, l.typ)) 
   }
 
 /*

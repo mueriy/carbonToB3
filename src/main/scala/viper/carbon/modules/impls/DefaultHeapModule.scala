@@ -414,9 +414,11 @@ class DefaultHeapModule(val verifier: Verifier)
   override def sumHeap(resultHeap: Exp, heap1: Exp, mask1: Exp, heap2: Exp, mask2: Exp): Exp = {
     FuncApp(sumHeapName, Seq(resultHeap, heap1, mask1, heap2, mask2), Bool)
   }
+*/
 
   override def heapType: Type = heapTyp
 
+/*
   override def successorHeapState(first: Seq[LocalVarDecl], second: Seq[LocalVarDecl]): Exp = {
     FuncApp(succHeapTransName, (first ++ second) map (_.l), Bool)
   }
@@ -641,7 +643,7 @@ class DefaultHeapModule(val verifier: Verifier)
 */
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    stmts => TODO_Stmt("DefaultHeapModule", "handleStmt")+++stmts
+    stmts => TODO_Stmt("DefaultHeapModule", s"handleStmt: ${s.toString().take(10)}")+++stmts
 
 /*
       stmt => (
@@ -857,9 +859,9 @@ class DefaultHeapModule(val verifier: Verifier)
 */
   }
 
-/*
   override def currentHeap = Seq(heap)
 
+/*
   override def identicalOnKnownLocations(otherHeap:Seq[Exp],otherMask:Seq[Exp]):Exp =
     FuncApp(identicalOnKnownLocsName,otherHeap ++ heap ++ otherMask, Bool)
 */

@@ -222,10 +222,10 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       functionDefinitions(f) ++ //"Uninterpreted function definitions"
         (if (f.isAbstract) Nil else definitionalAxiom(f)) ++ //"Definitional axiom"
         framingAxiom(f) ++ //"Framing axioms"
-//B3 TODO:        postconditionAxiom(f) //++ //"Postcondition axioms"
+        postconditionAxiom(f) ++ //"Postcondition axioms"
         triggerFunction(f) ++ //"Trigger function (controlling recursive postconditions)"
-        triggerFunctionStateless(f) //++ //"State-independent trigger function"
-//B3 TODO:        checkFunctionDefinedness(f) //"Check contract well-formedness and postcondition"
+        triggerFunctionStateless(f) ++ //"State-independent trigger function"
+        checkFunctionDefinedness(f) //"Check contract well-formedness and postcondition"
 
     if (names.isDefined){
       val usedNames = env.currentNameMapping
@@ -389,49 +389,45 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     res
   }
 
-/*
   private def postconditionAxiom(f: sil.Function): Seq[Decl] = {
     val height = heights(f.name)
     val heap = heapModule.staticStateContributions(true, true)
-    val args = f.formalArgs map translateLocalVarDecl
+    val args = f.formalArgs map {translateLocalVarDeclToFParameter(_)}
     val fapp = translateFuncApp(f.name, (heap ++ args) map (_.l), f.typ, true)
-    val precondition : Exp = f.pres.map(p => translateExp(Expressions.asBooleanExp(p).whenExhaling)) match {
+    val precondition : Expr = f.pres.map(p => translateExp(Expressions.asBooleanExp(p).whenExhaling)) match {
       case Seq() => TrueLit()
       case Seq(p) => p
-      case ps => ps.tail.foldLeft(ps.head)((p,q) => BinExp(p,And,q))
+      case ps => ps.tail.foldLeft(ps.head)((p,q) => (p && q))
     }
     val limitedFapp = transformFuncAppsToLimitedForm(fapp)
     val res = translateResult(sil.Result(f.typ)())
     for (post <- f.posts) yield {
       val translatedPost = translateExp(whenInhaling(post))
-      val resultToPrimedFapp : PartialFunction[Exp,Option[Exp]] = {
-        case e: LocalVar if e == res => Some(limitedFapp)
+      val resultToPrimedFapp : PartialFunction[Expr,Option[Expr]] = {
+        case e: IdExpr if e == res => Some(limitedFapp)
       }
-      def resultToFapp : PartialFunction[Exp,Option[Exp]] = {
-        case e: LocalVar if e == res => Some(fapp)
+      def resultToFapp : PartialFunction[Expr,Option[Expr]] = {
+        case e: IdExpr if e == res => Some(fapp)
         case Forall(vs,ts,e,tvs,w) =>
-          Some(Forall(vs,ts map (_ match {case Trigger(trig) => Trigger(trig map (_ transform resultToPrimedFapp)) } ),
+          Some(Forall(vs,ts map (_ match {case Pattern(trig) => Pattern(trig map (_ transform resultToPrimedFapp)) } ),
             (e transform resultToFapp),tvs,w))
       }
       val bPost = translatedPost transform resultToFapp
       Axiom(Forall(
-        stateModule.staticStateContributions() ++ args,
-        Trigger(Seq(staticGoodState, limitedFapp)),
+        (stateModule.staticStateContributions() ++ args) map {_.toQ},
+        Pattern(Seq(staticGoodState, limitedFapp)),
         (staticGoodState && (assumeFunctionsAbove(height) || triggerFuncApp(f,heapModule.staticStateContributions(true,true) map (_.l), args map (_.l)))) ==> (precondition ==> transformFuncAppsToLimitedForm(bPost, height))))
     }
   }
-*/
 
   /** Declaration of trigger function (controlling recursive postconditions) */
   private def triggerFunction(f: sil.Function): Seq[Decl] = {
     Function(Identifier(f.name + triggerFuncPostfix), FParameter(Identifier("frame"), frameType) ++ (f.formalArgs map {translateLocalVarDeclToFParameter(_)}), Bool)
   }
 
-/*
-  private def triggerFuncApp(func: sil.Function, heapArgs: Seq[Exp], normalArgs:Seq[Exp]): Exp = {
-    FuncApp(Identifier(func.name + triggerFuncPostfix), getFunctionFrame(func, heapArgs ++ normalArgs)._1 ++ normalArgs, Bool) // no need to declare auxiliary definitions; taken care of in framingAxiom below
+  private def triggerFuncApp(func: sil.Function, heapArgs: Seq[Expr], normalArgs:Seq[Expr]): Expr = {
+    FunctionCallExpr(Identifier(func.name + triggerFuncPostfix), getFunctionFrame(func, heapArgs ++ normalArgs)._1 ++ normalArgs, Bool) // no need to declare auxiliary definitions; taken care of in framingAxiom below
   }
-*/
 
   /** Declaration of State-independent trigger function (used as trigger for definitionalAxiom and framingAxiom 
    * in some cases [which?]). Always in context when a fucntion is called (see axiom declared by functionDefinitions) */
@@ -684,28 +680,31 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       }
     }).flatten
   }
+*/
 
   private def checkFunctionDefinedness(f: sil.Function) = {
     checkingDefinednessOfFunction = Some(f.name)
-    val args = f.formalArgs map translateLocalVarDecl
+    val args = f.formalArgs map {translateLocalVarDeclToPParameter(_)}
     val res = sil.Result(f.typ)()
-    val init : Stmt = MaybeCommentBlock("Initializing the state",
-      stateModule.initBoogieState ++ (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(false)) ++
-        (f.formalArgs map (a => allAssumptionsAboutValue(a.typ,mainModule.translateLocalVarDecl(a),true))) ++ assumeFunctionsAt(heights(f.name)))
+    //"Initializing the state"
+    val init : Stmt = stateModule.initBoogieState ++ 
+        // B3 TODO2 (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(false)) ++
+        (f.formalArgs map (a => allAssumptionsAboutValue(a.typ,mainModule.translateLocalVarDeclToPParameter(a),true))) ++ assumeFunctionsAt(heights(f.name))
     val checkPre : Stmt = checkFunctionPreconditionDefinedness(f)
-    val checkExp : Stmt = if (f.isAbstract) MaybeCommentBlock("(no definition for abstract function)",Nil) else
-      MaybeCommentBlock("Check definedness of function body",
-      expModule.checkDefinedness(f.body.get, errors.FunctionNotWellformed(f)))
-    val exp : Stmt = if (f.isAbstract) MaybeCommentBlock("(no definition for abstract function)",Nil) else
-      MaybeCommentBlock("Translate function body",
-      translateResult(res) := translateExp(f.body.get))
+    val checkExp : Stmt = if (f.isAbstract) /*"(no definition for abstract function)"*/ Nil else
+      //"Check definedness of function body"
+      expModule.checkDefinedness(f.body.get, errors.FunctionNotWellformed(f))
+    val exp : Stmt = if (f.isAbstract) /*"(no definition for abstract function)"*/ Nil else
+      //"Translate function body"
+      translateResult(res) := translateExp(f.body.get)
     val checkPost = checkFunctionPostconditionDefinedness(f)
     val body : Stmt = Seq(init, checkPre, checkExp, exp, checkPost)
-    val definednessChecks = Procedure(Identifier(f.name + "#definedness"), args, translateResultDecl(res), body)
+    val definednessChecks = Procedure(Identifier(f.name + "#definedness"), args ++ translateResultDecl(res), Some(/*B3 TODO2: Replace the following with just 'body' after adding the correct INOUT Heap&Mask PParameters*/mainModule.addLocalVarDeclarations(body, args ++ translateResultDecl(res))))
     checkingDefinednessOfFunction = None
     definednessChecks
   }
 
+/*
   /** check that body of predicate is self-framing */
   private def checkPredicateDefinedness(p: sil.Predicate) : Option[Procedure] = {
     if(p.isAbstract) {
@@ -726,6 +725,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
     Some(predicateCheck)
   }
+*/
 
   private def checkFunctionPostconditionDefinedness(f: sil.Function): Stmt with Product with Serializable = {
     if (contains[sil.InhaleExhaleExp](f.posts)) {
@@ -752,20 +752,19 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
             })
           )
       }
-      val inhaleCheck = MaybeCommentBlock(
-        "Do welldefinedness check of the inhale part.",
-        NondetIf(onlyInhalePosts ++ Assume(FalseLit())))
+      //"Do welldefinedness check of the inhale part."
+      val inhaleCheck = Choose(Block(onlyInhalePosts ++ Assume(FalseLit())))
       if (f.isAbstract) {
-        MaybeCommentBlock("Checking definedness of postcondition (no body)",
-          inhaleCheck ++
-          MaybeCommentBlock("Do welldefinedness check of the exhale part.",
-            onlyExhalePosts))
+        //"Checking definedness of postcondition (no body)"
+        inhaleCheck ++
+        //"Do welldefinedness check of the exhale part."
+        onlyExhalePosts
       }
       else {
-        MaybeCommentBlock("Exhaling postcondition (with checking)",
-          inhaleCheck ++
-          MaybeCommentBlock("Normally exhale the exhale part.",
-            onlyExhalePosts))
+        //"Exhaling postcondition (with checking)"
+        inhaleCheck ++
+        //"Normally exhale the exhale part."
+        onlyExhalePosts
       }
     }
     else {
@@ -774,7 +773,8 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         val posts: Seq[Stmt] = f.posts map (e => {
           inhaleWithDefinednessCheck(e, errors.ContractNotWellformed(e)) // inhale since we are not checking, but want short-circuiting
         })
-        MaybeCommentBlock("Checking definedness of postcondition (no body)", posts)
+        //"Checking definedness of postcondition (no body)"
+        posts
       }
       else {
         val posts: Seq[Stmt] =
@@ -787,7 +787,8 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
                 )
               })
             )
-        MaybeCommentBlock("Exhaling postcondition (with checking)", posts)
+        //"Exhaling postcondition (with checking)"
+        posts
       }
     }
   }
@@ -806,12 +807,10 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         (e) => {
           errors.ContractNotWellformed(e)
         })
-      MaybeCommentBlock("Inhaling precondition (with checking)",
-        MaybeCommentBlock("Do welldefinedness check of the exhale part.",
-          NondetIf(onlyExhalePres ++ Assume(FalseLit()))) ++
-          MaybeCommentBlock("Normally inhale the inhale part.",
-            onlyInhalePres)
-      )
+      //"Inhaling precondition (with checking)",
+      //"Do welldefinedness check of the exhale part."
+      Choose(Block(onlyExhalePres ++ Assume(FalseLit()))) ++
+        onlyInhalePres //"Normally inhale the inhale part."
     }
     else {
       val pres: Seq[Stmt] = inhaleInhaleSpecWithDefinednessCheck(
@@ -819,13 +818,15 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         (e) => {
           errors.ContractNotWellformed(e)
         })
-      MaybeCommentBlock("Inhaling precondition (with checking)", pres)
+      //"Inhaling precondition (with checking)"
+      pres
     }
   }
 
-  private def translateResultDecl(r: sil.Result) = LocalVarDecl(resultName, translateType(r.typ))
+  private def translateResultDecl(r: sil.Result) = PParameter(resultName, translateType(r.typ), OUT)
   override def translateResult(r: sil.Result) = translateResultDecl(r).l
 
+/*
   /***
     * Emits the statement for unfolding into the previous definedness state and adjusts the definedness state.
     * This is achieved by creating a new definedness state that is initialized to the previous definedness state.
@@ -1184,27 +1185,30 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   var exhaleTmpStateId = -1
   var extraUnfolding = false
   override def inhaleExp(e: sil.Exp, error: PartialVerificationError): Stmt = {
-    TODO_Stmt("DefaultFuncPredModule", "inhaleExp (B3 TODO1/TODO2)")
-/*
     e match {
       case sil.Unfolding(acc, _) =>
+        sys.error("(B3 TODO3) Got to: DefaultFuncPredModule -> inhaleExp -> case sil.Unfolding(acc, _)")
+/*
         if (duringUnfoldingExtraUnfold) {
           Nil
         } else {
-        // execute the unfolding, since this may gain information
-        duringUnfoldingExtraUnfold = true
-        tmpStateId += 1
-        val tmpStateName = if (tmpStateId == 0) "Unfolding" else s"Unfolding$tmpStateId"
-        val (stmt, state) = stateModule.freshTempState(tmpStateName)
-        val stmts = stmt ++ unfoldPredicate(acc, NullPartialVerificationError, true)
-        tmpStateId -= 1
-        stateModule.replaceState(state)
-        duringUnfoldingExtraUnfold = false
+          // execute the unfolding, since this may gain information
+          duringUnfoldingExtraUnfold = true
+          tmpStateId += 1
+          val tmpStateName = if (tmpStateId == 0) "Unfolding" else s"Unfolding$tmpStateId"
+          val (stmt, state) = stateModule.freshTempState(tmpStateName)
+          val stmts = stmt ++ unfoldPredicate(acc, NullPartialVerificationError, true)
+          tmpStateId -= 1
+          stateModule.replaceState(state)
+          duringUnfoldingExtraUnfold = false
 
-        CommentBlock("Execute unfolding (for extra information)",stmts)
-      }
+          CommentBlock("Execute unfolding (for extra information)",stmts)
+        }
+*/
 
       case pap@sil.PredicateAccessPredicate(loc@sil.PredicateAccess(_, _), perm) =>
+        sys.error("(B3 TODO3) Got to: DefaultFuncPredModule -> inhaleExp -> case sil.PredicateAccessPredicate(loc@sil.PredicateAccess(_, _), perm)")
+/* 
         val res: Stmt = if (extraUnfolding) {
           exhaleTmpStateId += 1
           extraUnfolding = false
@@ -1218,9 +1222,9 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         } else Nil
         MaybeCommentBlock("Extra unfolding of predicate",
           res ++ (if (duringUnfold) insidePredicate(unfoldInfo, pap) else Nil))
+*/
       case _ => Nil
     }
-*/
   }
 
 /*
