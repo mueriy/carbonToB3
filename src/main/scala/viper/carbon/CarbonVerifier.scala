@@ -104,14 +104,7 @@ case class CarbonVerifier(override val reporter: Reporter,
   else false
 
   override def usePolyMapsInEncoding =
-    if (config != null) {
-      config.desugarPolymorphicMaps.toOption match {
-        case Some(b) => !b
-        case None => true
-      }
-    } else {
-      true
-    }
+    false //B3 NOTE: PolyMaps do not exist in B3
 
   def name: String = "carbon"
   def version: String = "1.0"
@@ -177,6 +170,7 @@ case class CarbonVerifier(override val reporter: Reporter,
     }
 
     // reset all modules
+    heapModule.resetFields(program, config)
     allModules map (m => m.reset())
     heapModule.enableAllocationEncoding = config == null || !config.disableAllocEncoding.isSupplied // NOTE: config == null happens on the build server / via sbt test
 

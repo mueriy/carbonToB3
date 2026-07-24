@@ -184,7 +184,7 @@ class BoogieToB3Transformer(verifier: Verifier) {
       case ConstDecl(name, typ, false) => B3.Function(name, Seq(), getNameFromTyp(typ))
       case ConstDecl(name, typ, true) => //unique
         val typName = getNameFromTyp(typ)
-        val tagName = "%ConstTag_"+typName
+        val tagName = "%Tag_"+typName
         const_tags += ((tagName, typName))
         B3.Function(name, Seq(), typName, tagName)
     })

@@ -50,7 +50,7 @@ object Statements {
       case l: IdExpr => decls.find(_.name == l.name) match {
         case None => List(l)
         case Some(d) if d.typ != l.typ => {
-          sys.error("Local variable " + l.name + " is declared with type " + d.typ + " but used with type " + l.typ + ".")
+          sys.error(s"Local variable ${l.name} is declared with type ${d.typ} but used with type ${l.typ}.")
         }
         case _ => Nil
       }
@@ -59,7 +59,7 @@ object Statements {
     def combineLists(s1: Seq[IdExpr], s2: Seq[IdExpr]) = {
       for (l1 <- s1; l2 <- s2) {
         if (l1.name == l2.name && l1.typ != l2.typ) {
-          sys.error("Local variable " + l1.name + " is used with different types " + l1.typ + " and " + l2.typ)
+          sys.error("Local variable " + l1.name.name + " is used with different types " + l1.typ + " and " + l2.typ)
         }
       }
       (s1 ++ s2).distinct
@@ -93,7 +93,7 @@ object Nodes {
       case _: Variable => Nil
       case lvd:LocalVarDecl => 
         lvd match {
-          case VarDecl(_, body, _, _, optInitVal) => body ++ (optInitVal map {_.toSeq.asInstanceOf[Node]})
+          case VarDecl(_, body, _, _, optInitVal) => body ++ optInitVal.toList
           case _: FParameter => Nil
           case _: PParameter => Nil
           case _: Binding => Nil
@@ -108,10 +108,11 @@ object Nodes {
           case _:Domain => sys.error("Domain is NOT_SUPPORTED, so this should not be reachable") 
           case TypeDecl(_, _) => Nil
           case Tagger(_, _) => Nil
-          case Function(_, args, _, _) => args
+          case Function(_, args, _, _, optBody) => args ++ Seq() ++ optBody.toList
           case Axiom(exp, _) => exp
-          case Procedure(_, args, optBody, pre, post) => args ++ pre ++ post ++ (optBody map {_.toSeq})
+          case Procedure(_, args, optBody, pre, post) => args ++ pre ++ post ++ optBody.toList
         }
+      case FunctionDef(body, when) => body
       case ss: Stmt =>
         ss match {
           case _:VarDecl => sys.error("this case should not be reachable (LocalVar is already handled by LocalVarDecl sub-case)")
@@ -159,7 +160,7 @@ object Nodes {
         exp match {
           case IntLit(_) => exp
           case BoolLit(_) => exp
-          // case RealLit(b) => exp
+          case RealLit(_) => exp
           // case RealConv(exp) => RealConv(func(exp))
           case IdExpr(_, _, _) => exp
           case OpExpr(op, es) => OpExpr(op, es map func)

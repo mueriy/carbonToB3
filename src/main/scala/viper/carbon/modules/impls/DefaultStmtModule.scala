@@ -290,40 +290,16 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
     stmt match {
       case sil.Seqn(ss, scopedDecls) =>
         val locals = scopedDecls.collect {case l: sil.LocalVarDecl => l}
-        /* B3 INFO: In Boogie, VarDecl's were added by PrettyPrinter when printing the Procedure. In B3, VarDecl's have
-        a Body, which defines its scope. Outside of this they are NOT declared. Because e.g. the while statement is replaced
-        with a special non-while construction, getting the scope of LocalVarDecl's in a sil.Seqn correctly is not that 
-        straightforward. (Since the variables could be also used in the parts added before and after the (translated) while body.)
-        This means that it would be safer for now to rename the variables in e.g. while stmts as before and declaring all 
-        variables "at the start" of the procedure. We should try to keep track of all "special locations" (like While), to
-        then find a way to decrease the VarDecl scope wherever possible. I believe B3 does it like that because they think it
-        is more efficient that way, although that would only be true if B3 parses written B3 code in a way that keeps the
-        scopes actually small (<-- TODO: check this) 
-        For now we do not declare the vars here and leave that to the Method->Procedure transformer.
-        Special Stmts:
-          - While
-          - (probably) Wand (ADVANCED)
-          - TODO: collect and add all here
-        */
 
-        // B3 TODO: check again if this really works. Saver option would be to just "VarDecl" the whole Procedure body)
-        val localVars = locals map (v => mainModule.env.define(v.localVar)) // add local variables to environment
+        locals map (v => mainModule.env.define(v.localVar)) // add local variables to environment
         //"Assumptions about local variables"
         val localVarsAssumptions = locals map (a => mainModule.allAssumptionsAboutValue(a.typ, mainModule.translateLocalVarDeclToVarDecl(a), true)) // B3 TODO: we need to find out what local variables are included here; theoretically this should only include VarDecl's, but what if Bindings are also included?
         val translatedStmts = (ss map (st => translateStmt(st, statesStack, allStateAssms, duringPackage)))
         val seqOfAllStmts = localVarsAssumptions ++ translatedStmts
-        
-        // In B3, VarDecl have a body and the scope of the Var is only in that body => we need to nest all vardecls and place 
-        //  the actual statement in the innermost place (body).
-        val translatedStmt = seqOfAllStmts match {
-          case Seq(oneStmt) => oneStmt
-          case moreStmts => Block(moreStmts)
-        }
-        val translatedStmtWithVarDecls = localVars.foldRight(translatedStmt)((l, r) => VarDecl(l.name, r, l.typ)) 
-        
+         
         locals map (v => mainModule.env.undefine(v.localVar)) // remove local variables from environment
         // return to avoid the extra 'assumeGoodState'
-        return seqOfAllStmts // (use "return translatedStmtWithVarDecls" instead to do the VarDecl here.)
+        return seqOfAllStmts
       case _ =>
     }
 
@@ -337,7 +313,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
     if (stmts.children.size == 0 && !loopModule.isLoopDummyStmt(stmt)) {
       assert(assertion = false, "Translation of " + stmt + " is not defined")
     }
-    val translation = stmts ::
+    val translation = stmts +++
       (if(duringPackage){  //[[B3 temp: remove heap-state assumptions after statements]]
         ADVANCED_Stmt("DefaultStmtModule", "translateStmt -> good state if Wand")
 /*

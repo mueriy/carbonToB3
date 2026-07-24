@@ -19,12 +19,12 @@ case class PMaskDesugaredRep(selectId: Identifier, storeId: Identifier)
  */
 trait PermModule extends Module with CarbonStateComponent {
 
-/*
   /**
    * The type used to represent permissions.
    */
   def permType: Type
 
+/*
   /**
    * Translate a permission amount
    */
@@ -85,15 +85,14 @@ trait PermModule extends Module with CarbonStateComponent {
 */
 
   /**
-    * The type used for masks.
+    * The type used for mask-splits.
     */
-  def maskType: Type
+  def maskTypes: Seq[Type]
 
-/*
   /**
    * The type used to for predicate masks.
    */
-  def pmaskType: Type
+  def pmaskType(ftvars: Seq[Type]): Type
 
   /**
     * The desugared poly map version of [[pmaskType]].
@@ -102,8 +101,9 @@ trait PermModule extends Module with CarbonStateComponent {
     */
   def pmaskTypeDesugared: PMaskDesugaredRep
 
-  def zeroPMask: Expr
+  def zeroPMask(ftvars: Seq[Type]): Expr
 
+/*
   def hasDirectPerm(ra: sil.ResourceAccess): Expr
 
   /**

@@ -8,7 +8,7 @@ package viper.carbon.modules
 
 import components.{CarbonStateComponent, ComponentRegistry}
 import viper.silver.components.StatefulComponent
-import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Stmt, Binding, FParameter}
+import viper.carbon.b3.B3Nodes.{IdExpr, Expr, Stmt, FParameter, Type, NamedType}
 
 /**
  * A module for dealing with the state of a program during execution.  Allows other modules
@@ -21,44 +21,44 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   /**
    * Returns an assumption that the current state is 'good', or well-formed.
    */
-  def assumeGoodState: Stmt
+  def assumeGoodState: Seq[Stmt]
 
   /**
    * Returns a static invocation of the 'is good state' function with the arguments from
    * `stateContributions`.
    */
-  def staticGoodState: Expr
+  def staticGoodState(ftvars: Seq[Type]): Expr
 
   /**
    * Returns invocation of the 'is good state' function with the arguments from
    * `currentStateContributions`.
    */
-  def currentGoodState: Expr
+  def currentGoodState: Seq[Expr]
 
   /**
    * The statements necessary to initialize the Boogie state of all CarbonStateComponent modules.
    * This will also set the variable names used in the current state to the initial ones.
    */
-  def initBoogieState: Stmt
+  def initBoogieState: Seq[Stmt]
 
   /**
    * The statements necessary to reset the Boogie state of all CarbonStateComponent modules.
    * Note that this should modify the *current* state (i.e. reassign all Boogie state in use), not create a fresh state
    */
-  def resetBoogieState: Stmt
+  def resetBoogieState: Seq[Stmt]
 
   def reset() = {initBoogieState; initOldState} // make the call to reset all Boogie state (e.g. variable names) - the latter call is probably not necessary, since it always gets called before relevant, but the former can affect the translation of many features (e.g. axioms)
 
   /**
    * The statements necessary to initialize old(state).
    */
-  def initOldState: Stmt
+  def initOldState: Seq[Stmt]
 
   /**
    * The name and type of the static contribution of the state components registered with this module to the state. The returned value should remain the
-   * same even if the state is changed. (For Functions; For Axiom use 'output map {_.toQ}')
+   * same even if the state is changed. (for the given Field-type)
    */
-  def staticStateContributions(withHeap : Boolean = true, withPermissions : Boolean = true): Seq[FParameter]
+  def staticStateContributions(fvars: Seq[Type], withHeap: Boolean = true, withPermissions: Boolean = true): Seq[FParameter]
 
   /**
    * The current values for all registered components' state contributions.  The number of elements
@@ -72,7 +72,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
     stateContributionValues(state)
   }
 
-  def stateContributionValues(snap : StateSnapshot): Seq[Expr]
+  def stateContributionValues(snap: StateSnapshot): Seq[Expr]
 
   type StateSnapshot// used to abstractly capture the Boogie variables, old expressions etc. used to represent a current state in the translation
 
@@ -96,13 +96,13 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   /**
     * Returns a fresh state that is not an old state. This method has no side-effects on the current state.
     */
-  def freshTempStateKeepCurrent(name: String) : StateSnapshot
+  def freshTempStateKeepCurrent(name: String): StateSnapshot
 
   /**
     * Returns the statement that initializes the input state to the current state. This method has no side-effects on
     * the current state.
     */
-  def initToCurrentStmt(snapshot: StateSnapshot) : Stmt
+  def initToCurrentStmt(snapshot: StateSnapshot): Seq[Stmt]
 
 /*
   /**
@@ -169,12 +169,12 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    * @param name the key to associate with this StateSnapshot
    * @param snapshot the StateSnapshot to store
    */
-  def stateRepositoryPut(name:String, snapshot: StateSnapshot): Unit
+  def stateRepositoryPut(name: String, snapshot: StateSnapshot): Unit
 
   /*
    * Analogous get operation to the put above.
    */
-  def stateRepositoryGet(name:String) : Option[StateSnapshot]
+  def stateRepositoryGet(name: String): Option[StateSnapshot]
 
 /*
   /*
@@ -194,4 +194,25 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
   case class StateRep(state: StateSnapshot, boolVar: IdExpr)
 
   case class StateSetup(usedState: StateRep, initStmt: Stmt)
+
+  /** 
+   * Groups the Expressions by the according Field type. Throws an error if none is found.
+   * Returns a Seq of Seq's, where the Stmt's in each of the internal Seq's correspond to one Field type.
+   */
+  def groupByFieldSeq(stmts: Seq[Expr]): Seq[Seq[Expr]]
+  /** 
+   * Groups the Expressions by the according Field type. Throws an error if none is found.
+   * Returns a map: "Field-typevars -> matching expressions"
+   */
+  def groupByField(stmts: Seq[Expr]): Map[Seq[Type], Seq[Expr]]
+  /** 
+   * Groups the FParameters by the according Field type. Throws an error if none is found.
+   * Returns a Seq of Seq's, where the Stmt's in each of the internal Seq's correspond to one Field type.
+   */
+  def groupFPByFieldSeq(stmts: Seq[FParameter]): Seq[Seq[FParameter]]
+  /** 
+   * Groups the FParameters by the according Field type. Throws an error if none is found.
+   * Returns a map: "Field-typevars -> matching expressions"
+   */
+  def groupFPByField(stmts: Seq[FParameter]): Map[Seq[Type], Seq[FParameter]]
 }

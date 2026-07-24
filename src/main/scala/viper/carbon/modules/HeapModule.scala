@@ -11,6 +11,7 @@ import viper.carbon.b3.B3Nodes._
 import viper.carbon.modules.components.CarbonStateComponent
 import viper.carbon.utility.PolyMapDesugarHelper
 import viper.silver.ast.{LocationAccess, MagicWand}
+import viper.carbon.CarbonConfig
 
 /**
  * A module for translating heap expressions (access, updating) and determining
@@ -19,34 +20,77 @@ import viper.silver.ast.{LocationAccess, MagicWand}
 trait HeapModule extends Module with CarbonStateComponent {
 
   /**
-    * The type used for heaps
+    * The types used for all heap-splits.
     */
-  def heapType: Type
+  def heapTypes: Seq[NamedType]
 
-/*
   /**
    * The type used for references.
    */
   def refType: Type
 
   /**
-   * The type used for fields.
+   * The types used for fields.
    */
-  def fieldType: Type
+  def fieldTypes: Seq[Type]
+
+  /**
+   * Creates a Field type corresponding to the given (Field-)typeVars
+   */
+  def fieldType(ftVars: Seq[Type]): NamedType
 
   /**
    * The type used for fields of type t.
    */
   def fieldTypeOf(t: Type): Type
 
+  /**
+   * Modifies 'baseName' and returns new, unique name that matches the given Field variant
+   */
+  def addFieldMark(baseName: String, ftVars: Seq[Type]): String
+
+
+  /** 
+   * Returns all unique typVars-pairs of the field type.
+   * 
+   * (If no field types exist this returns a fake typVars-pair. This ensures that at least one heap-splits 
+   * is created. Without any heap-splits the heap would not exist, which would cause an errors. Since we are 
+   * apparently never interacting with the heap, we dont care that this is a heap-split with a fake type.)
+   */
+  def allFieldsTypVars: Seq[Seq[Type]]
 
   /**
-    * Represents the Boogie type constructor for fields.
+   * Collects all Field types and updates the corresponding collection.  
+   */
+  def resetFields(program: sil.Program, config: CarbonConfig): Unit
+
+  /**
+   * Returns the Field index of the given Field type variables. (i.e. the index in allFieldsTypVars) 
+   */
+  def fieldIdx(ftVars: Seq[Type]): Int
+
+  def forallFields(formula: Seq[Type] => Any): Seq[Any]
+
+  /**
+    * Represents the B3 type constructor for fields.
     * The first element specifies how many type arguments (n_ty_args) the field type constructor takes and
     * the second element provides a function to construct a field type given n_ty_args many type arguments
     */
-  def fieldTypeConstructor : (Int, Seq[Type] => Type)
+  def fieldTypeConstructor: Seq[Type] => NamedType
 
+  /**
+    * A function that, given a Field Type, returns the range type that the matching desugared map has.
+    */
+  def heapMapRangeTypeFromField: Type => Type
+
+  /** 
+   * Returns all unique typVars-pairs of the field type.
+   * (If no field types exist this returns a fake typVars-pair. This ensures that at least one heap-splits 
+   * is created. Without any heap-splits the heap would not exist, which would cause an errors. Since we are 
+   * apparently never interacting with the heap, we dont care that this is a heap-split with a fake type.)
+   */
+
+/*
   /**
    * The type used for predicates.
    */
@@ -81,27 +125,34 @@ trait HeapModule extends Module with CarbonStateComponent {
    * new type introduced for a wand
    */
   def wandBasicType(wandName: String): Type
+*/
 
   /**
-   * Definitions for a field.
+   * Definitions for a field. (B3: This is also where all field types are collected. 
+   * Must be called before any of the other translate functions)
    */
   def translateField(f: sil.Field): Seq[Decl]
 
+/*
   /**
    * Definitions for the ghost field of a predicate.
    */
   def predicateGhostFieldDecl(f: sil.Predicate): Seq[Decl]
+*/
 
   /**
    * Translation of a field read, predicate instance, or wand instance.
    */
   def translateResourceAccess(f: sil.ResourceAccess): Expr
+/*
   /**
     * Translation of a field read.
     */
   def translateLocationAccess(rcv: Expr, loc: Expr): Expr
+*/
 
   def translateResource(f: sil.ResourceAccess): Expr
+/*
   def translateLocation(pred: sil.Predicate, args: Seq[Expr]): Expr
 
   /**

@@ -241,8 +241,11 @@ object B3Nodes {
       Transformer.transform[this.type](this, pre)(recursive, post)
     //(Taken from boogie.scala -> Node) ^^^
   }
-  sealed trait Decl extends Node // Domain, TypeDecl, Tagger, Function, Axiom, and Procedure. (TypeName is String)
-  sealed trait LocalVarDecl extends Node {//Binding, PParameter, FParameter, VarDecl(also extends Stmt)
+
+  /** Decl includes: [[Domain]], [[TypeDecl]], [[Tagger]], [[Function]], [[Axiom]], and [[Procedure]]. (B3's 'TypeName' is String here) */
+  sealed trait Decl extends Node 
+  /** LocalVarDecl includes: [[Binding]], [[PParameter]], [[FParameter]], and [[VarDecl]](which also extends Stmt) */
+  sealed trait LocalVarDecl extends Node {
     /* B3 INFO: splitting the LocalVarDecl into the different "B3 versions" makes sense because they have/need different 
     parameters (see in the following). However, Boogie-Carbon naturally always used LocalVarDecl, and in some cases
     we need two different variants. Currently this is solved by adding def F/P/Q to the case-classes, which returns the 
@@ -270,7 +273,10 @@ object B3Nodes {
   sealed trait BuiltInType extends Type
   case object Int extends BuiltInType { override def b3fy: String = "int" }
   case object Bool extends BuiltInType { override def b3fy: String = "bool" }
-  case object Real extends BuiltInType { override def b3fy: String = "int" } // B3 TODO: change this to real as soon as that is possible
+  /** Temporarily represented by int. B3 TODO: change this to real as soon as that is possible */
+  case object Real extends BuiltInType { override def b3fy: String = "int" }
+  /** This is (currently) the same as Real, but please use this for permissions. */
+  case object Perm extends BuiltInType { override def b3fy: String = Real.b3fy }
   /** This is only for temporary use. Using it in the final Program version will almost certainly fail. */
   case class TypeVar(name: String) extends Type {
     override def freeTypeVars: Seq[TypeVar] = Seq(this)
@@ -358,26 +364,25 @@ object B3Nodes {
     def b3fy: RawAst.Tagger = new RawAst.Tagger(daf(name), daf(typ.b3fy))
   }
 
-    /**
-    * Scala representation of a B3 RawAst Function node.
-    *
-    * @param name The function name.
-    * @param parameters A Seq of the function's parameters (as FParameter)
-    * @param resultType The function's return type 
-    * @param tag The name of a tag (if any; default "" means no tag). 
-    * The values returned by different functions with the same tag are disjoint.
-    */
-  case class Function(name: Identifier, args: Seq[FParameter], typ: Type, tag: String = "") extends Decl {
+  /**
+   * Scala representation of a B3 RawAst Function node.
+   *
+   * @param name The function name.
+   * @param args A Seq of the function parameters
+   * @param resultType The function's return type 
+   * @param tag The optional name of a tag (functions with the same tag return disjoint values).
+   * @param body 
+   */
+  case class Function(name: Identifier, args: Seq[FParameter], typ: Type, tag: Option[String] = None, body: Option[FunctionDef] = None) extends Decl {
     // Automatically register this function
     registerFunction(this)
     
     def b3fy: RawAst.Function = {
-      val optB3Tag = if (tag == "") Option_None[DString] else Option_Some[DString](daf(tag))
       new RawAst.Function(daf(functionName), 
                           daf(args map {_.b3fy}),
                           daf(typ.b3fy),
-                          optB3Tag,
-                          Option_None)  // <- Carbon never uses function bodies/definitions (FunctionDefinition); it defines them using axioms.
+                          daf(tag map {daf(_)}),
+                          daf(body map {_.b3fy}))
     }
     def functionName: String = funcName(this)
     def isPure: Boolean = typ.freeTypeVars.size == 0
@@ -388,6 +393,25 @@ object B3Nodes {
     def b3fy: RawAst.FParameter = new RawAst.FParameter(daf(name), isInjective, daf(typ.b3fy))
     def toQ: Binding = Binding(name, typ)
     def toP(mode: RawAst.ParameterMode = IN): PParameter = PParameter(name, typ, mode)
+  }
+
+  case class FunctionDef(body: Expr, when: Seq[Expr] = Seq()) extends Node {
+    def b3fy: RawAst.FunctionDefinition = new RawAst.FunctionDefinition(daf(when map {_.b3fy}), body.b3fy)
+  }
+
+  /**
+   * This represents a single, constant value. In reality this just creates a nonary Function Node, but
+   * using this increases Carbon's readability by differencing between "real" functions and values.
+   * Note that these Functions never need to be manually registered (because they don't *need* to be registered).
+   *
+   * @param name The constant/function name.
+   * @param resultType The constant/function's return type 
+   * @param tag The optional name of a tag (constants/functions with the same tag return disjoint values).
+   * The values returned by different functions with the same tag are disjoint.
+   */
+  object ConstDecl {
+    def apply(name: Identifier, typ: Type, tag: Option[String] = None, body: Option[FunctionDef] = None): Function =
+      Function(name, Seq(), typ, tag, body)
   }
 
   
@@ -550,11 +574,11 @@ object B3Nodes {
   /** 
    * Scala representation of a B3 RawAst VarDecl-Stmt node. (introduces a local variable)
    * 
-   * Has val variable = corresponding Variable node.
+   * Has the field [[variable]], which contains the corresponding [[Variable]] Node.
    * 
-   * @param name The name of the Variable
+   * @param name The name of the variable
    * @param body The variable is ONLY in scope in the given body! (Overshadows 'parent' VarDecl's with same name).
-   * @param typ must either be "bool", "int", or "tag" OR a type defined by a TypeDecl
+   * @param typ must either be "bool", "int", or "tag" OR a type defined by a [[TypeDecl]]
    * @param isMutable var (true) vs val (false)
    * @param optInitValue optionally provide the initial value here (in form of an Expression, i.e. Option[Expr])
    */
@@ -565,7 +589,7 @@ object B3Nodes {
 
 
   /** 
-   * Scala representation of a B3 RawAst VarDecl-Stmt node. 'lhs := rhs'
+   * Scala representation of a B3 RawAst Assign-Stmt node. 'lhs := rhs'
    * @param lhr must be the name of a variable in scope (= must be in body of a corresponding VarDecl) 
    */
   case class Assign(lhs: IdExpr, rhs: Expr) extends Stmt {
@@ -730,6 +754,7 @@ object B3Nodes {
 
   sealed trait Expr extends Node {
     def b3fy: RawAst.Expr
+    def typ: Type
     
     def ===(other: Expr) = OpExpr(EqCmp, Seq(this, other))
     def !==(other: Expr) = OpExpr(NeCmp, Seq(this, other))
@@ -773,11 +798,20 @@ object B3Nodes {
       def els(els: Expr) = CondExp(cond, thn, els)
     }
   }
+  /***/
+  def andAll(exprs: Seq[Expr]): Expr = {
+    exprs match {
+      case Seq() => sys.error("Empty Seq[Expr] that should not be empty")
+      case Seq(single) => single
+      case seq => seq(0) && andAll(seq.tail)
+    }
+  }
 
 
   /** Scala representation of a B3 RawAst BLiteral-Expr node. (Boolean values) */
   sealed abstract class BoolLit(val b: Boolean) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_BLiteral(b)
+    override def typ: Type = Bool
   }
   object BoolLit {
   def unapply(b: BoolLit) = Some(b.b)
@@ -792,6 +826,19 @@ object B3Nodes {
   /** Scala representation of a B3 RawAst ILiteral-Expr node. (Integer values) */
   case class IntLit(x: BigInt) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_ILiteral(x.bigInteger)
+    override def typ: Type = Int
+  }
+
+  /** 
+   * Real is currently not supported by B3. Therefore, RealLit works currently 
+   * the same as IntLit, except that it is not the same class, making the switch 
+   * to supporting reals easier, when B3 finally supports them.
+   * 
+   * B3 LATER (real) change to: "Scala representation of a B3 RawAst RLiteral-Expr node. (Real values)"
+   */
+  case class RealLit(x: BigInt) extends Expr {
+    override def b3fy: RawAst.Expr = new RawAst.Expr_ILiteral(x.bigInteger)
+    override def typ: Type = Real
   }
 
   /* CustomLiteral  =^=  "|" LiteralIdentifier ":" Type "|"  =>  not what we want; we use nonary functions if we have to. */
@@ -816,15 +863,26 @@ object B3Nodes {
 
   /** Scala representation of a B3 RawAst OpExpr-Expr node. (Replaces BinExp and UnExp; CondExp has its own class)
    * @param op RawAst Operators are provided as values by the current Object (use ObjectName.{Op-name})
+   * @param exprs The number of expressions must match to what makes sense for the given Operator.
+   * (NOTE: maybe it would make sense to split this into a Binary and Unary Operator internally, with one or two 
+   * Expr as parameters instead of one Seq[Expr], even though it is combined in B3)
    */
   case class OpExpr(op: RawAst.Operator, exprs: Seq[Expr]) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_OperatorExpr(op, daf(exprs map {_.b3fy}))
+    override def typ: Type = op match {
+      case LtCmp|LeCmp|EqCmp|NeCmp => Bool
+      case And|Equiv|Implies|Or|Not => Bool
+      case Div => Real
+      case IntDiv => Int
+      case Add|Sub|Mul|Mod|Minus => Int //B3 LATER (real): could also be Real, I think?
+    }
   }
   /** Scala representation of a B3 RawAst OpExpr-Expr node in CondExp-mode. 
    * @param op RawAst Operators are provided as values by the current Object (use ObjectName.{Op-name})
    */
   case class CondExp(cond: Expr, thn: Expr, els: Expr) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_OperatorExpr(new RawAst.Operator_IfThenElse, daf(Seq(cond, thn, els) map {_.b3fy}))
+    override def typ: Type = thn.typ
   }
 
   /* For easy use of B3 operators: (same names as in Silver) */
@@ -854,6 +912,16 @@ object B3Nodes {
     def functionName: String = funcName(name, args, typ)
   }
 
+  /**
+   * This represents a single, constant value. In reality this just creates a nonary FunctionCallExpr Node, but
+   * using this increases Carbon's readability by differencing between "real" functions and values.
+   *
+   * @param typ is only for internal purposes 
+   */
+  object Const {
+    def apply(name: Identifier, typ: Type): FunctionCallExpr = FunctionCallExpr(name, Seq(), typ)
+  }
+
   /** Scala representation of a B3 RawAst IdExpr-Expr node.
    * 
    * Notes on Labeled expression: = "{label}: {expr}", where label can be used to provide information, 
@@ -863,12 +931,14 @@ object B3Nodes {
    */
   case class LabeledExpr(label: String, expr: Expr) extends Expr {
     override def b3fy: RawAst.Expr = new RawAst.Expr_LabeledExpr(daf(label), expr.b3fy)
+    override def typ: Type = expr.typ
   }
 
 
   sealed trait QuantifiedExpr extends Expr {
     def vars: Seq[Binding]
     def expr: Expr
+    override def typ: Type = Bool
   }
   /**
     * Scala representation of a B3 RawAst Quantifier(Forall)-Expr node.
@@ -905,14 +975,16 @@ object B3Nodes {
   case class Binding(name: Identifier, typ: Type) extends LocalVarDecl {
     def b3fy: RawAst.Binding = new RawAst.Binding(daf(name), daf(typ.b3fy))
     def toP(mode: RawAst.ParameterMode = IN): PParameter = PParameter(name, typ, mode) 
-    def toF(isInjective: Boolean = false): FParameter = FParameter(name, typ, isInjective) 
+    def toF(isInjective: Boolean = false): FParameter = FParameter(name, typ, isInjective)
   }
 
   /** (= Trigger) Scala representation of a B3 RawAst Pattern node. (equivalent to a sil.Trigger; for pattern-matching in forall/exists). 
    * (Actually, Pattern nodes only exist in standard B3, but not in B3.jar - there it is "Seq[Seq[Expr]]". But using this nonetheless makes certain transformations easier.) */
   case class Pattern(exprs: Seq[Expr]) extends Expr {
+    /** DO NOT USE THIS! (use b3fyPattern instead) */
     def b3fy: RawAst.Expr = sys.error("You are not allowed to call 'b3fy' on a Pattern node! Use 'b3fyPattern' instead")
     def b3fyPattern: DafnySequence[RawAst.Expr] = daf(exprs map {_.b3fy}) // We dont use "new RawAst.Pattern(daf(exprs map {_.b3fy}))" because QuantifierExpr expects DafnySequence[_ <: RawAst.Expr] instead of RawAst.Pattern" in B3's java version
+    override def typ: Type = sys.error("You are not allowed to call 'typ' on a Pattern node!")
   }
 
   // case class ClosureBinding extends Node
@@ -971,33 +1043,33 @@ object B3Development {
     val grouped = infos.groupMap(_._1)(_._2)
     println("=== OTHER INFOS ===")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n ${detailSet.mkString(", ")}")
+      println(s"==> $main:\n  - ${detailSet.mkString("\n  - ")}")
     }
-    println("=================")
+    println("=================================")
   }
   def printTODO(): Unit = {
     val grouped = todos.groupMap(_._1)(_._2)
-    println("=== TODO INFO ===")
+    println("=========== TODO INFO ===========")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n ${detailSet.mkString(", ")}")
+      println(s"==> $main:\n  - ${detailSet.mkString("\n  - ")}")
     }
-    println("=================")
+    println("=================================")
   }
   def printLATER(): Unit = {
     val grouped = laters.groupMap(_._1)(_._2)
-    println("=== LATER INFO ===")
+    println("========== LATER INFO ===========")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n ${detailSet.mkString(", ")}")
+      println(s"==> $main:\n  - ${detailSet.mkString("\n  - ")}")
     }
-    println("=================")
+    println("=================================")
   }
   def printADVANCED(): Unit = {
     val grouped = advanced.groupMap(_._1)(_._2)
-    println("=== ADVANCED INFO ===")
+    println("========= ADVANCED INFO =========")
     grouped.foreach { case (main, detailSet) =>
-      println(s"=> $main:\n ${detailSet.mkString(", ")}")
+      println(s"==> $main:\n  - ${detailSet.mkString("\n  - ")}")
     }
-    println("=================")
+    println("=================================")
   }
   def printALL(): Unit = {
     printTODO()
@@ -1012,7 +1084,6 @@ object B3Development {
  */
 object B3Implicits {
   import viper.carbon.b3.B3Nodes._
-  import viper.carbon.b3.B3Naming._
   import language.implicitConversions
 
   // DAFNY HELPERS
@@ -1025,6 +1096,11 @@ object B3Implicits {
     dstr.asScala.foreach(cp => sb.appendCodePoint(cp.value()))
     sb.toString
   }
+
+  // "LocalVarDecl"-CONVERSION HELPERS
+  implicit def fToQ(fSeq: Seq[FParameter]): Seq[Binding] = fSeq map {_.toQ}
+  implicit def fToExpr(fSeq: Seq[FParameter]): Seq[IdExpr] = fSeq map {_.l}
+
 
   // GENERAL Seq HELPERS
   implicit def lift[T](t: T): Seq[T] = Seq(t)
@@ -1063,40 +1139,12 @@ object B3Implicits {
       }
     }
   }
-
-
-
-
-  // IDENTIFIER UNIQUENESS (and other properties; stolen from PrettyPrinter; 'ident2doc' -> 'idName')
-  /** The current mapping from identifier to names. */
-  private val idnMap = collection.mutable.HashMap[Identifier, String]()
-
-  /** B3NameGenerator instance. */ 
-  private val names = new B3NameGenerator()
-  /**
-    * The current mapping from unique B3 names to the original identifiers (inverse mapping of idnMap,
-    * where the names of the identifiers are used directly).
-    */
-  val backMap = collection.mutable.HashMap[String, Identifier]()
-
-  /** Map an identifier to a string, making it unique first if necessary. */
-  implicit def idName(i: Identifier): String = {
-    idnMap.get(i) match {
-      case Some(s) => s
-      case None =>
-        val s = names.createUniqueIdentifier(i.preferredName)
-        idnMap.put(i, s)
-        backMap.update(s, i)
-        s
-    }
-  }
 }
 
 
 object B3Naming {
   // Currently, only ONE Program is allowed to be translated, since there is no reset yet.
   import viper.carbon.b3.B3Development._
-  import viper.carbon.b3.DafnyHelper._
   import viper.carbon.b3.B3Nodes._
 
   // --- Namespace ---
@@ -1127,6 +1175,7 @@ object B3Naming {
       }
     }
     override def hashCode = List(name, namespace).hashCode
+    override def toString: String = name
   }
   case object Identifier {
     def apply(n: String)(implicit ns: Namespace): Identifier =
@@ -1176,7 +1225,7 @@ object B3Naming {
   /** 
    * Maps Identifiers to an Int sequence. Each value x in the sequence says: "the x'th parameter's type should be used 
    * for naming" (the output type counts as the "last parameter", so if there are n parameters, then value n means the 
-   * output type should be used for naming (since we start at index 0).
+   * output type should be used for naming (since we start at index 0)). This should only be updated by 'registerFunction'
    */
   private val paramFuctionMap = collection.mutable.HashMap[Identifier, Seq[Int]]()
 
@@ -1187,17 +1236,25 @@ object B3Naming {
   def funcName(name: Identifier, parameterTypeNames: Seq[String], outputTypeName: String): String = {
     paramFuctionMap.get(name) match {
       case Some(paramFuctionHandler) => 
-        info("funcName of", "(funcName="+name.name+", argTypeNames="+(parameterTypeNames ++ Seq(outputTypeName))+", paramArgIdxs="+paramFuctionHandler+")")
         name+"%F"+paramFuctionHandler.collect(parameterTypeNames ++ Seq(outputTypeName)).mkString("%%")
       case None => name
     } 
   }
+  // TODO: find less ugly way to do this whole "nicer-name thing".
+  var specialFunctionReadHeapName = Identifier("x")(Namespace("wrong", -666))
+  var specialFunctionUpdateHeapName = Identifier("y")(Namespace("wrong", -666))
+  var heapTypVarsToIdx: Map[Seq[B3Nodes.Type],Int] = Map()
   /** 
    * Returns the correct name to use for the given Identifier, args, and output Type. 
    * For non-parametric functions, this corresponds to the name defined by the Identifier.
    */
   def funcName(name: Identifier, args: Seq[Expr], typ: Type): String = {
-    val argTypeNames = args map {getTypeOfExpr(_).b3fy}
+    // TODO: find less ugly way to do this whole "nicer-name thing".
+    if (name == specialFunctionReadHeapName || name == specialFunctionUpdateHeapName) {
+      return name+"%F"+heapTypVarsToIdx(args(0).typ.asInstanceOf[NamedType].typVars)
+    }
+
+    val argTypeNames = args map {_.typ.b3fy}
     val outputTypeName = typ.b3fy
     funcName(name, argTypeNames, outputTypeName)
   }
@@ -1208,12 +1265,17 @@ object B3Naming {
   def funcName(fc: FunctionCallExpr): String = {
     funcName(fc.name, fc.args, fc.typ)
   }
+
   /** 
    * Returns the correct name to use for the given Function. 
    * For non-parametric functions, this corresponds to the name defined by the Identifier.
    * Do not call this on parametric Function's
    */
-  def funcName(f: Function): String = {FParameter
+  def funcName(f: Function): String = {
+    // TODO: find less ugly way to do this whole "nicer-name thing".
+    if (f.name == specialFunctionReadHeapName || f.name == specialFunctionUpdateHeapName) {
+      return f.name+"%F"+heapTypVarsToIdx(f.args(0).typ.asInstanceOf[NamedType].typVars)
+    }
     val argTypeNames = f.args map {_.typ.b3fy}
     val outputTypeName = f.typ.b3fy
     funcName(f.name, argTypeNames, outputTypeName)
@@ -1239,31 +1301,24 @@ object B3Naming {
       paramFuctionMap.getOrElseUpdate(func.name, freeTypVarIndexes)
     }
   }
-
-
-  // Expression types
-  /** returns the type of the expression (as Type) */
-  def getTypeOfExpr(exp: Expr): Type = {
-    exp match {
-      case BoolLit(_) => Bool
-      case IntLit(_) => Int
-      case IdExpr(_, typ, _) => typ
-      case OpExpr(binop, _) =>
-        binop match {
-          case LtCmp|LeCmp|EqCmp|NeCmp => Bool
-          case And|Equiv|Implies|Or => Bool
-          case Div => Real
-          case IntDiv => Int
-          case Add|Sub|Mul|Mod => Int //B3 LATER (real): could also be Real, I think?
-        }
-      case CondExp(cond, thn, els) => getTypeOfExpr(thn)
-      case FunctionCallExpr(_, _, typ) => typ
-      case LabeledExpr(_, expr) => getTypeOfExpr(expr)
-      case Forall(_, _, _, _, _) => Bool
-      case Exists(_, _, _, _) => Bool
-      case Pattern(_) => sys.error("Patterns don't have a type that you want to know.")
+  /** 
+   * This function can be used to register a function without declaring its parametric version.
+   * If the function is already registered, then an error is thrown. (Since this "manual" version is
+   * likely what we actually want.)
+   * 
+   * @param funcName The Identifier of the function to register.
+   * @param idxs A Seq containing the indexes (as integers) of the parameters that should be used 
+   * for the name. (Starts at index 0, ends at index |parameters|, which corresponds to the output)
+   */
+  def registerFunction(funcName: Identifier, idxs: Seq[Int]): Unit = {
+    if (paramFuctionMap.contains(funcName)) {
+      sys.error("The manual version of registerFunction is must only be called on a yet unregistered" +
+        "function. This did not hold right now, so the order of operations is wrong somewhere.")
     }
-  } 
+    if (!idxs.isEmpty) {
+      paramFuctionMap.getOrElseUpdate(funcName, idxs)
+    }
+  }
 }
 
 object ErrorMemberMapping {

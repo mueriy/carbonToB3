@@ -19,10 +19,13 @@ class B3NameGenerator extends DefaultNameGenerator {
   %_ to replace #
   %% for parametric types (and vvv); replaces spaces in Boogie name with %% (e.g. "Field Int Bool" -> "Field%%Int%%Bool")
   %F placed between function name and "parametric type identifier", which is the important parameter type names with %% 
-     (This is save, because the combined names themselfe are completed types, which are otherwise never combined by %%
+     (This is save, because the combined names themselves are completed types, which are otherwise never combined by %%
       without being parameters of some other type. The (function name +) %F ensure that this is not the case.)
-  %ConstTag_ to define the name of the tag used for unique constants (f"%ConstTag_${typeNameOfTheConst}").
+  %Tag_ to define the name of the tag used for unique constants (f"%Tag_${typeNameOfTheConst}").
   %M_ at the start of manually created names that must be unique
+  %HeapType  As the HeapType main name (all heap-splits are now of type %HeapType A B, for all Field A B versions)
+  %MaskType  ( ^^^ for MaskType)
+  %PMaskType ( ^^^ for PMaskType)
   */
 
   private val otherChars = "a-zA-Z%"

@@ -25,60 +25,84 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
 
   def name = "State module"
 
-  private val isGoodState = "state" //B3 TODO: unique name
+  private val isGoodState = "state" //B3 NOTE: This is a function name, so it can be a single name
 
   implicit val stateNamespace = verifier.freshNamespace("state")
 
-  override def assumeGoodState = {
-    Assume(currentGoodState)
+  override def assumeGoodState: Seq[Stmt] = {
+    currentGoodState map {Assume(_)}
+  }
+
+  override def groupByFieldSeq(stmts: Seq[Expr]): Seq[Seq[Expr]] = groupByField(stmts).values.toSeq
+  override def groupByField(stmts: Seq[Expr]): Map[Seq[Type], Seq[Expr]] = {
+    (stmts.groupBy {stmt =>
+      stmt.typ match {
+        case nt: NamedType => nt.typVars
+        case t => sys.error(s"'groupByField(Seq)' expects Stmts of type NamedType, got $t")
+      }
+    })
+  }
+  override def groupFPByFieldSeq(ppars: Seq[FParameter]): Seq[Seq[FParameter]] = groupFPByField(ppars).values.toSeq
+  override def groupFPByField(ppars: Seq[FParameter]): Map[Seq[Type], Seq[FParameter]] = {
+    (ppars.groupBy {ppar =>
+      ppar.typ match {
+        case nt: NamedType => nt.typVars
+        case t => sys.error(s"'groupByField(Seq)' expects Stmts of type NamedType, got $t")
+      }
+    })
   }
 
   override def preamble: Seq[Decl] = {
-    Function(Identifier(isGoodState), staticStateContributions(), Bool) ++
+    registerFunction(Identifier(isGoodState), Seq(0))
+
+    (heapModule.allFieldsTypVars map {ftvars => Function(Identifier(isGoodState), staticStateContributions(ftvars), Bool)}) ++
     {
       val prevState = stateModule.state
       stateModule.replaceState(stateModule.pureState)
+      
       // TODO: It would be great if we could use StateModule.currentStateContributionValues, but that will not
       // give us the pure state (see comment there). Once that is fixed, this should be changed accordingly.
       val stateExps = components flatMap (_.currentStateExps)
-      val res = FunctionCallExpr(Identifier(isGoodState), stateExps, Bool)
+      val groupedStateExps = groupByFieldSeq(stateExps)
       stateModule.replaceState(prevState)
-      // This axiom corresponds to the Boogie expression "state(dummyHeap, emptyMask)",
+      
+      // These axioms correspond to the B3 expressions "state(dummyHeap, emptyMask)" of a specific Field version,
       // which is necessary since function definitional axioms trigger on "state(heap, mask), f(heap, args)",
       // so without this assumption, function calls with dummyHeap and emptyMask won't trigger the definition.
-      Axiom(res)
+      groupedStateExps map {stateExpVariant => Axiom(FunctionCallExpr(Identifier(isGoodState), stateExpVariant, Bool))}
     }
   }
 
-  override def reset : Unit = {
+  override def reset(): Unit = {
     curOldState = null
     curState = null
+    //B3 DEVELOPMENT NOTE: these were already commented away:
     //usingOldState = false
     //treatOldAsCurrent = false
     resetBoogieState
   }
 
-  def initBoogieState: Stmt = {
+  def initBoogieState: Seq[Stmt] = {
     curState = new StateComponentMapping()
     // note: it is important that these are set before calling e.g. initState on components
     usingOldState = false
 
     // initialize the state of all components and assume that afterwards the
     // whole state is good
-    val firstStmt =  components map (_.initBoogieState)
+    val firstStmt =  components flatMap (_.initBoogieState)
     // note: this code should come afterwards, to allow the components to reset their state variables
     for (c <- components) {
       curState.put(c, c.currentStateVars)
     }
     firstStmt ++ assumeGoodState // assumeGoodState needs the state components to be in place
   }
-  def resetBoogieState: Stmt = {
+  def resetBoogieState: Seq[Stmt] = {
     usingOldState = false
     curState = new StateComponentMapping()
 
     // initialize the state of all components and assume that afterwards the
     // whole state is good
-    val firstStmt = components map (_.resetBoogieState)
+    val firstStmt = components flatMap (_.resetBoogieState)
     // note: this code should come afterwards, to allow the components to reset their state variables
     for (c <- components) {
       curState.put(c, c.currentStateVars)
@@ -86,13 +110,14 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     firstStmt ++ assumeGoodState // assumeGoodState should come after the state vars have been updated
   }
 
-  def initOldState: Stmt = {
+  def initOldState: Seq[Stmt] = {
     val freshSnapshot = freshTempStateKeepCurrentAux("old", true)
     curOldState = freshSnapshot._1
     initToCurrentStmt(freshSnapshot)
   }
 
-  def staticStateContributions(withHeap: Boolean = true, withPermissions: Boolean = true): Seq[FParameter] = components flatMap (_.staticStateContributions(withHeap, withPermissions))
+  def staticStateContributions(fvars: Seq[Type], withHeap: Boolean = true, withPermissions: Boolean = true): Seq[FParameter] = 
+    components flatMap (_.staticStateContributions(fvars, withHeap, withPermissions))
   // def currentStateContributions: Seq[LocalVarDecl] = components flatMap (_.currentStateContributions)
   /** B3 NOTE: returns the variables that contribute to the state (in the given snapshot). */
   def stateContributionValues(snap: StateSnapshot): Seq[Expr] = {
@@ -114,19 +139,20 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   private var curOldState: StateComponentMapping = null
   private var curState: StateComponentMapping = null
 
-  def staticGoodState: Expr = {
-    FunctionCallExpr(Identifier(isGoodState), staticStateContributions() map (v => IdExpr(v.name, v.typ)), Bool)
+  def staticGoodState(ftvars: Seq[Type]): Expr = {
+    FunctionCallExpr(Identifier(isGoodState), staticStateContributions(ftvars), Bool)
   }
 
-  def currentGoodState: Expr = {
-    FunctionCallExpr(Identifier(isGoodState), currentStateContributionValues, Bool)
+  def currentGoodState: Seq[Expr] = {
+    val groupedVals = groupByFieldSeq(currentStateContributionValues)
+    groupedVals map {FunctionCallExpr(Identifier(isGoodState), _, Bool)}
   }
 
   private lazy val stateRepository = new mutable.HashMap[String, StateSnapshot]()
 
-  override def stateRepositoryPut(name:String, snapshot: StateSnapshot) = stateRepository.put(name,snapshot)
+  override def stateRepositoryPut(name: String, snapshot: StateSnapshot) = stateRepository.put(name,snapshot)
 
-  override def stateRepositoryGet(name:String) : Option[StateSnapshot] = stateRepository.get(name)
+  override def stateRepositoryGet(name: String): Option[StateSnapshot] = stateRepository.get(name)
 
   override def freshTempState(name: String, discardCurrent: Boolean = false, initialise: Boolean = false): (Stmt, StateSnapshot) = {
     assert(name != "old")
@@ -166,9 +192,9 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
     (freshState, false, false)
   }
 
-  override def initToCurrentStmt(snapshot: StateSnapshot) : Stmt = {
+  override def initToCurrentStmt(snapshot: StateSnapshot): Seq[Stmt] = {
     for (e <- snapshot._1.entrySet().asScala.toSeq) yield {
-      val s: Stmt = (e.getValue zip e.getKey.currentStateExps) map (x => x._1 := x._2)
+      val s: Seq[Stmt] = (e.getValue zip e.getKey.currentStateExps) map (x => x._1 := x._2)
       s
     }
   }

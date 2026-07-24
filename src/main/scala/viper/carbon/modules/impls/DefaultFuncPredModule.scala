@@ -60,7 +60,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
   private val assumeFunctionsAboveName = Identifier("AssumeFunctionsAbove")
   override val TODO_REMOVE_assumeFunctionsAboveName = assumeFunctionsAboveName
-  private val assumeFunctionsAbove: FunctionCallExpr = FunctionCallExpr(assumeFunctionsAboveName, Seq(), Int) //Const(assumeFunctionsAboveName)
+  private val assumeFunctionsAbove: FunctionCallExpr = Const(assumeFunctionsAboveName, Int)
 /*
   private val specialRefName = Identifier("special_ref")
   private val specialRef = Const(specialRefName)
@@ -78,13 +78,13 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   private val frameType = NamedType(frameTypeName)
   private val emptyFrameName = Identifier("EmptyFrame")
   override val TODO_REMOVE_emptyFrameName = emptyFrameName
-  private val emptyFrame = FunctionCallExpr(emptyFrameName, Seq(), frameType) //Const(emptyFrameName)
+  private val emptyFrame = Const(emptyFrameName, frameType)
   private val combineFramesName = Identifier("CombineFrames")
   //B3 REMOVED: private val frameFirstName = Identifier("FrameFirst")
   //B3 REMOVED: private val frameSecondName = Identifier("FrameSecond")
   private val frameFragmentName = Identifier("FrameFragment")
   //B3 REMOVED: private val frameContentName = Identifier("FrameContent")
-//B3 LATER:  private val condFrameName = Identifier("ConditionalFrame")
+  private val condFrameName = Identifier("ConditionalFrame")
   private val dummyTriggerName = Identifier("dummyFunction")
   /** Collection of all function output types, to know which variations of dummyFunction are needed */
   private val functionOutputTypes = collection.mutable.Set.empty[Type]
@@ -109,24 +109,22 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     /* B3 INFO: We were able to remove some functions and axiom that defined inverse-functions by
     declaring the function parameters of the "stantard-direction" function as injective. */
     {if (verifier.program.functions.isEmpty) Nil
-     else Seq(Function(assumeFunctionsAboveName, Seq(), Int)) // ConstDecl(assumeFunctionsAboveName, Int)
+     else Seq(ConstDecl(assumeFunctionsAboveName, Int))
     } ++
       //"Declarations for function framing"
       TypeDecl(frameType) ++ 
-      Function(emptyFrameName, Seq(), frameType) ++ //ConstDecl(emptyFrameName, frameType) ++ 
-      // B3 TODO: check which variations for frameFragmentName exist 
-//B3 TODO (FrameFragment): Function(frameFragmentName, Seq(FParameter(Identifier("t"), TypeVar("T"), true)), frameType) ++
-//B3 LATER (perm): Function(condFrameName, Seq(FParameter(Identifier("p"), permType), FParameter(Identifier("f"), frameType)), frameType) ++
-      { // First create the parametric version to register it (needed to correctly translate the name in fucntion calls)
-        Function(dummyTriggerName, Seq(FParameter(Identifier("func"), TypeVar("T"))), Bool)
-        // Now we define and return only the concrete versions. 
+      ConstDecl(emptyFrameName, frameType) ++ 
+//B3 LATER (predicates): Function(frameFragmentName, Seq(FParameter(Identifier("t"), TypeVar("T"), true)), frameType) ++
+      Function(condFrameName, Seq(FParameter(Identifier("p"), permType), FParameter(Identifier("f"), frameType)), frameType) ++
+      { registerFunction(dummyTriggerName, Seq(0))
+        // Now we can directly define and return the concrete versions
         functionOutputTypes map {outTyp =>
           Function(dummyTriggerName, Seq(FParameter(Identifier("func"), outTyp)), Bool)}
       } ++
       Function(combineFramesName,
         Seq(FParameter(Identifier("a"), frameType, true), FParameter(Identifier("b"), frameType, true)),
         frameType) 
-/* B3 LATER (perm) [add "explains ..." to axiom] ++
+/* B3 LATER (predicates) [add "explains ..." to axiom] ++
       CommentedDecl("Definition of conditional frame fragments", {
         val params = Seq(LocalVarDecl(Identifier("p"), permType), LocalVarDecl(Identifier("f"), frameType))
         val condFrameApp = FuncApp(condFrameName, params map (_.l), frameType)
@@ -213,6 +211,8 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   override def translateFunction(f: sil.Function, names: Option[mutable.Map[String, String]]): Seq[Decl] = {
     env = Environment(verifier, f)
     ErrorMemberMapping.currentMember = f
+    
+    // B3 QUEST: technically we only need to use the Heap/Mask-splits where we have read permission to when translating a function
 
 /* B3 LATER (perm)
     val oldCheckReadPermOnly = permModule.setCheckReadPermissionOnly(!verifier.respectFunctionPrecPermAmounts)
@@ -222,7 +222,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       functionDefinitions(f) ++ //"Uninterpreted function definitions"
         (if (f.isAbstract) Nil else definitionalAxiom(f)) ++ //"Definitional axiom"
         framingAxiom(f) ++ //"Framing axioms"
-        postconditionAxiom(f) ++ //"Postcondition axioms"
+// B3 TODO (function postcondition):        postconditionAxiom(f) ++ //"Postcondition axioms"
         triggerFunction(f) ++ //"Trigger function (controlling recursive postconditions)"
         triggerFunctionStateless(f) ++ //"State-independent trigger function"
         checkFunctionDefinedness(f) //"Check contract well-formedness and postcondition"
@@ -244,7 +244,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     val typ = translateType(f.typ)
     functionOutputTypes += typ 
     val fargs = (f.formalArgs map {translateLocalVarDeclToFParameter(_)})
-    val args = heapModule.staticStateContributions(true, true) ++ fargs
+    val args = (allFieldsTypVars flatMap {heapModule.staticStateContributions(_, true, true)}) ++ fargs
     val name = Identifier(f.name)
     val func = Function(name, args, typ)
     val name2 = Identifier(f.name + limitedPostfix)
@@ -291,7 +291,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
   private def definitionalAxiom(f: sil.Function): Seq[Decl] = {
     val height = heights(f.name)
-    val heap = heapModule.staticStateContributions(true, true)
+    val heap = allFieldsTypVars flatMap {heapModule.staticStateContributions(_, true, true)}
     val args = f.formalArgs map {translateLocalVarDeclToFParameter(_)}
     val fapp = translateFuncApp(f.name, (heap ++ args) map (_.l), f.typ, true)
     val precondition : Expr = f.pres.map(p => translateExp(Expressions.asBooleanExp(p).whenExhaling)) match {
@@ -341,9 +341,9 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 */
 
     Axiom(Forall(
-      (stateModule.staticStateContributions() ++ args) map {_.toQ},
-      Seq(Pattern(Seq(staticGoodState,fapp))) /*B3 LATER (predicates): ++ (if (!usePredicateTriggers || predicateTriggers.isEmpty) Seq()  else Seq(Trigger(Seq(staticGoodState, triggerFuncStatelessApp(f,args map (_.l))) ++ predicateTriggers))) */,
-      (staticGoodState && assumeFunctionsAbove(height)) ==>
+      ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ args) map {_.toQ},
+      Seq(Pattern((allFieldsTypVars flatMap staticGoodState) ++ fapp)) /*B3 LATER (predicates): ++ (if (!usePredicateTriggers || predicateTriggers.isEmpty) Seq()  else Seq(Trigger(Seq(staticGoodState, triggerFuncStatelessApp(f,args map (_.l))) ++ predicateTriggers))) */,
+      (andAll(allFieldsTypVars flatMap staticGoodState) && assumeFunctionsAbove(height)) ==>
         (precondition ==> (fapp === body))
     ))
   }
@@ -389,6 +389,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     res
   }
 
+/* B3 TODO (function postcondition)
   private def postconditionAxiom(f: sil.Function): Seq[Decl] = {
     val height = heights(f.name)
     val heap = heapModule.staticStateContributions(true, true)
@@ -419,6 +420,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         (staticGoodState && (assumeFunctionsAbove(height) || triggerFuncApp(f,heapModule.staticStateContributions(true,true) map (_.l), args map (_.l)))) ==> (precondition ==> transformFuncAppsToLimitedForm(bPost, height))))
     }
   }
+*/
 
   /** Declaration of trigger function (controlling recursive postconditions) */
   private def triggerFunction(f: sil.Function): Seq[Decl] = {
@@ -442,7 +444,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   private def framingAxiom(f: sil.Function): Seq[Decl] = {
     stateModule.reset()
     val typ = translateType(f.typ)
-    val heap = heapModule.staticStateContributions(true, true)
+    val heap = allFieldsTypVars flatMap {heapModule.staticStateContributions(_, true, true)}
     val realArgs = (f.formalArgs map {translateLocalVarDeclToFParameter(_)})
     val args = heap ++ realArgs
     val name = Identifier(f.name + framePostfix)
@@ -466,9 +468,9 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
     Seq(func) ++
       Seq(Axiom(Forall(
-        (stateModule.staticStateContributions() ++ realArgs) map {_.toQ},
-        Seq(Pattern(Seq(staticGoodState, transformFuncAppsToLimitedForm(funcApp2)))) /* B3 LATER (predicates): ++ (if (predicateTriggers.isEmpty) Seq()  else Seq(Pattern(Seq(staticGoodState, triggerFuncStatelessApp(f,realArgs map (_.l))) ++ predicateTriggers))) */,
-        staticGoodState ==> (transformFuncAppsToLimitedForm(funcApp2) === funcApp))) ) 
+        ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ realArgs) map {_.toQ},
+        Seq(Pattern((allFieldsTypVars map staticGoodState) ++ transformFuncAppsToLimitedForm(funcApp2))) /* B3 LATER (predicates): ++ (if (predicateTriggers.isEmpty) Seq()  else Seq(Pattern(Seq(staticGoodState, triggerFuncStatelessApp(f,realArgs map (_.l))) ++ predicateTriggers))) */,
+        andAll(allFieldsTypVars map staticGoodState) ==> (transformFuncAppsToLimitedForm(funcApp2) === funcApp))) ) 
 /* B3 LATER (QPerm): ++
       translateCondAxioms("function "+f.name, f.formalArgs, funcFrameInfo._2)
 */
@@ -541,7 +543,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
         val (heapArgs,normalArgs) =
         if(argsIncludeHeap) {
-          val numHeapArgs = heapModule.staticStateContributions(true, true /* second param makes no difference for the HeapModule */).size
+          val numHeapArgs = (allFieldsTypVars flatMap {heapModule.staticStateContributions(_, true, true /* second param makes no difference for the HeapModule */)}).size
           (args take numHeapArgs, args drop numHeapArgs)
         } else {
           (currentStateContributionValues,args)
@@ -699,7 +701,13 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       translateResult(res) := translateExp(f.body.get)
     val checkPost = checkFunctionPostconditionDefinedness(f)
     val body : Stmt = Seq(init, checkPre, checkExp, exp, checkPost)
-    val definednessChecks = Procedure(Identifier(f.name + "#definedness"), args ++ translateResultDecl(res), Some(/*B3 TODO2: Replace the following with just 'body' after adding the correct INOUT Heap&Mask PParameters*/mainModule.addLocalVarDeclarations(body, args ++ translateResultDecl(res))))
+    val ins = args
+    val outs = translateResultDecl(res)
+    val inouts = mainModule.defaultInoutPParameters
+    val bodyWithDecls : Stmt = addLocalVarDeclarations(body, ins ++ outs ++ inouts)
+    val definednessChecks = Procedure(name = Identifier(f.name + "#definedness"), 
+                                      parameters = ins ++ outs ++ inouts, 
+                                      body = Some(bodyWithDecls))
     checkingDefinednessOfFunction = None
     definednessChecks
   }

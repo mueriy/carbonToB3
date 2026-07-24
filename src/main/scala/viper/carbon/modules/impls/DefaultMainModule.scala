@@ -109,14 +109,10 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         // evaluation happens lazily, which can lead to incorrect behaviour (evaluation order is important here)
         // B3 INFO: interestingly, the order even seems to be correct to support un-parametrization of type 
         // and splitting the heap and adding it as procedure inout parameters 
-/* B3 TODO2
-        val translatedFields = (fields flatMap translateField).toList
-*/
+        val translatedFields = (fields flatMap translateField).toList //"Translation of all fields"
         nameMaps = (methods ++ functions ++ predicates).map(_.name -> new mutable.HashMap[String, String]()).toMap
         val members = // (domains flatMap translateDomainDecl) ++ //B3 TODO
-/* B3 TODO2
           translatedFields ++
-*/
           (functions flatMap (f => translateFunction(f, nameMaps.get(f.name)))) ++
 /* B3 TODO2
           (predicates flatMap (p => translatePredicate(p, nameMaps.get(p.name)))) ++
@@ -128,15 +124,15 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
 
         // get the preambles (only at the end, even if we add it at the beginning)
         val preambles: Seq[Decl] = verifier.allModules flatMap {
-          m =>
-            //"Preamble of ${m.name}."
-            if (m.preamble.size > 0) m.preamble
-            else Nil
+          // B3 NOTE: Removed the if (m.preamble.size > 0) ... part here, which doesn't seem to have done anything 
+          // useful, and the new registerFunction's in the preambles raise errors when the preamble is run twice. 
+          // (We could also not raise that error, but...)
+          m => m.preamble
         }
-        
+
         // B3: Removed the header information for debugging, because we cannot add that to a B3-AST
 
-        val declCollection = members ++ preambles
+        val declCollection = preambles ++ members
 
         // We need to split the "Decl"s into their own groups, because there is no overarching Decl type in the B3 AST 
         val b3signatureTypes: Seq[String] = Seq() // Not sure what this is. Is a new, unexplained feature.
@@ -162,10 +158,10 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         if (!b3types.contains(TypeDecl(NamedType("FrameType")))) {
           b3types = b3types ++ TypeDecl(NamedType("FrameType"))
         }
-        val stateFunc = Function(stateModule.staticGoodState.asInstanceOf[FunctionCallExpr].name, stateModule.staticStateContributions(), Bool)
-        if (!b3functions.contains(stateFunc)) {
-          b3functions = b3functions ++ stateFunc
-        }
+        // val stateFunc = Function(stateModule.staticGoodState.asInstanceOf[FunctionCallExpr].name, stateModule.staticStateContributions(), Bool)
+        // if (!b3functions.contains(stateFunc)) {
+        //   b3functions = b3functions ++ stateFunc
+        // }
         val AssumeFunctionsAbove = Function(funcPredModule.TODO_REMOVE_assumeFunctionsAboveName, Seq(), Int)
         if (!b3functions.contains(AssumeFunctionsAbove)) {
           b3functions = b3functions ++ AssumeFunctionsAbove
@@ -195,7 +191,7 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         // implementation we need variables that can be some value at the start and then can be modified.
         //(B3 TODO: since we don't actually call any procedures, we could also just use a vardecl? 
         //  What are the (dis)advantages of these two options?)
-        val inouts: Seq[PParameter] = Seq() //B3 TODO: add global variables here!
+        val inouts: Seq[PParameter] = defaultInoutPParameters
 
         // Translate individual parts for the procedure body
         // "Initializing the state"
@@ -262,6 +258,12 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
     val undecl = body.undeclLocalVars filter (v1 => inOuts.forall(v2 => v2.name != v1.name))
     // pack procedure body in layers of VarDecls (one layer per undeclared variable)
     undecl.foldRight(body.asInstanceOf[Stmt])((l, r) => VarDecl(l.name, r, l.typ)) 
+  }
+
+  override def defaultInoutPParameters: Seq[PParameter] = {
+    allFieldsTypVars flatMap {
+      ftvars => Seq(heapModule, permModule) flatMap {_.staticStateContributions(ftvars, true, true) map {_.toP(INOUT)}}
+    }
   }
 
 /*

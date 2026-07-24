@@ -19,18 +19,18 @@ trait CarbonStateComponent extends Component {
   /**
    * The statements necessary to initialize the part of the state belonging to this module.
    */
-  def initBoogieState: Stmt
+  def initBoogieState: Seq[Stmt]
 
   /**
    * The statements necessary to reset the part of the state belonging to this module.
    */
-  def resetBoogieState: Stmt
+  def resetBoogieState: Seq[Stmt]
 
   /**
    * The name and type of the static contribution of this component to the state. The returned value should remain the
-   * same even if the state is changed. (For Functions; For Axiom use 'output map {_.toQ}')
+   * same even if the state is changed. (for the given Field-type)
    */
-  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[FParameter]
+  def staticStateContributions(fvars: Seq[Type], withHeap: Boolean, withPermissions: Boolean): Seq[FParameter]
 
 
 /*

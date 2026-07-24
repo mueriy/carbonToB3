@@ -48,7 +48,7 @@ object Transformer {
             case TypeDecl(_, _) => parent
             // case TypeAlias(n, de) => TypeAlias(go(n), go(de))
             case Tagger(_,_) => parent
-            case Function(name, args, typ, tag) => Function(name, args map go, typ, tag)
+            case Function(name, args, typ, optTag, optBody) => Function(name, args map go, typ, optTag, optBody map go)
             case Axiom(exp, explains) => Axiom(go(exp), explains)
             // case GlobalVarDecl(name, typ) => GlobalVarDecl(name, go(typ))
             case Procedure(name, args, optBody, pre, post) => Procedure(name, args map go, optBody map go, pre map go, post map go)
@@ -56,6 +56,7 @@ object Transformer {
             // case DeclComment(_) => parent
             // case LiteralDecl(_) => parent
           }
+        case FunctionDef(body, when) => FunctionDef(go(body), when map go)
         case ss: Stmt =>
           ss match {
             case _:VarDecl => sys.error("this case should not be reachable (LocalVar is already handled by LocalVarDecl sub-case)")
@@ -76,7 +77,7 @@ object Transformer {
           e match {
             case BoolLit(_) => parent
             case IntLit(_) => parent
-            // case RealLit(_) => parent
+            case RealLit(_) => parent
             case IdExpr(_,_,_) => parent
             case OpExpr(op, es) => OpExpr(op, es map go)
             case CondExp(cond, thn, els) => CondExp(go(cond), go(thn), go(els))
@@ -162,16 +163,24 @@ object DuplicatingTransformer {
             case TypeDecl(_,_) => Seq(parent)
             case Tagger(_,_) => Seq(parent)
             // case TypeAlias(n, de) => for {nResult <- go(n); deResult <- go(de)} yield TypeAlias(nResult, deResult)
-            case Function(name, args, typ, tag) => for {argsResult <- goSeq(args); typResult <- go(typ)} yield Function(name, argsResult, typResult, tag)
+            case Function(name, args, typ, optTag, optBody) => 
+              for {argsResult <- goSeq(args); typResult <- go(typ); 
+                bodyResult <- {optBody match {
+                  case None => Seq(None)
+                  case Some(fdef) => go(fdef).map({x => Some(x)})}
+              }} yield Function(name, argsResult, typResult, optTag, bodyResult)
             case Axiom(exp, explains) => go(exp) map (Axiom(_, explains))
             // case GlobalVarDecl(name, typ) => go(typ) map (GlobalVarDecl(name, _))
             case Procedure(name, args, optBody, pre, post) =>
               for {argsResult <- goSeq(args); preResult <- goSeq(pre); postResult <- goSeq(post); 
-              bodyResult <- {optBody match {
-                case None => Seq(None)
-                case Some(stmt) => go(stmt).map({x => Some(x)})}
+                bodyResult <- {optBody match {
+                  case None => Seq(None)
+                  case Some(stmt) => go(stmt).map({x => Some(x)})}
               }} yield Procedure(name, argsResult, bodyResult, preResult, postResult)
           }
+        case FunctionDef(body, when) => 
+          for {bodyResult <- go(body); whenResult <- goSeq(when)} yield
+            FunctionDef(bodyResult, whenResult)
         case ss: Stmt =>
           ss match {
             case _:VarDecl => sys.error("this case should not be reachable (LocalVar is already handled by LocalVarDecl sub-case)")
@@ -196,7 +205,7 @@ object DuplicatingTransformer {
           e match {
             case BoolLit(_) => Seq(parent)
             case IntLit(_) => Seq(parent)
-            // case RealLit(_) => Seq(parent)
+            case RealLit(_) => Seq(parent)
             case IdExpr(n,t,o) => go(t) map (IdExpr(n,_,o))
             // case RealConv(exp) => go(exp) map (RealConv(_))
             // case Const(_) => Seq(parent)

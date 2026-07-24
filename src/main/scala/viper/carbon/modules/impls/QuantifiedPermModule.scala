@@ -38,6 +38,10 @@ class QuantifiedPermModule(val verifier: Verifier)
   with StmtComponent
   with DefinednessComponent {
 
+  // B3 NOTE: The reason why we always add the "field-index-nr" behind names (e.g. to maskName), even if we only use
+  // a single name in the current context, is that we are not allowed to combine the same Identifier with different
+  // types. So StdMaskName + MaskType1 and StdMaskName + MaskType2 (even in different location) leads to problems
+
   import verifier._
   import heapModule._
   import mainModule._
@@ -57,40 +61,48 @@ class QuantifiedPermModule(val verifier: Verifier)
 
   implicit val namespace = verifier.freshNamespace("perm")
   private val axiomNamespace = verifier.freshNamespace("perm.axiom")
-  private val permTypeName = "Perm"
+
+  // B3 NOTE: permTypeName (= "Perm") and the NamedType created from it has been replaced by the Type-Node: Perm
   private val maskTypeName = "MaskType"
-  override val maskType = NamedType(maskTypeName)
-/*
   private val pmaskTypeName = "PMaskType"
-  override val pmaskType = NamedType(pmaskTypeName)
-*/
-  private val maskName = Identifier("Mask")
-  private val originalMask = IdExpr(maskName, maskType)
-  private var mask: IdExpr = originalMask // When reading, don't use this directly: use either maskVar or maskExp as needed
-  private def maskVar : IdExpr = {assert (!usingOldState); mask}
-  private def maskExp : Expr = if (usingPureState) zeroMask else mask
-  private val zeroMaskName = Identifier("ZeroMask")
-  private val zeroMask = FunctionCallExpr(zeroMaskName, Seq(), maskType)
-/*
-  private val zeroPMaskName = Identifier("ZeroPMask")
-  override val zeroPMask = Const(zeroPMaskName)
+  override def pmaskType(ftvars: Seq[Type]) = NamedType(pmaskTypeName, ftvars)
+
+  private def maskType(ftvars: Seq[Type]) = NamedType(maskTypeName, ftvars)
+  override def maskTypes: Seq[Type] = allFieldsTypVars map {maskType(_)}
+  private def maskName(ftvars: Seq[Type]) = Identifier(addFieldMark("Mask", ftvars))
+
+  private var originalMasks: Seq[IdExpr] = Seq()
+  private var masks: Seq[IdExpr] = originalMasks // When reading, don't use this directly: use either maskVar or maskExp as needed
+  private def maskVar: Seq[IdExpr] = {assert (!usingOldState); masks}
+  private def maskExp: Seq[Expr] = if (usingPureState) zeroMasks else masks
+  private def zeroMaskName(ftvars: Seq[Type]) = Identifier(addFieldMark("ZeroMask", ftvars))
+
+  private lazy val zeroMasks: Seq[FunctionCallExpr] = allFieldsTypVars map {ftvars => Const(zeroMaskName(ftvars), maskType(ftvars))}
+  private def zeroMask(ftvars: Seq[Type]) = Const(zeroMaskName(ftvars), maskType(ftvars))
+  private def zeroPMaskName(ftvars: Seq[Type]) = Identifier(addFieldMark("ZeroPMask", ftvars))
+  override def zeroPMask(ftvars: Seq[Type]) = Const(zeroPMaskName(ftvars), pmaskType(ftvars))
   private val noPermName = Identifier("NoPerm")
-  private val noPerm = Const(noPermName)
+  private val noPerm = Const(noPermName, permType)
   private val fullPermName = Identifier("FullPerm")
-  private val fullPerm = Const(fullPermName)
+/*
+  private val fullPerm = Const(fullPermName, permType)
   private val permAddName = Identifier("PermAdd")
   private val permSubName = Identifier("PermSub")
   private val permDivName = Identifier("PermDiv")
+*/
   private val permConstructName = Identifier("Perm")
-  private val goodMaskName = Identifier("GoodMask")
+  private def goodMaskName(ftvars: Seq[Type]) = Identifier(addFieldMark("GoodMask", ftvars))
+/*
   private val hasDirectPermName = Identifier("HasDirectPerm")
   private val predicateMaskFieldName = Identifier("PredicateMaskField")
   private val wandMaskFieldName = Identifier("WandMaskField")
+*/
 
   private val assumePermUpperBoundName = Identifier("AssumePermUpperBound")
-  private val assumePermUpperBound: Const = Const(assumePermUpperBoundName)
+  private val assumePermUpperBound: FunctionCallExpr = Const(assumePermUpperBoundName, Bool)
 
 
+/*
   private val resultMask = LocalVarDecl(Identifier("ResultMask"),maskType)
   private val summandMask1 = LocalVarDecl(Identifier("SummandMask1"),maskType)
   private val summandMask2 = LocalVarDecl(Identifier("SummandMask2"),maskType)
@@ -110,6 +122,7 @@ class QuantifiedPermModule(val verifier: Verifier)
   private var triggerFuncs: ListBuffer[Func] = new ListBuffer[Func](); //list of inverse functions used for inhale/exhale qp
 
   private var assertReadPermOnly: Boolean = false
+*/
 
   private val readMaskName = Identifier("readMask")
   private val updateMaskName = Identifier("updMask")
@@ -118,72 +131,80 @@ class QuantifiedPermModule(val verifier: Verifier)
   private val updatePMaskName = Identifier("updPMask")
 
   override val pmaskTypeDesugared = PMaskDesugaredRep(readPMaskName, updatePMaskName)
-*/
 
   override def preamble = {
-    Function(zeroMaskName, Seq(), maskType)
-/*B3 TODO
-    val obj = LocalVarDecl(Identifier("o")(axiomNamespace), refType)
-    val field = LocalVarDecl(Identifier("f")(axiomNamespace), fieldType)
-    val permInZeroMask = currentPermission(zeroMask, obj.l, field.l)
-    val permInZeroPMask = currentPermission(zeroPMask, obj.l, field.l, true)
+    
+    val obj = Binding(Identifier("o")(axiomNamespace), refType)
+    def field(ftvars: Seq[Type]) = Binding(Identifier(addFieldMark("f", ftvars))(axiomNamespace), fieldType(ftvars))
+    def permInZeroMask(ftvars: Seq[Type]) = currentPermission(zeroMask(ftvars), obj.l, field(ftvars).l)
+    def permInZeroPMask(ftvars: Seq[Type]) = currentPermission(zeroPMask(ftvars), obj.l, field(ftvars).l, true)
 
-    // permission type
-    TypeAlias(permType, Real) ::
-      // mask and mask type
-      (if (verifier.usePolyMapsInEncoding)
-        TypeAlias(maskType, MapType(Seq(refType, fieldType), permType, fieldType.freeTypeVars))
-      else TypeDecl(maskType)) ::
-      GlobalVarDecl(maskName, maskType) ::
+    // register functions:
+    registerFunction(readMaskName, Seq(0))
+    registerFunction(updateMaskName, Seq(0))
+    registerFunction(readPMaskName, Seq(0))
+    registerFunction(updatePMaskName, Seq(0))
+
+
+    //B3 INFO: Removed perm type alias, internally that is just a Real (/Int)
+    (allFieldsTypVars flatMap {ftvar => 
+      // mask and mask type (B3 NOTE: Removed usePolyMapsInEncoding case)
+      TypeDecl(maskType(ftvar)) ++
       // zero mask
-      ConstDecl(zeroMaskName, maskType) ::
+      ConstDecl(zeroMaskName(ftvar), maskType(ftvar)) ++
       Axiom(Forall(
-        Seq(obj, field),
-        Trigger(permInZeroMask),
-        (permInZeroMask === noPerm))) ::
-      // pmask type
-      (if(verifier.usePolyMapsInEncoding)
-        TypeAlias(pmaskType, MapType(Seq(refType, fieldType), Bool, fieldType.freeTypeVars))
-      else TypeDecl(pmaskType)) ::
+        Seq(obj, field(ftvar)),
+        Pattern(permInZeroMask(ftvar)),
+        (permInZeroMask(ftvar) === noPerm))) ++
+      // pmask type (B3 NOTE: Removed usePolyMapsInEncoding case)
+      TypeDecl(pmaskType(ftvar)) ++
       // zero pmask
-      ConstDecl(zeroPMaskName, pmaskType) ::
+      ConstDecl(zeroPMaskName(ftvar), pmaskType(ftvar)) ++
       Axiom(Forall(
-        Seq(obj, field),
-        Trigger(permInZeroPMask),
-        permInZeroPMask === FalseLit())) ::
+        Seq(obj, field(ftvar)),
+        Pattern(permInZeroPMask(ftvar)),
+        permInZeroPMask(ftvar) === FalseLit()))
+    }) ++
+/* B3 LATER (predicates)
       // predicate mask function
       Func(predicateMaskFieldName,
         Seq(LocalVarDecl(Identifier("f"), predicateVersionFieldType())),
         predicateMaskFieldType) ::
+*/
+/* B3 ADVANCED (wand)
       Func(wandMaskFieldName,
         Seq(LocalVarDecl(Identifier("f"), predicateVersionFieldType())),
         predicateMaskFieldType) ::
+*/
       // permission amount constants
-      ConstDecl(noPermName, permType) ::
-      Axiom(noPerm === RealLit(0)) ::
-      ConstDecl(fullPermName, permType) ::
-      Axiom(fullPerm === RealLit(1)) ::
-      // permission constructor
-      Func(permConstructName, Seq(LocalVarDecl(Identifier("a"), Real), LocalVarDecl(Identifier("b"), Real)), permType) :: Nil ++
+      // B3 NOTE: We leave encoding the function bodies here to B3 (instead of splitting them into Function-Axiom-pairs ourselves).
+      ConstDecl(noPermName, permType, body = Some(FunctionDef(RealLit(0)))) ++
+      ConstDecl(fullPermName, permType, body = Some(FunctionDef(RealLit(1)))) ++
+      // permission constructor // B3 NOTE: this is not actually used anywhere... ?
+      Function(permConstructName, Seq(FParameter(Identifier("a"), Real), FParameter(Identifier("b"), Real)), permType) ++
       //read and update mask/pmask
       (if(!verifier.usePolyMapsInEncoding) {
-        val maskPolyMapDesugarHelper = PolyMapDesugarHelper(refType, fieldTypeConstructor, namespace)
+        val maskPolyMapDesugarHelper = PolyMapDesugarHelper(allFieldsTypVars, refType, fieldTypeConstructor, namespace)
         val maskRep = maskPolyMapDesugarHelper.desugarPolyMap(maskType, (readMaskName, updateMaskName), _ => permType)
         val pmaskRep = maskPolyMapDesugarHelper.desugarPolyMap(pmaskType, (readPMaskName, updatePMaskName), _ => Bool)
 
-        MaybeCommentedDecl("read and update permission mask",
-          maskRep.select ++ maskRep.store ++ maskRep.axioms) ++
-        MaybeCommentedDecl("read and update known-folded mask",
-            pmaskRep.select ++ pmaskRep.store ++ pmaskRep.axioms)
+        //"read and update permission mask"
+        maskRep.select ++ maskRep.store ++ maskRep.axioms ++
+        //"read and update known-folded mask"
+        pmaskRep.select ++ pmaskRep.store ++ pmaskRep.axioms
       } else {
         Nil
       }) ++
-      (if (verifier.respectFunctionPrecPermAmounts) Nil else ConstDecl(assumePermUpperBoundName, Bool)) ++
-      // good mask
-      Func(goodMaskName, LocalVarDecl(maskName, maskType), Bool) ++
-      Axiom(Forall(stateModule.staticStateContributions(),
-        Trigger(Seq(staticGoodState)),
-        staticGoodState ==> staticGoodMask)) ++ {
+      (if (verifier.respectFunctionPrecPermAmounts) Nil else Seq(ConstDecl(assumePermUpperBoundName, Bool))) ++
+      (allFieldsTypVars flatMap {ftvar =>
+        // good mask
+        Function(goodMaskName(ftvar), FParameter(maskName(ftvar), maskType(ftvar)), Bool) ++
+        Axiom(Forall((stateModule.staticStateContributions(ftvar) map {_.toQ}),
+          Pattern(staticGoodState(ftvar)(0)),
+          staticGoodState(ftvar)(0) ==> staticGoodMask(ftvar)))
+      }) ++ 
+Nil/*B3 TODO
+      {
       val perm = currentPermission(obj.l, field.l)
       val shouldAssumePermUpperBound = if (verifier.respectFunctionPrecPermAmounts) TrueLit() else assumePermUpperBound
       Axiom(Forall(staticStateContributions(true, true) ++ obj ++ field,
@@ -232,9 +253,9 @@ class QuantifiedPermModule(val verifier: Verifier)
 */
   }
 
-/*
-  def permType = NamedType(permTypeName)
+  def permType = Perm
 
+/*
   override def assumePermUpperBounds(doAssume: Boolean) : Stmt = {
     if (doAssume)
       Assume(assumePermUpperBound)
@@ -243,25 +264,26 @@ class QuantifiedPermModule(val verifier: Verifier)
   }
 */
 
-  def staticStateContributions(withHeap: Boolean, withPermissions: Boolean): Seq[FParameter] = if (withPermissions) Seq(FParameter(maskName, maskType)) else Seq()
+  def staticStateContributions(ftvars: Seq[Type], withHeap: Boolean, withPermissions: Boolean): Seq[FParameter] = if (withPermissions) { FParameter(maskName(ftvars), maskType(ftvars)) } else Seq()
 /*
   def currentStateContributions: Seq[LocalVarDecl] = Seq(LocalVarDecl(mask.name, maskType))
 */
-  def currentStateVars: Seq[IdExpr] = Seq(mask)
-  def currentStateExps: Seq[Expr] = Seq(maskExp)
+  def currentStateVars: Seq[IdExpr] = masks
+  def currentStateExps: Seq[Expr] = maskExp
 
-  def initBoogieState: Stmt = {
-    mask = originalMask
+  def initBoogieState: Seq[Stmt] = {
+    masks = originalMasks
     resetBoogieState
   }
-  def resetBoogieState = {
-    (maskVar := zeroMask)
+  def resetBoogieState: Seq[Stmt] = { // B3 QUEST: Remove unneeded variants (less likely to be possible here than in other places)
+    maskVar.zip(zeroMasks) map {case (mvar, zmask) => (mvar := zmask)}
   }
 
-  override def reset = {
+  override def reset() = {
     addADVANCED("QuantifiedPermModule", "reset")
+    originalMasks = allFieldsTypVars map {ftvars => IdExpr(maskName(ftvars), maskType(ftvars))}
+    masks = originalMasks
 /*
-    mask = originalMask
     qpId = 0
     inverseFuncs = new ListBuffer[Func]();
     rangeFuncs = new ListBuffer[Func]();
@@ -290,20 +312,22 @@ class QuantifiedPermModule(val verifier: Verifier)
   override def wandMaskField(wand: Exp): Exp = {
     FuncApp(wandMaskFieldName, Seq(wand), pmaskType)
   }
+*/
 
-  def staticGoodMask = FuncApp(goodMaskName, LocalVar(maskName, maskType), Bool)
+  def staticGoodMask(ftvars: Seq[Type]) = FunctionCallExpr(goodMaskName(ftvars), IdExpr(maskName(ftvars), maskType(ftvars)), Bool)
 
+/*
   private def permAdd(a: Exp, b: Exp): Exp = a + b
   private def permSub(a: Exp, b: Exp): Exp = a - b
   private def permDiv(a: Exp, b: Exp): Exp = a / b
 */
 
   override def freshTempState(name: String): Seq[IdExpr] = {
-    Seq(IdExpr(Identifier(s"${name}Mask"), maskType))
+    allFieldsTypVars map {ftvars => IdExpr(Identifier(s"${name}${maskName(ftvars)}"), maskType(ftvars))}
   }
 
   override def restoreState(s: Seq[IdExpr]): Unit = {
-    mask = s(0)
+    masks = s
   }
 
 /*
@@ -1488,17 +1512,16 @@ class QuantifiedPermModule(val verifier: Verifier)
   def currentPermission(rcv: Exp, location: Exp): Exp = {
     currentPermission(maskExp, rcv, location)
   }
-  def currentPermission(mask: Exp, rcv: Exp, location: Exp, isPMask: Boolean = false): Exp = {
-    if(verifier.usePolyMapsInEncoding) {
-      MapSelect(mask, Seq(rcv, location))
-    } else {
-      FuncApp( if(isPMask) { readPMaskName } else { readMaskName },
-               Seq(mask, rcv, location),
-               if(isPMask) { Bool } else { permType }
-      )
-    }
+*/
+  def currentPermission(mask: Expr, rcv: Expr, location: Expr, isPMask: Boolean = false): Expr = {
+    // B3 INFO: removed usePolyMapsInEncoding
+     FunctionCallExpr(if(isPMask) { readPMaskName } else { readMaskName },
+                      Seq(mask, rcv, location),
+                      if(isPMask) { Bool } else { permType }
+     )
   }
 
+/*
   private def currentMaskAssignUpdate(loc: LocationAccess, newPerm: Exp) : Stmt = {
     val (rcv, field) = rcvAndFieldExp(loc)
     currentMaskAssignUpdate(rcv, field, newPerm)
@@ -1521,7 +1544,7 @@ class QuantifiedPermModule(val verifier: Verifier)
   }
 */
 
-  override def currentMask = Seq(maskExp)
+  override def currentMask = maskExp
 /*
   override def staticMask = Seq(LocalVarDecl(maskName, maskType))
   override def staticPermissionPositive(rcv: Exp, loc: Exp) = {

@@ -41,7 +41,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   implicit val namespace = verifier.freshNamespace("loop")
 
   //separate masks for each loop to store the permissions which are framed away
-  private var frames: Map[Int, (Variable,Variable)] = Map[Int, (Variable, Variable)]();
+  private var frames: Map[Int, Seq[(Variable,Variable)]] = Map[Int, Seq[(Variable, Variable)]]();
 
   private var loopToInvs: Map[Int, Seq[sil.Exp]] = Map.empty
   private var labelLoopInfoMap: Map[String, LoopInfo] = Map.empty
@@ -584,11 +584,11 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
     executeUnfoldings(invs, (inv => errors.LoopInvariantNotEstablished(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotEstablished(e)))
     ) ++
     loopIdOpt.fold(Nil:Stmt)(loopId => {
-      val (frameMask, frameHeap) = getFrame(loopId)
-      //"Store frame in mask associated with loop"
-      Seq(Assign(frameMask.l, currentMask(0)),
-          Assign(frameHeap.l, currentHeap(0))
-      )
+      getFrame(loopId) flatMap { 
+        case (frameMask, frameHeap) =>
+          Seq(Assign(frameMask.l, currentMask(0)),
+              Assign(frameHeap.l, currentHeap(0)))
+      }
     })
   }
 
@@ -628,14 +628,15 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
     useLoopDetector = false
   }
 
-  private def getFrame(loopId: Int): (Variable, Variable) = {
+  private def getFrame(loopId: Int): Seq[(Variable, Variable)] = {
     frames.get(loopId) match {
       case Some(fMask) => fMask
       case None => {
-        val freshMaskDecl = Variable(Identifier("frameMask" + loopId), permModule.maskType)
-        val freshHeapDecl = Variable(Identifier("frameHeap" + loopId), heapModule.heapType)
-        frames += (loopId -> (freshMaskDecl, freshHeapDecl))
-        (freshMaskDecl, freshHeapDecl)
+        val freshMaskDecls = permModule.maskTypes.zipWithIndex map {case (typ, idx) => Variable(Identifier(s"frameMask${idx}%%${loopId}"), typ)}
+        val freshHeapDecls = heapModule.heapTypes.zipWithIndex map {case (typ, idx) => Variable(Identifier(s"frameHeap${idx}%%${loopId}"), typ)}
+        val freshBothDecls = freshMaskDecls zip freshHeapDecls
+        frames += (loopId -> freshBothDecls)
+        freshBothDecls
       }
     }
   }

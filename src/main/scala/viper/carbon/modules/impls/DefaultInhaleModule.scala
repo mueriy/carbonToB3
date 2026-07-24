@@ -26,6 +26,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
   import expModule._
   import stateModule._
   import mainModule._
+  import heapModule._
 
   def name = "Inhale module"
 
@@ -143,9 +144,9 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
 
           //do not transform definednessChecks inside package (backwards compatible with older version)
           val retStmt =
-            transformStmtInsidePackage(if (containsFunc(e)) Seq(assumeGoodState) else Seq()) ++
+            transformStmtInsidePackage(if (containsFunc(e)) assumeGoodState else Seq()) ++
             definednessChecks ++
-            transformStmtInsidePackage(stmt ++ (if (e.isPure) Seq() else Seq(assumeGoodState))) ++
+            transformStmtInsidePackage(stmt ++ (if (e.isPure) Seq() else assumeGoodState)) ++
             freeAssms
           //(if (containsFunc(e)) assumeGoodState else Seq[Stmt]()) ++ stmt ++ (if (e.isPure) Seq[Stmt]() else assumeGoodState)
 

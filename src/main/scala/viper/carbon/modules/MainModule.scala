@@ -86,4 +86,9 @@ trait MainModule extends Module {
    */
   def addLocalVarDeclarations(body: Stmt, inOuts: Seq[PParameter]): Stmt
 
+  /** 
+   * Returns default INOUT PParameters, meaning Heap and Mask.
+   */
+  def defaultInoutPParameters: Seq[PParameter]
+
 }
