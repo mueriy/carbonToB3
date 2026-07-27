@@ -158,7 +158,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           // if e is pure, then assert and exhale are the same
           exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
         } else {
-          TODO_Stmt("simpleHandleStmt", "sil.Assert")
+          TODO_Stmt("simpleHandleStmt", "sil.Assert (non-pure version)")
 /*
           // we create a temporary state to ignore the side-effects
           val (backup, snapshot) = freshTempState("Assert")
@@ -214,7 +214,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           //B3 LATER: unfolding: executeUnfoldings(pres, (pre => errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))) ++
             exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt) ++
           //"Havocing target variables"
-          Reinit(Seq()) ++ //B3 TODO: correct var name list; was previously: "Havoc((targets map translateExp).asInstanceOf[Seq[Var]]) ++"
+          Reinit((targets map translateExp).asInstanceOf[Seq[IdExpr]]) ++
           {
             stateModule.replaceOldState(preCallState)
             //"Inhaling postcondition"
@@ -293,7 +293,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
 
         locals map (v => mainModule.env.define(v.localVar)) // add local variables to environment
         //"Assumptions about local variables"
-        val localVarsAssumptions = locals map (a => mainModule.allAssumptionsAboutValue(a.typ, mainModule.translateLocalVarDeclToVarDecl(a), true)) // B3 TODO: we need to find out what local variables are included here; theoretically this should only include VarDecl's, but what if Bindings are also included?
+        val localVarsAssumptions = locals map (a => mainModule.allAssumptionsAboutValue(a.typ, mainModule.translateLocalVarDeclToBinding(a), true)) // B3 NOTE: we use the ...ToBinding version here, but we could use any version; we are only interested in the IdExpr behind it.
         val translatedStmts = (ss map (st => translateStmt(st, statesStack, allStateAssms, duringPackage)))
         val seqOfAllStmts = localVarsAssumptions ++ translatedStmts
          

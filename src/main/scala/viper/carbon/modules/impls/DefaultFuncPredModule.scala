@@ -222,7 +222,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       functionDefinitions(f) ++ //"Uninterpreted function definitions"
         (if (f.isAbstract) Nil else definitionalAxiom(f)) ++ //"Definitional axiom"
         framingAxiom(f) ++ //"Framing axioms"
-// B3 TODO (function postcondition):        postconditionAxiom(f) ++ //"Postcondition axioms"
+        postconditionAxiom(f) ++ //"Postcondition axioms"
         triggerFunction(f) ++ //"Trigger function (controlling recursive postconditions)"
         triggerFunctionStateless(f) ++ //"State-independent trigger function"
         checkFunctionDefinedness(f) //"Check contract well-formedness and postcondition"
@@ -389,12 +389,11 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     res
   }
 
-/* B3 TODO (function postcondition)
   private def postconditionAxiom(f: sil.Function): Seq[Decl] = {
     val height = heights(f.name)
-    val heap = heapModule.staticStateContributions(true, true)
+    val heaps = heapModule.allFieldsTypVars flatMap {heapModule.staticStateContributions(_, true, true)}
     val args = f.formalArgs map {translateLocalVarDeclToFParameter(_)}
-    val fapp = translateFuncApp(f.name, (heap ++ args) map (_.l), f.typ, true)
+    val fapp = translateFuncApp(f.name, (heaps ++ args) map (_.l), f.typ, true)
     val precondition : Expr = f.pres.map(p => translateExp(Expressions.asBooleanExp(p).whenExhaling)) match {
       case Seq() => TrueLit()
       case Seq(p) => p
@@ -414,13 +413,15 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
             (e transform resultToFapp),tvs,w))
       }
       val bPost = translatedPost transform resultToFapp
+      val allStaticGoodStates = heapModule.allFieldsTypVars map {staticGoodState(_)}
+      val allStaticStateContributionsStateModule = heapModule.allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}
+      val allStaticStateContributionsHeapModule = heapModule.allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}
       Axiom(Forall(
-        (stateModule.staticStateContributions() ++ args) map {_.toQ},
-        Pattern(Seq(staticGoodState, limitedFapp)),
-        (staticGoodState && (assumeFunctionsAbove(height) || triggerFuncApp(f,heapModule.staticStateContributions(true,true) map (_.l), args map (_.l)))) ==> (precondition ==> transformFuncAppsToLimitedForm(bPost, height))))
+        (allStaticStateContributionsStateModule ++ args) map {_.toQ},
+        Pattern((allStaticGoodStates ++ limitedFapp)),
+        (andAll(allStaticGoodStates) && (assumeFunctionsAbove(height) || triggerFuncApp(f, allStaticStateContributionsHeapModule map (_.l), args map (_.l)))) ==> (precondition ==> transformFuncAppsToLimitedForm(bPost, height))))
     }
   }
-*/
 
   /** Declaration of trigger function (controlling recursive postconditions) */
   private def triggerFunction(f: sil.Function): Seq[Decl] = {
@@ -690,7 +691,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     val res = sil.Result(f.typ)()
     //"Initializing the state"
     val init : Stmt = stateModule.initBoogieState ++ 
-        // B3 TODO2 (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(false)) ++
+        (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(false)) ++
         (f.formalArgs map (a => allAssumptionsAboutValue(a.typ,mainModule.translateLocalVarDeclToPParameter(a),true))) ++ assumeFunctionsAt(heights(f.name))
     val checkPre : Stmt = checkFunctionPreconditionDefinedness(f)
     val checkExp : Stmt = if (f.isAbstract) /*"(no definition for abstract function)"*/ Nil else
@@ -1195,7 +1196,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   override def inhaleExp(e: sil.Exp, error: PartialVerificationError): Stmt = {
     e match {
       case sil.Unfolding(acc, _) =>
-        sys.error("(B3 TODO3) Got to: DefaultFuncPredModule -> inhaleExp -> case sil.Unfolding(acc, _)")
+        LATER_Stmt("DefaultFuncPredModule", "inhaleExp -> sil.Unfolding (predicates)")
 /*
         if (duringUnfoldingExtraUnfold) {
           Nil
@@ -1215,7 +1216,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 */
 
       case pap@sil.PredicateAccessPredicate(loc@sil.PredicateAccess(_, _), perm) =>
-        sys.error("(B3 TODO3) Got to: DefaultFuncPredModule -> inhaleExp -> case sil.PredicateAccessPredicate(loc@sil.PredicateAccess(_, _), perm)")
+        LATER_Stmt("DefaultFuncPredModule", "inhaleExp -> ...(sil.PredicateAccess) (predicates)")
 /* 
         val res: Stmt = if (extraUnfolding) {
           exhaleTmpStateId += 1

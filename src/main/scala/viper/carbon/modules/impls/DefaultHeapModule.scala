@@ -104,10 +104,8 @@ class DefaultHeapModule(val verifier: Verifier)
   private val heapTypeName = "%HeapType"
   private def heapTyp(ftvars: Seq[Type]) = NamedType(heapTypeName, ftvars)
   private def heapName(ftvars: Seq[Type]) = Identifier(addFieldMark("Heap", ftvars))
-/*
-  private val exhaleHeapName = Identifier("ExhaleHeap")
-  private val exhaleHeap = LocalVar(exhaleHeapName, heapTyp)
-*/
+  private def exhaleHeapName(ftvars: Seq[Type]) = Identifier(addFieldMark("ExhaleHeap", ftvars))
+  private def exhaleHeap(ftvars: Seq[Type]) = IdExpr(exhaleHeapName(ftvars), heapTyp(ftvars))
   private def constructOriginalHeap = allFieldsTypVars map {ftvars => IdExpr(heapName(ftvars), heapTyp(ftvars))}
   private var originalHeaps: Seq[IdExpr] = constructOriginalHeap
 /*
@@ -566,7 +564,7 @@ class DefaultHeapModule(val verifier: Verifier)
     program match {
       case sil.Program(domains, fields, functions, predicates, methods, extensions) =>
         fields map {fieldFromField(_)}
-        // B3 TODO: collect other field types!
+        // B3 LATER/ADVANCED: collect other field types! (predicates) (wand)
     }
 
     // Update field-type collection for current Program
@@ -787,15 +785,8 @@ class DefaultHeapModule(val verifier: Verifier)
 */
     } 
     val fieldExp = translateResource(f)
-    println(fieldExp)
     translateResourceAccess(f, heapExp(heapTypVars))
   }
-    // override def translateField(f: sil.Field) = {
-    // val field = locationIdentifier(f)
-    // val typ = translateType(f.typ)
-    // val funcTyp = NamedType(fieldTypeName, Seq(normalFieldType, typ))
-    // // registerFieldType(funcTyp.typVars)
-    // ConstDecl(field, funcTyp, Some(fieldTagName(funcTyp.typVars))) 
 
   private def translateResourceAccess(f: sil.ResourceAccess, heap: Expr, isPMask: Boolean = false): Expr = {
     val (rcvExp, fieldExp) = rcvAndFieldExp(f)
@@ -819,7 +810,7 @@ class DefaultHeapModule(val verifier: Verifier)
         FuncApp(locationIdentifier(pred), args map translateExp, t)
 */
       case sil.FieldAccess(rcv, field) =>
-        Const(locationIdentifier(field), fieldTypeOf(translateType(field.typ))) // B3 TODO: correct type
+        Const(locationIdentifier(field), fieldTypeOf(translateType(field.typ)))
       case w: sil.MagicWand =>
         ADVANCED_Expr_bool("DefaultHeapModule", "translateResource(wand)")
 /*
@@ -1028,18 +1019,20 @@ class DefaultHeapModule(val verifier: Verifier)
 
   override def usingPureState = stateModuleIsUsingPureState
 
-/*
   override def beginExhale: Stmt = {
-//    Havoc(exhaleHeap)
+//    Havoc(exhaleHeap) //<--(non-B3 comment)
     EmptyStmt
   }
 
   override def endExhale: Stmt = {
-    if (!usingOldState) Havoc(exhaleHeap) ++ Assume(FuncApp(identicalOnKnownLocsName, Seq(heapExp, exhaleHeap) ++ currentMask, Bool)) ++
-      (heapVar := exhaleHeap)
-    else Nil
+    if (!usingOldState) { 
+      allFieldsTypVars flatMap { ftvars =>
+        Reinit(exhaleHeap(ftvars)) ++
+//B3 LATER (predicates): Assume(FunctionCallExpr(identicalOnKnownLocsName, Seq(heapExp(ftvars), exhaleHeap(ftvars)) ++ currentMask(fieldIdx(ftvars)), Bool)) ++
+          (heapVar(ftvars) := exhaleHeap(ftvars))
+      }
+    } else Nil
   }
-*/
 
   /**
    * Reset the state of this module so that it can be used for new program. This method is called

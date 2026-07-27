@@ -68,7 +68,6 @@ object Transformer {
             case Assert(e, error) => Assert(go(e), error)
             case Choose(branches) => Choose(branches map go)
             case If(cond, thn, els) => If(go(cond), go(thn), go(els))
-            case Loop(inv, body) => Loop(inv map go, go(body))
             case LabeledStmt(lbl, body) => LabeledStmt(lbl, go(body))
           }
         case e: Expr =>
@@ -194,9 +193,6 @@ object DuplicatingTransformer {
             case If(cond, thn, els) =>
               for {condResult <- go(cond); thnResult <- go(thn); elsResult <- go(els)} yield
                 (If(condResult, thnResult, elsResult))
-            case Loop(inv, body) =>
-              for {invResult <- goSeq(inv); bodyResult <- go(body)} yield
-                (Loop(invResult, bodyResult))
             case LabeledStmt(lbl, body) => go(body) map (LabeledStmt(lbl, _))
           }
         case e: Expr =>

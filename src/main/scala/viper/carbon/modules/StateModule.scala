@@ -56,7 +56,7 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
 
   /**
    * The name and type of the static contribution of the state components registered with this module to the state. The returned value should remain the
-   * same even if the state is changed. (for the given Field-type)
+   * same even if the state is changed. (Only the one matching the given Field-type.)
    */
   def staticStateContributions(fvars: Seq[Type], withHeap: Boolean = true, withPermissions: Boolean = true): Seq[FParameter]
 

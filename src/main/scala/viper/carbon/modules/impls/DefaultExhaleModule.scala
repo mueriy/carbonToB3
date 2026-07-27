@@ -10,6 +10,7 @@ import viper.carbon.modules._
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 import viper.carbon.verifier.Verifier
 import viper.carbon.modules.components.DefinednessState
 import viper.silver.ast.utility.Expressions
@@ -30,7 +31,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
 
   def name = "Exhale module"
 
-  override def reset = { }
+  override def reset() = { }
 
   override def start(): Unit = {
     register(this)
@@ -45,9 +46,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
 
     // create a definedness state that matches the state before the exhale
     val wellDefState = stateModule.freshTempStateKeepCurrent(s"ExhaleWellDef${nestedExhaleId - 1}")
-/*B3 TODO2
     val wellDefStateInitStmt = stateModule.initToCurrentStmt(wellDefState)
-*/
 
     // creating a new temp state if we are inside a package statement
     val curState = stateModule.state
@@ -82,9 +81,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     nestedExhaleId -= 1
 
     //only emit initialization of the well-definedness state if the exhale is non-empty
-/*B3 TODO2
-    val wellDefStateInitStmtOpt : Stmt = if(exhaleStmt.flatten.isEmpty) { Nil } else { wellDefStateInitStmt }
-*/
+    val wellDefStateInitStmtOpt: Stmt = if(exhaleStmt.flatten.isEmpty) { Nil } else { wellDefStateInitStmt }
 
     if ((exps map (_._1.isPure) forall identity) || !havocHeap || isAssert) {
       // if all expressions are pure, then there is no need for heap copies
@@ -93,20 +90,17 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
       // print("2:", initStmtWand) // [[B3 tests]]
       // print("3:", exhaleStmt) // [[B3 tests]]
       // print("4:", assumptions) // [[B3 tests]]
-      // wellDefStateInitStmtOpt ++ //[[B3 temp: Remove ExhaleWellDef#Heap lines]]
-      initStmtWand ++ exhaleStmt ++ assumptions
+      info("exhale", "1")
+      wellDefStateInitStmtOpt ++ initStmtWand ++ exhaleStmt ++ assumptions
     } else {
-/*B3 TODO2
+      info("exhale", "2")
       beginExhale ++
       wellDefStateInitStmtOpt ++
-*/
       initStmtWand ++
         exhaleStmt ++
-        assumptions //B3 TODO2 (re-add:) ++
+        assumptions ++
         //"Finish exhale"
-/*B3 TODO2
         endExhale
-*/
     }
 
   }

@@ -294,26 +294,7 @@ object B3Nodes {
     override def b3fy: String = name
   }
 
-  private val typeTracker = collection.mutable.MultiDict.empty[String, Seq[Type]]
-  def addType(name: String, typVars: Seq[Type]): Unit = {
-    typeTracker += ((name, typVars))
-  }
-
-  /** 
-   * Returns the B3-transformed type name for a parametrized type given its name and the names of (concrete) parameters.
-   * Also adds them to 
-   * 
-   * @param name name of the type (without parameters) (e.g. "Field")
-   * @param typVarNames parameter names as Seq of Strings. (e.g. ["Int", "Bool"])
-   * @return The same name as would be used in boogie, but spaces are replaced by %% (=> e.g. "Field%%Int%%Bool")
-   */
-  def getNameFromParamTypeConstel(name: String, typVars: Seq[Type]): String = {
-    addType(name, typVars)
-    if (name.startsWith("%") || name == "Field") {
-      name + "%%" + heapTypVarsToIdx(typVars)
-    } else name + "%%" + (typVars map {_.b3fy}).mkString("%%")
-  }
-
+  
   // STANDALONE NODES
   /** 
    * Scala representation of a B3 Program.
@@ -329,7 +310,7 @@ object B3Nodes {
                      functions: Seq[Function], axioms: Seq[Axiom], 
                      procedures: Seq[Procedure]) extends Node {
     def b3fy: RawAst.Program = {
-      new RawAst.Program( daf_Set(signatureTypes), // TODO: Find out what "signatureTypes" is
+      new RawAst.Program( daf_Set(signatureTypes), // B3 TODO: Find out what "signatureTypes" is
                           daf(Seq[RawAst.Domain]()),//(domains map {_.b3fy}),
                           daf(types map {_.b3fy}),
                           daf(taggers map {_.b3fy}),
@@ -421,7 +402,7 @@ object B3Nodes {
   /** 
    * Scala representation of a B3 RawAst Axiom node. 
    * @param explains If an explains is provided, that is used later. If none is provided
-   * it will be (tried to be) created when transforming it to its RawAst form (TODO). 
+   * it will try to define it automatically when transforming it to its RawAst form. 
    * Technically, every 'explains' that can be manually created should also be able to be
    * created automatically, so in the future there should be no need to declare it beforehand.
    * (Although, for preamble-axioms we might know that we use one axiom only when we use another, 
@@ -444,7 +425,7 @@ object B3Nodes {
 
     /** 
      * Auto-generates "explains"-identifiers for axioms
-     * TODO: support more complicated cases.
+     * B3 TODO: support more complicated cases.
      */
     def axiomExplanations(ax: Axiom): Seq[String] = {
       ax.expr match {
@@ -489,7 +470,7 @@ object B3Nodes {
       new RawAst.Variable(daf(name),                  // var name
                           isMutable,                  // "isMutable" => var vs val
                           Option_Some(daf(typ.b3fy)), // "optionalType" => is NOT optional here (since we dont initiate values when using TypeDecl)!
-                          Option_None[RawAst.Expr])   // optionalAutoInv => TODO: look if we can use this
+                          Option_None[RawAst.Expr])   // optionalAutoInv => B3 TODO: check what this is and whether we can use this
     }
   }
 
@@ -511,8 +492,6 @@ object B3Nodes {
   val IN = new RawAst.ParameterMode_In
   val INOUT = new RawAst.ParameterMode_InOut
   val OUT = new RawAst.ParameterMode_Out
-  // TODO: better name ("IN" might be too "common") (can search for RawAst.ParameterMode to find all locations)
-  
 
   // Option Some/None:
   /** creates a B3/Dafny Option->Some instance: "Some(input)" */
@@ -660,17 +639,15 @@ object B3Nodes {
 
   /** Unused (~"if case b1 stmt1, case b2 stmt2, ...") */
   // case class IfCase(node: RawAst.Stmt_IfCase) extends B3Stmt
-  
-  /** Scala representation of a B3 RawAst Loop-Stmt node. (= do forever...until Exit-stmt) 
-   * TODO: check how to implement sil.While using this (instead of the current approach where
-   * no while is used) */
-  case class Loop(invariants: Seq[AExpr], body: Stmt) extends Stmt {
-    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Loop(daf(invariants map {_.b3fy}), body.b3fy)
-  }
 
-  /** Scala representation of a B3 RawAst Loop-Stmt node. 
-   * Labels are not allowed to shadow other labels. TODO: decribe allowed names 
-   * ADVANCED: To actually support labels (for goto, etc.) we will need Identifier instead of String */
+  /** Unused (= "do forever...until Exit-stmt") */
+  // case class IfCase(node: RawAst.Stmt_IfCase) extends B3Stmt
+
+  /** Scala representation of a B3 RawAst LabeledStmt-Stmt node. 
+   * Labels are not allowed to shadow other labels (of same name).
+   * ADVANCED: To actually support labels (for goto, etc.) we will need [[Identifier]] instead of String.
+   *  For now, any String string seems to be allowed, e.g. "bl(ä;): b=ñ..(". This may not hold true
+   *  if we actually want to jump out of a label, but using [[Identifier]] would solve that. */
   case class LabeledStmt(lbl: String, body: Stmt) extends Stmt {
     override def b3fy: RawAst.Stmt = new RawAst.Stmt_LabeledStmt(daf(lbl), body.b3fy)
   }
@@ -694,15 +671,13 @@ object B3Nodes {
   sealed trait AExpr extends Node {
     def b3fy: RawAst.AExpr
   }
-  /** Scala representation of a B3 RawAst AExpression-AExpr node. 
-   * TODO: rules for this (see manual)!
-   * (pre-/post-conditions and loop-invariants) */
+  /** Scala representation of a B3 RawAst AExpression-AExpr node (Procedure pre-/post-conditions)
+   * (Check the B3 manual for rules of this Expr) */
   case class AExpression(expr: Expr) extends AExpr {
     override def b3fy: RawAst.AExpr = new RawAst.AExpr_AExpr(expr.b3fy)
   }
-  /** Scala representation of a B3 RawAst AAssertion-AExpr node. 
-   * TODO: rules for this (see manual)!
-   * (pre-/post-conditions and loop-invariants) */
+  /** Scala representation of a B3 RawAst AAssertion-AExpr node (Procedure pre-/post-conditions)
+   * (Check the B3 manual for rules of this Expr) */
   case class AAssertion(stmt: Stmt) extends AExpr {
     override def b3fy: RawAst.AExpr = new RawAst.AExpr_AAssertion(stmt.b3fy)
   }
@@ -892,7 +867,7 @@ object B3Nodes {
   // val CondExp = new RawAst.Operator_IfThenElse (Made into case class CondExp for easier use)
   val Add = new RawAst.Operator_Plus
   val And = new RawAst.Operator_LogicalAnd
-  val Div = new RawAst.Operator_Div //TODO: This is WRONG! Div is for "RealLit"s, which we need to handle in a special way.
+  val Div = sys.error("Div (Real division) is not supported yet by B3")
   val EqCmp = new RawAst.Operator_Eq
   val Equiv = new RawAst.Operator_Equiv
   val Implies = new RawAst.Operator_LogicalImp
@@ -1243,7 +1218,7 @@ object B3Naming {
       case None => name
     } 
   }
-  // TODO: find less ugly way to do this whole "nicer-name thing".
+  // B3 TODO: find less ugly way to do this whole "nicer-name thing".
   var specialFunctionReadHeapName = Identifier("x")(Namespace("wrong", -666))
   var specialFunctionUpdateHeapName = Identifier("y")(Namespace("wrong", -666))
   var heapTypVarsToIdx: Map[Seq[B3Nodes.Type],Int] = Map()
@@ -1253,7 +1228,7 @@ object B3Naming {
    * For non-parametric functions, this corresponds to the name defined by the Identifier.
    */
   def funcName(name: Identifier, args: Seq[Expr], typ: Type): String = {
-    // TODO: find less ugly way to do this whole "nicer-name thing".
+    // B3 TODO: find less ugly way to do this whole "nicer-name thing".
     if (name == specialFunctionReadHeapName || name == specialFunctionUpdateHeapName) {
       return name+"%F"+heapTypVarsToIdx(args(0).typ.asInstanceOf[NamedType].typVars)
     }
@@ -1276,7 +1251,7 @@ object B3Naming {
    * Do not call this on parametric Function's
    */
   def funcName(f: Function): String = {
-    // TODO: find less ugly way to do this whole "nicer-name thing".
+    // B3 TODO: find less ugly way to do this whole "nicer-name thing".
     if (f.name == specialFunctionReadHeapName || f.name == specialFunctionUpdateHeapName) {
       return f.name+"%F"+heapTypVarsToIdx(f.args(0).typ.asInstanceOf[NamedType].typVars)
     }
@@ -1323,6 +1298,30 @@ object B3Naming {
       paramFuctionMap.getOrElseUpdate(funcName, idxs)
     }
   }
+
+
+
+  // --- Type names ---
+  private val typeTracker = collection.mutable.MultiDict.empty[String, Seq[Type]]
+  def addType(name: String, typVars: Seq[Type]): Unit = {
+    typeTracker += ((name, typVars))
+  }
+
+  /** 
+   * Returns the B3-transformed type name for a parametrized type given its name and the names of (concrete) parameters.
+   * Also adds them to 
+   * 
+   * @param name name of the type (without parameters) (e.g. "Field")
+   * @param typVarNames parameter names as Seq of Strings. (e.g. ["Int", "Bool"])
+   * @return The same name as would be used in boogie, but spaces are replaced by %% (=> e.g. "Field%%Int%%Bool")
+   */
+  def getNameFromParamTypeConstel(name: String, typVars: Seq[Type]): String = {
+    addType(name, typVars)
+    if (name.startsWith("%") || name == "Field") { // B3 LATER: Add a flag to choose whether to do this name-simplification or not (same for the one in B3Naming (select/read function name))
+      name + "%%" + heapTypVarsToIdx(typVars)
+    } else name + "%%" + (typVars map {_.b3fy}).mkString("%%")
+  }
+
 }
 
 object ErrorMemberMapping {

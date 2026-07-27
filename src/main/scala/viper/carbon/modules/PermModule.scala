@@ -167,8 +167,8 @@ trait PermModule extends Module with CarbonStateComponent {
   def exhaleWandFt(w: sil.MagicWand): Stmt
 
   def setCheckReadPermissionOnly(readOnly: Boolean): Boolean
+*/
 
   def assumePermUpperBounds(doAssume: Boolean): Stmt
-*/
 
 }

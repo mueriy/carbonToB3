@@ -56,14 +56,6 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   override def translateLocalVarSigToFParameter(typ:sil.Type, v:sil.LocalVar, isInjective: Boolean = false): FParameter = {
     FParameter(env.get(v).name, translateType(typ), isInjective)
   }
-  override def translateLocalVarSigToVarDecl(typ:sil.Type, v:sil.LocalVar, isInjective: Boolean = false): VarDecl = {
-    VarDecl(env.get(v).name, EmptyStmt, translateType(typ), isInjective)
-  }
-  // override def translateLocalVarSig(typ:sil.Type, v:sil.LocalVar): LocalVarDecl = {
-  //   val t: Type = translateType(typ)
-  //   val name: Identifier = env.get(v).name
-  //   LocalVarDecl(name, t)
-  // } B3 TODO: go over the above functions, this was the original version, but we need it for all LocalVarDecl types
 
   override def translate(p: sil.Program, reporter: Reporter): (Program, Map[String, Map[String, String]]) = {
 
@@ -91,10 +83,12 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         Traverse.TopDown)
     )
 
+/* B3 LATER (domains)
     val backendFuncs = new mutable.HashSet[sil.DomainFunc]()
     for (d <- p.domains) {
       backendFuncs.addAll(d.functions.filter(f => f.interpretation.isDefined))
     }
+*/
 
     // We record the B3 names of all Viper variables in this map.
     // The format is Viper member name -> (Viper variable name -> B3 variable name).
@@ -111,14 +105,14 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         // and splitting the heap and adding it as procedure inout parameters 
         val translatedFields = (fields flatMap translateField).toList //"Translation of all fields"
         nameMaps = (methods ++ functions ++ predicates).map(_.name -> new mutable.HashMap[String, String]()).toMap
-        val members = // (domains flatMap translateDomainDecl) ++ //B3 TODO
+        val members = // (domains flatMap translateDomainDecl) ++ //B3 LATER (domains)
           translatedFields ++
           (functions flatMap (f => translateFunction(f, nameMaps.get(f.name)))) ++
-/* B3 TODO2
+/* B3 LATER (predicates)
           (predicates flatMap (p => translatePredicate(p, nameMaps.get(p.name)))) ++
 */
           (methods flatMap (m => translateMethodDecl(m, nameMaps.get(m.name)))) //++
-/* B3 TODO: What is a backend function?
+/* B3 LATER (domains) (and what exactly is a backend function?)
           (backendFuncs flatMap translateBackendFunc)
 */
 
@@ -189,16 +183,14 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         val outs: Seq[PParameter] = formalReturns map {translateLocalVarDeclToPParameter(_, OUT)}
         //B3 INFO: Viper does not have inout parameters. However, for our heap and permission 
         // implementation we need variables that can be some value at the start and then can be modified.
-        //(B3 TODO: since we don't actually call any procedures, we could also just use a vardecl? 
-        //  What are the (dis)advantages of these two options?)
+        //(B3 QUEST: since we never actually call any procedures, we could also just declare them as local variables
+        //  (using [VarDecl]) without initial values. What would be the (dis)advantage of doing that? Does it matter?)
         val inouts: Seq[PParameter] = defaultInoutPParameters
 
         // Translate individual parts for the procedure body
         // "Initializing the state"
-        val init = stateModule.initBoogieState ++ assumeAllFunctionDefinitions 
-/* B3 TODO2 (perm): ++
+        val init = stateModule.initBoogieState ++ assumeAllFunctionDefinitions ++
           (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(true)) ++ stmtModule.initStmt(method.bodyOrAssumeFalse)
-*/
         //"Initializing the old state"
         val initOld = TODO_Stmt("translateMethodDecl", "initOld")//stateModule.initOldState
         //"Assumptions about method arguments"
@@ -267,7 +259,6 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   }
 
 /*
-  // B3 TODO
   private def translateMethodDeclCheckPosts(posts: Seq[sil.Exp]): Stmt = {
     val (freshStateStmtAux, state) = stateModule.freshTempState("Post", discardCurrent = true, initialise = true)
     val freshStateStmt = freshStateStmtAux ++ stateModule.assumeGoodState
@@ -312,7 +303,6 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   }
 
 
-  // B3 TODO
   private def translateMethodDeclPre(pres: Seq[sil.Exp]): Stmt = {
     val res = if (Expressions.contains[sil.InhaleExhaleExp](pres)) {
       // Precondition contains InhaleExhale expression.
@@ -354,7 +344,6 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   }
 
 /*
-  // B3 TODO
   def translateDomainDecl(d: sil.Domain): Seq[Decl] = {
     env = Environment(verifier, d)
     val res = translateDomain(d)

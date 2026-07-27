@@ -17,7 +17,7 @@ import viper.carbon.modules.TransferableEntity
  *used to handle the transfer operation across different modules
  */
 trait TransferComponent extends Component {
-/* B3 TODO2
+/*
   /**
    *
    * @param e

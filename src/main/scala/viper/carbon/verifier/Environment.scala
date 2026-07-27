@@ -14,18 +14,16 @@ import viper.carbon.b3.B3Naming._
 /**
  * An environment that assigns unique names to Viper variables;  in SIL, loops can have
  * local variables and thus a method might have two declarations of a local variable
- * with the same name (in different loops).  In Boogie, all variables needed to be unique,
- * but B3 supports shadowing variables again. Now there are other important criterias:
- * 1) B3 var declarations must include all statements where it should be in scope of, so
- * these declarations must be done correctly. Luckily this is supported by Seqn.
- * 2) All custom names must have a definitely unique name. See B3NameGenerator for more on that.
- * 3) To use a variable in an expression we only need a name (as string), but it might be 
- * helpful to associate that to a type.
- * B3 TODO: the above is wrong/not fully accurate; fix!
+ * with the same name (in different loops). While B3 does not require all Variable names
+ * to be unique (it supports variable scopes and even shadowing), we cannot just use the
+ * SIL names because we generate new variables (variables for if conditions; variables 
+ * for verifying Loops; ...), which have to be unique. Therefore it makes more sense to 
+ * just keep the current system of ensuring unique variable names. This is less complicated
+ * and can at most slow down the transformation step by some minicule amount of time.
  */
 case class Environment(verifier: Verifier, member: sil.Node) {
 
-  private val names = new B3NameGenerator() //B3 TODO: this vs generator in B3Naming ??
+  private val names = new B3NameGenerator()
 
   /** The current mapping of variables. */
   private val currentMapping = collection.mutable.HashMap[sil.LocalVar, IdExpr]()

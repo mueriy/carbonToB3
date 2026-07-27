@@ -261,14 +261,12 @@ Nil/*B3 ADVANCED (QPerm)
 
   def permType = Perm
 
-/*
   override def assumePermUpperBounds(doAssume: Boolean) : Stmt = {
     if (doAssume)
       Assume(assumePermUpperBound)
     else
       Assume(assumePermUpperBound.not)
   }
-*/
 
   def staticStateContributions(ftvars: Seq[Type], withHeap: Boolean, withPermissions: Boolean): Seq[FParameter] = if (withPermissions) { FParameter(maskName(ftvars), maskType(ftvars)) } else Seq()
 /*

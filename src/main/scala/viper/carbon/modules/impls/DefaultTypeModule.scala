@@ -36,20 +36,21 @@ class DefaultTypeModule(val verifier: Verifier) extends TypeModule with Stateles
       case sil.Perm =>
         permType
       case t: sil.SeqType =>
-        sys.error("B3 TODO: SeqType not supported yet.") //translateSeqType(t)
+        sys.error("B3 LATER-ER: SeqType not supported yet.") //translateSeqType(t)
       case t: sil.SetType =>
-        sys.error("B3 TODO: SetType not supported yet.") //translateSetType(t)
+        sys.error("B3 LATER-ER: SetType not supported yet.") //translateSetType(t)
       case t: sil.MultisetType =>
-        sys.error("B3 TODO: MultisetType not supported yet.") //translateMultisetType(t)
+        sys.error("B3 LATER-ER: MultisetType not supported yet.") //translateMultisetType(t)
       case t: sil.MapType =>
-        sys.error("B3 TODO: MapType not supported yet.") //translateMapType(t)
+        sys.error("B3 LATER-ER: MapType not supported yet.") //translateMapType(t)
       case sil.InternalType =>
         sys.error("This is an internal type, not expected here")
       case sil.TypeVar(name) =>
         TypeVar(name)
       case t@sil.DomainType(_, _) =>
-        sys.error("B3 TODO: DomainType not supported yet.") //translateDomainTyp(t)
-      case sil.BackendType(_, interpretations) if interpretations.contains("Boogie") => sys.error("B3 TODO: BackendType with 'Boogie' not supported yet.") //NamedType(interpretations("Boogie"))
+        sys.error("B3 LATER: DomainType not supported yet.") //translateDomainTyp(t)
+      case sil.BackendType(_, interpretations) if interpretations.contains("Boogie") => 
+        sys.error("B3 ADVANCED?: BackendType (with interpretation for 'Boogie') not supported yet.") //NamedType(interpretations("Boogie"))
       case sil.BackendType(_, _) => sys.error("Found non-Boogie-compatible backend type.")
       case _ => sys.error("Viper type didn't match any existing case.")
     }

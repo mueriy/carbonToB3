@@ -20,20 +20,17 @@ object Statements {
 
   /**
    * Returns a list of all actual statements contained in a given statement.  That
-   * is, all statements except `Seqn`, including statements in the branches of
+   * is, all statements except `Block`, including statements in the branches of
    * if's.
    *
    * Taken from the Viper AST with minimal adaptation.
    */
   def children(s: Stmt): Seq[Stmt] = {
     s match {
-      case c: If => Seq(s) ++ children(c.thn) ++ children(c.els)
-      case c: Choose => 
-        // supports any number of branches
-        val options = c.branches
-        Seq(s) ++ (options flatMap children)
-      case c: Block => c.stmts flatMap children
-      // B3 TODO: check if there are other cases that we use in B3 (there is e.g. IfCase, but we dont use that, so we dont need it here - for now)
+      case If(_, thn, els) => Seq(s) ++ children(thn) ++ children(els)
+      case Choose(branches) => Seq(s) ++ (branches flatMap children)
+      case Block(stmts) => stmts flatMap children
+      case LabeledStmt(_, body) => Seq(s) ++ children(body) // B3 NOTE: maybe we should also add Seq(s) (?)
       case _ => List(s)
     }
   }
@@ -124,7 +121,6 @@ object Nodes {
           case Assert(e, error) => e
           case Choose(branches) => branches
           case If(cond, thn, els) => Seq(cond, thn, els)
-          case Loop(inv, body) => inv ++ body
           case LabeledStmt(_, body) => body
         }
       case e: Expr =>

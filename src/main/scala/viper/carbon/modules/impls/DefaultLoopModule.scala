@@ -50,7 +50,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   private var nodeToCondLoopInfoOutput : Map[Int, Seq[LoopGenKind]] = Map.empty
   private var nodeToLoopInfoOutput : Map[Int, Seq[LoopGenKind]] = Map.empty
 
-/* B3 TODO2
+/*
   private val sumMaskName : Identifier = Identifier("LoopSumMask")(namespace)
   private val sumMask = IdExpr(sumMaskName, maskType)
 

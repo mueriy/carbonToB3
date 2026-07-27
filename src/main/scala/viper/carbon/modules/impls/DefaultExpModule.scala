@@ -429,7 +429,6 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         }
       case _ =>
         def translate(e: sil.Exp, definednessStateOptInTranslate: Option[DefinednessState]): Block = {
-          //B3 TODO: check why 'checks' is marked as type Seq[Nothing], should be Seq[(Stmt, Stmt)]
           val checks = components map (_.partialCheckDefinedness(e, error, makeChecks = makeChecks, definednessStateOptInTranslate))
           val stmt = checks map (_._1())
 

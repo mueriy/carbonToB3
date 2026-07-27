@@ -174,6 +174,7 @@ trait HeapModule extends Module with CarbonStateComponent {
   def checkNonNullReceiver(rcv: Expr): Expr = {
     rcv !== translateNull
   }
+*/
 
   /**
    * Begin of exhale.
@@ -185,6 +186,7 @@ trait HeapModule extends Module with CarbonStateComponent {
    */
   def endExhale: Stmt
 
+/*
   /**
    * Is the given field a predicate field?
    */
