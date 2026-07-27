@@ -6,7 +6,7 @@
 
 package viper.carbon.modules
 
-import viper.carbon.b3.B3Nodes.{Expr, Stmt, Type, LocalVarDecl}
+import viper.carbon.b3.B3Nodes.{Expr, Stmt, Type, Binding}
 import viper.carbon.b3.B3Naming._
 import viper.carbon.modules.components.CarbonStateComponent
 import viper.silver.{ast => sil}
@@ -34,6 +34,7 @@ trait PermModule extends Module with CarbonStateComponent {
    * Translate a permission comparison
    */
   def translatePermComparison(e: sil.Exp): Expr
+*/
 
   /**
    * Returns an expression representing that a permission amount is positive
@@ -44,6 +45,7 @@ trait PermModule extends Module with CarbonStateComponent {
    */
   def permissionPositive(permission: Expr, zeroOK : Boolean = false): Expr
 
+/*
   def conservativeIsPositivePerm(e: sil.Exp): Boolean
 
   /**
@@ -62,12 +64,12 @@ trait PermModule extends Module with CarbonStateComponent {
    */
   def currentMask: Seq[Expr]
 
-/*
   /**
    * A static reference to the mask.
    */
-  def staticMask: Seq[LocalVarDecl]
+  def staticMask(ftvars: Seq[Type]): Binding
 
+/*
   /**
    * Is the permission for a given expression positive (using the static mask).
    */

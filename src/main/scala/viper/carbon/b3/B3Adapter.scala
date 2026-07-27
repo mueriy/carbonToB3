@@ -284,17 +284,19 @@ object B3Nodes {
   }
   case class NamedType(n: String, typVars: Seq[Type] = Nil) extends Type {
     override def freeTypeVars: Seq[TypeVar] = typVars flatMap (_.freeTypeVars)
-    val name = (n, typVars) match {
+    // must be lazy because during setup heapTypVarsToIdx is set up AFTER creating the first
+    // 'NamedType', but would already be needed at that point
+    lazy val name = (n, typVars) match {
       case ("Perm", _) => "int" // B3 TODO: change "int" to "real" as soon as that is possible
       case (_, Seq()) => n
-      case _ => getNameFromParamTypeConstel(n, typVars map {_.b3fy})
+      case _ => getNameFromParamTypeConstel(n, typVars)
     } 
     override def b3fy: String = name
   }
 
-  private val typeTracker = collection.mutable.MultiDict.empty[String, Seq[String]]
-  def addType(name: String, typVarNames: Seq[String]): Unit = {
-    typeTracker += ((name, typVarNames))
+  private val typeTracker = collection.mutable.MultiDict.empty[String, Seq[Type]]
+  def addType(name: String, typVars: Seq[Type]): Unit = {
+    typeTracker += ((name, typVars))
   }
 
   /** 
@@ -305,10 +307,11 @@ object B3Nodes {
    * @param typVarNames parameter names as Seq of Strings. (e.g. ["Int", "Bool"])
    * @return The same name as would be used in boogie, but spaces are replaced by %% (=> e.g. "Field%%Int%%Bool")
    */
-  def getNameFromParamTypeConstel(name: String, typVarNames: Seq[String]): String = {
-    // info("TODO: NamedType: ", name + " " + typVarNames.mkString(" "))
-    addType(name, typVarNames)
-    name + "%%" + typVarNames.mkString("%%")
+  def getNameFromParamTypeConstel(name: String, typVars: Seq[Type]): String = {
+    addType(name, typVars)
+    if (name.startsWith("%") || name == "Field") {
+      name + "%%" + heapTypVarsToIdx(typVars)
+    } else name + "%%" + (typVars map {_.b3fy}).mkString("%%")
   }
 
   // STANDALONE NODES
@@ -1244,6 +1247,7 @@ object B3Naming {
   var specialFunctionReadHeapName = Identifier("x")(Namespace("wrong", -666))
   var specialFunctionUpdateHeapName = Identifier("y")(Namespace("wrong", -666))
   var heapTypVarsToIdx: Map[Seq[B3Nodes.Type],Int] = Map()
+  def printTypVarMapping = heapTypVarsToIdx map {case (typvars, idx) => println(s"${idx} <-> ${(typvars map {_.b3fy}).mkString(" ")}")}
   /** 
    * Returns the correct name to use for the given Identifier, args, and output Type. 
    * For non-parametric functions, this corresponds to the name defined by the Identifier.

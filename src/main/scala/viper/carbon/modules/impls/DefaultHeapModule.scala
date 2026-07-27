@@ -101,21 +101,21 @@ class DefaultHeapModule(val verifier: Verifier)
   override def wandBasicType(wand: String): Type = NamedType("WandType_" + wand)
   override def wandFieldType(wand: String) : Type = NamedType(fieldTypeName, Seq(wandBasicType(wand),Int))
 */
-  private val heapTypeBaseName = "%HeapType"
-  private def heapTyp(ftvars: Seq[Type]) = NamedType(heapTypeBaseName, ftvars)
+  private val heapTypeName = "%HeapType"
+  private def heapTyp(ftvars: Seq[Type]) = NamedType(heapTypeName, ftvars)
   private def heapName(ftvars: Seq[Type]) = Identifier(addFieldMark("Heap", ftvars))
 /*
   private val exhaleHeapName = Identifier("ExhaleHeap")
   private val exhaleHeap = LocalVar(exhaleHeapName, heapTyp)
 */
   private def constructOriginalHeap = allFieldsTypVars map {ftvars => IdExpr(heapName(ftvars), heapTyp(ftvars))}
-  private var originalHeap: Seq[IdExpr] = constructOriginalHeap
+  private var originalHeaps: Seq[IdExpr] = constructOriginalHeap
 /*
   private val qpHeapName = Identifier("QPHeap")
   private val qpHeap = LocalVar(qpHeapName, heapTyp)
 */
-  private var heap: Seq[IdExpr] = originalHeap
-  private def heap(ftvars: Seq[Type]): IdExpr = heap(fieldIdx(ftvars))
+  private var heaps: Seq[IdExpr] = originalHeaps
+  private def heap(ftvars: Seq[Type]): IdExpr = heaps(fieldIdx(ftvars))
   private def heapVar(ftvars: Seq[Type]): IdExpr = {assert (!usingOldState); heap(ftvars)}
   private def heapExp(ftvars: Seq[Type]): Expr = if (usingPureState) dummyHeap(ftvars) else heap(ftvars)
   private val nullName = Identifier("null")
@@ -198,6 +198,9 @@ class DefaultHeapModule(val verifier: Verifier)
               refField,
               normalHeap(fieldTypeOf(Bool)),
               normalHeap(fieldTypeOf(refType))),
+          // B3 NOTE: changed "Pattern(obj_refField)" to the following two variants. Needed   
+          // because the second heap split needs to be included in the pattern too. If this 
+          // does not work then we will need to add a special "dummy"-trigger instead.
           Seq(Pattern(Seq(obj_refField, validReference(obj.l))),
               Pattern(Seq(validReference(obj_refField)))),
           validReference(obj.l) ==> validReference(obj_refField)))
@@ -227,7 +230,7 @@ class DefaultHeapModule(val verifier: Verifier)
       {
         if(!verifier.usePolyMapsInEncoding) {
           val heapMapDesugarHelper = PolyMapDesugarHelper(allFieldsTypVars, refType, fieldTypeConstructor, heapNamespace)
-          val heapDesugaringRep : PolyMapRep = heapMapDesugarHelper.desugarPolyMap(tvars => heapTyp(tvars), (readHeapName, updateHeapName), heapMapRangeTypeFromField)
+          val heapDesugaringRep : PolyMapRep = heapMapDesugarHelper.desugarPolyMap(addFieldMark("H", _), heapTyp, (readHeapName, updateHeapName), heapMapRangeTypeFromField)
           heapDesugaringRep.select ++
           heapDesugaringRep.store ++
           //"Read and update axioms for the heap"
@@ -574,8 +577,8 @@ class DefaultHeapModule(val verifier: Verifier)
     fieldIdxMap = allFieldsTypVars.zipWithIndex.toMap
 
     // Update other variables dependent on the field-type collection and fieldIdxMap
-    originalHeap = constructOriginalHeap
-    heap = originalHeap
+    originalHeaps = constructOriginalHeap
+    heaps = originalHeaps
     permModule.reset()
 
     // TODO: find less ugly way to do this whole "nicer-name thing".
@@ -992,7 +995,7 @@ class DefaultHeapModule(val verifier: Verifier)
 */
 
   def initBoogieState: Seq[Stmt] = {
-    heap = originalHeap
+    heaps = originalHeaps
     Nil
   }
   def resetBoogieState: Seq[Stmt] = {
@@ -1003,7 +1006,7 @@ class DefaultHeapModule(val verifier: Verifier)
 /*
   def currentStateContributions: Seq[LocalVarDecl] = Seq(LocalVarDecl(heap.name, heapTyp))
 */
-  def currentStateVars: Seq[IdExpr] = heap
+  def currentStateVars: Seq[IdExpr] = heaps
   def currentStateExps: Seq[Expr] = allFieldsTypVars map {heapExp(_)}
 
 
@@ -1012,7 +1015,7 @@ class DefaultHeapModule(val verifier: Verifier)
   }
 
   override def restoreState(s: Seq[IdExpr]): Unit = {
-    heap = s // note: this should be accessed via heapVar or heapExp as appropriate (whether a variable is essential or not)
+    heaps = s // note: this should be accessed via heapVar or heapExp as appropriate (whether a variable is essential or not)
   }
 
 /*
@@ -1048,10 +1051,10 @@ class DefaultHeapModule(val verifier: Verifier)
     PredIdMap = Map()
     NextPredicateId = 0
 */
-    heap = originalHeap
+    heaps = originalHeaps
   }
 
-  override def currentHeap = heap
+  override def currentHeap = heaps
 
 /*
   override def identicalOnKnownLocations(otherHeap:Seq[Exp],otherMask:Seq[Exp]):Exp =

@@ -8,6 +8,7 @@ package viper.carbon.verifier
 
 import RawAst.Program // import viper.carbon.boogie.{Assert, Program}
 import viper.carbon.b3.B3Adapter.{runB3, printRawAst}
+import viper.carbon.b3.B3Naming
 import viper.carbon.b3.B3Development
 // import viper.silver.reporter.BackendSubProcessStages._
 import viper.silver.reporter.Reporter // import viper.silver.reporter.{BackendSubProcessReport, Reporter}
@@ -81,6 +82,10 @@ trait B3Interface {
       System.setOut(oldOut)
     }
     val output = outStream
+
+    // Show Field Mappings (when using shortened form)
+    println("Field Mappings:")
+    B3Naming.printTypVarMapping
 
     // Output B3 output
     println("*************************")

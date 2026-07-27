@@ -26,18 +26,20 @@ case class PolyMapDesugarHelper(fieldTypeVariants: Seq[Seq[Type]], refType: Type
   /**
     * Creates store and select functions with corresponding axioms to desugar a Boogie map of the form
     * {@code <...>[ref, Field ... ...]RangeType} .
+    * @param mapRepNameConstr         the name constructor that should be used to construct the map name representer
     * @param mapRepTypeConstr         the type constructor that should be used to construct the map type representer
     * @param selectAndStoreId         the identifiers for selection and store functions
     * @param mapRangeTypeFromField    the range type of the map as a function of the field type
     * @return [[PolyMapRep]] representation of desugared type
     */
-  def desugarPolyMap(mapRepTypeConstr: Seq[Type] => NamedType,
+  def desugarPolyMap(mapRepNameConstr: Seq[Type] => String,
+                     mapRepTypeConstr: Seq[Type] => NamedType,
                      selectAndStoreId: (Identifier, Identifier),
                      mapRangeTypeFromField: Type => Type): PolyMapRep =  {
     val (selectId, storeId) = selectAndStoreId
     var polyMapRep = PolyMapRep(Seq(), Seq(), Seq())
     fieldTypeVariants map {case typArgs =>
-      val mapTypeId = Identifier(mapRepTypeConstr(typArgs).name)
+      val mapTypeId = Identifier(mapRepNameConstr(typArgs))
       val h = FParameter(mapTypeId, mapRepTypeConstr(typArgs))
       val obj = FParameter(Identifier("obj"), refType)
       val obj2 = FParameter(Identifier("obj2"), refType)

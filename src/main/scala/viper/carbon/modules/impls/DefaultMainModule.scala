@@ -149,15 +149,15 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
 
 
         // ADDING SOME DECLs MANUALLY DURING DEVELOPMENT
-        if (!b3types.contains(TypeDecl(NamedType("HeapType")))) {
-          b3types = b3types ++ TypeDecl(NamedType("HeapType"))
-        }
-        if (!b3types.contains(TypeDecl(NamedType("MaskType")))) {
-          b3types = b3types ++ TypeDecl(NamedType("MaskType"))
-        }
-        if (!b3types.contains(TypeDecl(NamedType("FrameType")))) {
-          b3types = b3types ++ TypeDecl(NamedType("FrameType"))
-        }
+        // if (!b3types.contains(TypeDecl(NamedType("HeapType")))) {
+        //   b3types = b3types ++ TypeDecl(NamedType("HeapType"))
+        // }
+        // if (!b3types.contains(TypeDecl(NamedType("MaskType")))) {
+        //   b3types = b3types ++ TypeDecl(NamedType("MaskType"))
+        // }
+        // if (!b3types.contains(TypeDecl(NamedType("FrameType")))) {
+        //   b3types = b3types ++ TypeDecl(NamedType("FrameType"))
+        // }
         // val stateFunc = Function(stateModule.staticGoodState.asInstanceOf[FunctionCallExpr].name, stateModule.staticStateContributions(), Bool)
         // if (!b3functions.contains(stateFunc)) {
         //   b3functions = b3functions ++ stateFunc
