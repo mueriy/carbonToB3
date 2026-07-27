@@ -867,7 +867,7 @@ object B3Nodes {
   // val CondExp = new RawAst.Operator_IfThenElse (Made into case class CondExp for easier use)
   val Add = new RawAst.Operator_Plus
   val And = new RawAst.Operator_LogicalAnd
-  val Div = sys.error("Div (Real division) is not supported yet by B3")
+  val Div = new RawAst.Operator_Div // B3 TODO (real): Change B3 Operator to the actual Real division operator as soon as that is supported by B3
   val EqCmp = new RawAst.Operator_Eq
   val Equiv = new RawAst.Operator_Equiv
   val Implies = new RawAst.Operator_LogicalImp
