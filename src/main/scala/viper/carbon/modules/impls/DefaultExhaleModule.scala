@@ -110,10 +110,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     * empty statement
     */
   private def maybeDefCheck(e: sil.Exp, defCheckData: DefinednessCheckData): Stmt = {
-    TODO_Stmt("DefaultExhaleModule", "maybeDefCheck")
-/*
-    defCheckData.performDefinednessChecks.fold(Statements.EmptyStmt: Stmt)(definednessError => checkDefinedness(e, definednessError, makeChecks = true, Some(defCheckData.definednessStateOpt.get)))
-*/
+    defCheckData.performDefinednessChecks.fold(EmptyStmt: Stmt)(definednessError => checkDefinedness(e, definednessError, makeChecks = true, Some(defCheckData.definednessStateOpt.get)))
   }
 
 

@@ -117,11 +117,9 @@ class DefaultHeapModule(val verifier: Verifier)
   private def heapVar(ftvars: Seq[Type]): IdExpr = {assert (!usingOldState); heap(ftvars)}
   private def heapExp(ftvars: Seq[Type]): Expr = if (usingPureState) dummyHeap(ftvars) else heap(ftvars)
   private val nullName = Identifier("null")
-/*
-  private val nullLit = Const(nullName)
+  private val nullLit = Const(nullName, refType)
   private val freshObjectName = Identifier("freshObj")
-  private val freshObjectVar = LocalVar(freshObjectName, refType)
-*/
+  private val freshObjectVar = IdExpr(freshObjectName, refType)
   private lazy val allocName = if(enableAllocationEncoding) Identifier("$allocated")(fieldNamespace) else null
   private lazy val allocFieldVal = if(enableAllocationEncoding) Const(allocName, fieldTypeOf(Bool)) else null
   private lazy val allocType = if(enableAllocationEncoding) fieldTypeOf(Bool) else null
@@ -697,10 +695,8 @@ class DefaultHeapModule(val verifier: Verifier)
    */
   private def alloc(o: Expr) = lookup(heapExp(fieldTypeOf(Bool).typVars), o, allocFieldVal)
 
-/*
   /** Returns assignment that updates heap to reflect that @{code ref} is assigned  */
-  private def allocUpdateRef(ref: Exp) : Stmt = currentHeapAssignUpdate(ref, Const(allocName), TrueLit())
-*/
+  private def allocUpdateRef(ref: Expr): Stmt = currentHeapAssignUpdate(ref, Const(allocName, allocType), TrueLit())
 
   /** 
    * Returns a heap-lookup for o.f in a given heap h.
@@ -721,25 +717,6 @@ class DefaultHeapModule(val verifier: Verifier)
     }
   }
 
-  /** 
-   * Returns a heap-update for o.f to v in a given heap h.
-   * 
-   * @param h Must have a concrete NamedType of form "HeapType A B"
-   * @param o Must have Type "Ref"
-   * @param f Must have a concrete NamedType of form "Field A B"
-   * @param v Must have a concrete Type "B"
-   * @param isPMask (optional) returns PMask-lookup instead
-   * 
-   * (A and B must match for all parameters)
-   */
-  private def store(h: Expr, o: Expr, f: Expr, v: Expr, isPMask: Boolean = false) = {
-    if (isPMask) {
-      FunctionCallExpr(permModule.pmaskTypeDesugared.storeId, Seq(h, o, f, v), h.typ)
-    } else {
-      FunctionCallExpr(updateHeapName, Seq(h, o, f, v), h.typ)
-    }
-  }
-
   def rcvAndFieldExp(f: sil.ResourceAccess) : (Expr, Expr) =
     f match {
       case sil.FieldAccess(rcv, _) => (translateExp(rcv), translateResource(f))
@@ -751,28 +728,37 @@ class DefaultHeapModule(val verifier: Verifier)
 */
     }
 
-/*
-  override def currentHeapAssignUpdate(f: sil.LocationAccess, newVal: Exp): Stmt = {
+  override def currentHeapAssignUpdate(f: sil.LocationAccess, newVal: Expr): Stmt = {
     val (rcvExp, fieldExp) = rcvAndFieldExp(f)
     currentHeapAssignUpdate(rcvExp, fieldExp, newVal)
   }
 
-  private def currentHeapAssignUpdate(rcv: Exp, field: Exp, newVal: Exp): Stmt = {
-    heap := heapUpdate(heap, rcv, field, newVal)
+  private def currentHeapAssignUpdate(rcv: Expr, field: Expr, newVal: Expr): Stmt = {
+    val splitVariant = field.typ.asInstanceOf[NamedType].typVars
+    heap(splitVariant) := heapUpdate(heap(splitVariant), rcv, field, newVal)
   }
 
+/*
   private def heapUpdateLoc(heap: Exp, f: sil.LocationAccess, newVal: Exp, isPMask: Boolean = false): Exp = {
     val (rcvExp, fieldExp) = rcvAndFieldExp(f)
     heapUpdate(heap, rcvExp, fieldExp, newVal, isPMask)
   }
-
-  private def heapUpdate(heap: Exp, rcv: Exp, field: Exp, newVal: Exp, isPMask: Boolean = false): Exp = {
-    if(verifier.usePolyMapsInEncoding)
-      MapUpdate(heap, Seq(rcv, field), newVal)
-    else
-      FuncApp(if(isPMask) { permModule.pmaskTypeDesugared.storeId } else { updateHeapName }, Seq(heap, rcv, field, newVal), Bool)
-  }
 */
+
+  /** 
+   * Returns a heap-update for o.f to v in a given heap h.
+   * 
+   * @param h Must have a concrete NamedType of form "HeapType A B"
+   * @param o Must have Type "Ref"
+   * @param f Must have a concrete NamedType of form "Field A B"
+   * @param v Must have a concrete Type "B"
+   * @param isPMask (optional) returns PMask-lookup instead
+   * 
+   * (A and B must match for all parameters)
+   */
+  private def heapUpdate(h: Expr, o: Expr, f: Expr, v: Expr, isPMask: Boolean = false): Expr = {
+    FunctionCallExpr(if(isPMask) permModule.pmaskTypeDesugared.storeId else updateHeapName, Seq(h, o, f, v), h.typ)
+  }
 
   override def translateResourceAccess(f: sil.ResourceAccess): Expr = {
     val heapTypVars = f match {
@@ -827,9 +813,7 @@ class DefaultHeapModule(val verifier: Verifier)
 */
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    stmts => TODO_Stmt("DefaultHeapModule", s"handleStmt: ${s.toString().take(10)}")+++stmts
 
-/*
       stmt => (
         s match {
           case sil.MethodCall(_, _, targets) if enableAllocationEncoding =>
@@ -838,6 +822,8 @@ class DefaultHeapModule(val verifier: Verifier)
                 Assume(validReference(t))
             })
           case sil.Fold(sil.PredicateAccessPredicate(loc, perm)) => // AS: this should really be taken care of in the FuncPredModule (and factored out to share code with unfolding case, if possible)
+            LATER_Stmt("DefaultHeapModule", "handleStmt -> sil.Fold-case (predicates)") +++ stmt
+/* 
             if(usingOldState) sys.error("heap module: fold is executed while using old state")
             stmt ++ ({val newVersion = LocalVar(Identifier("freshVersion"), funcPredModule.predicateVersionType)
               val resetPredicateInfo : Stmt =
@@ -847,22 +833,20 @@ class DefaultHeapModule(val verifier: Verifier)
 
               If(UnExp(Not,hasDirectPerm(loc)), resetPredicateInfo, Nil) ++
                 addPermissionToPMask(loc) ++ stateModule.assumeGoodState}  )
+*/
           case sil.FieldAssign(lhs, rhs) =>
             if(usingOldState) sys.error("heap module: field is assigned while using old state")
             stmt ++ (currentHeapAssignUpdate(lhs, translateExp(rhs))) // after all checks
           case _ => simpleHandleStmt(s) ++ stmt
         }
       )
-*/
 
   }
 
   override def simpleHandleStmt(stmt: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): Stmt = {
-    TODO_Stmt("DefaultHeapModule", "simpleHandleStmt")
-/*
     stmt match {
       case sil.NewStmt(target,fields) =>
-        Havoc(freshObjectVar) ::
+        Reinit(freshObjectVar) ::
           // assume the fresh object is non-null and not allocated yet.
           // this means that whenever we allocate a new object and havoc freshObjectVar, we
           // assume that we consider a newly allocated cell, which gives the prover
@@ -872,9 +856,8 @@ class DefaultHeapModule(val verifier: Verifier)
           // for loops (see the StateModule implementation)
           Assume(if(enableAllocationEncoding) (freshObjectVar !== nullLit) && alloc(freshObjectVar).not else (freshObjectVar !== nullLit)) ::
           (if(enableAllocationEncoding) allocUpdateRef(freshObjectVar) :: (translateExp(target) := freshObjectVar) :: Nil else (translateExp(target) := freshObjectVar) :: Nil)
-      case _ => Statements.EmptyStmt
+      case _ => EmptyStmt
     }
-*/
   }
 
 /*
@@ -968,22 +951,20 @@ class DefaultHeapModule(val verifier: Verifier)
       case _ => Nil
     }
   }
+*/
 
-  override def validValue(typ: sil.Type, variable: LocalVar, isParameter: Boolean): Option[Exp] = {
+  override def validValue(typ: sil.Type, variable: IdExpr, isParameter: Boolean): Option[Expr] = {
     if(enableAllocationEncoding) typ match {
       case sil.Ref => Some(validReference(variable))
       case _ => None
     } else None
   }
-*/
 
   private def validReference(exp: Expr): Expr = {
     /*exp === nullLit ||*/ alloc(exp)
   }
 
-/*
-  override def translateNull: Exp = nullLit
-*/
+  override def translateNull: Expr = nullLit
 
   def initBoogieState: Seq[Stmt] = {
     heaps = originalHeaps

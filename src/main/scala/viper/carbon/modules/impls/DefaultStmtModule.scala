@@ -53,24 +53,21 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
   /**
     * For each label we track a boolean that indicates whether the label has been defined in the trace
     */
-  var labelBooleanGuards : collection.mutable.Map[String, LocalVarDecl] = new collection.mutable.HashMap[String, LocalVarDecl]()
+  var labelBooleanGuards : collection.mutable.Map[String, Binding] = new collection.mutable.HashMap[String, Binding]()
   override def initStmt(methodBody: sil.Stmt): Stmt = {
-    ADVANCED_Stmt("initStmt (DefaultStmtModule)", "this is required for labels")
-/*
-    labelBooleanGuards = new collection.mutable.HashMap[String, LocalVarDecl]()
+    labelBooleanGuards = new collection.mutable.HashMap[String, Binding]()
 
     //create a boolean variable declaration for each label
     methodBody.visit(
       n => n match {
         case sil.Label(name,_) =>
-          labelBooleanGuards.put(name, LocalVarDecl(Identifier(name+"_lblGuard")(lblVarsNamespace), Bool))
+          labelBooleanGuards.put(name, Binding(Identifier(name+"_lblGuard")(lblVarsNamespace), Bool))
       }
     )
 
     for (boolDecls <- labelBooleanGuards.values.toList) yield {
       boolDecls.l := FalseLit()
     }
-*/
   }
 
   /**
@@ -100,7 +97,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
   override def handleStmt(s: sil.Stmt, statesStackForPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
     s match {
       case s: sil.Fold => 
-        val (bef, aft) = (TODO_Stmt("handleStmt: sil.Fold"), TODO_Stmt())//translateFold(s, statesStackForPackageStmt, insidePackageStmt)
+        val (bef, aft) = (LATER_Stmt("handleStmt", "sil.Fold-case (predicates)"), LATER_Stmt())//translateFold(s, statesStackForPackageStmt, insidePackageStmt)
         stmts => bef +++ stmts +++ aft // put new stmts in front and in back
       case _ =>  stmts => simpleHandleStmt(s, statesStackForPackageStmt, allStateAssms, insidePackageStmt) +++ stmts // put new stmts in front
     }
@@ -140,16 +137,13 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           checkDefinedness(rhs, errors.AssignmentFailed(assign))
       case fold@sil.Fold(e) => sys.error("Internal error: translation of fold statement cannot be handled by simpleHandleStmt code; found:" + fold.toString())
       case unfold@sil.Unfold(e) =>
-        LATER_Stmt("simpleHandleStmt", "sil.Unfold") //translateUnfold(unfold, statesStack, insidePackageStmt)
+        LATER_Stmt("simpleHandleStmt", "sil.Unfold (predicates)") //translateUnfold(unfold, statesStack, insidePackageStmt)
       case inh@sil.Inhale(e) =>
-        LATER_Stmt("simpleHandleStmt", "sil.Inhale") //inhaleWithDefinednessCheck(whenInhaling(e), errors.InhaleFailed(inh), statesStack, insidePackageStmt)
+        inhaleWithDefinednessCheck(whenInhaling(e), errors.InhaleFailed(inh), statesStack, insidePackageStmt)
       case exh@sil.Exhale(e) =>
-        LATER_Stmt("simpleHandleStmt", "sil.Exhale")
-/*
         val transformedExp = whenExhaling(e)
         val defErrorOpt = maybeDefError(errors.ExhaleFailed(exh))
         exhale(Seq((transformedExp, errors.ExhaleFailed(exh), defErrorOpt)), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
-*/
       case a@sil.Assert(e) =>
         val transformedExp = whenExhaling(e)
         val defErrorOpt = maybeDefError(errors.AssertFailed(a))
@@ -158,15 +152,12 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           // if e is pure, then assert and exhale are the same
           exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
         } else {
-          TODO_Stmt("simpleHandleStmt", "sil.Assert (non-pure version)")
-/*
           // we create a temporary state to ignore the side-effects
           val (backup, snapshot) = freshTempState("Assert")
           val exhaleStmt = exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), isAssert =  true, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt, havocHeap = false)
           replaceState(snapshot)
           // B3 TODO: freshTempState must return a B3 backup Stmt! 
           exhaleStmt //backup :: exhaleStmt :: Nil
-*/
         }
       case mc@sil.MethodCall(methodName, args, targets) =>
         val method = verifier.program.findMethod(methodName)
@@ -286,6 +277,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
     }
 */
 
+    //var comment = "Translating statement: " + stmt.toString.replace("\n", "\n  // ")
     // Seqn (sequence of stmts) => handle each Stmt individually, then return. Declare all local variables first
     stmt match {
       case sil.Seqn(ss, scopedDecls) =>
@@ -300,6 +292,10 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
         locals map (v => mainModule.env.undefine(v.localVar)) // remove local variables from environment
         // return to avoid the extra 'assumeGoodState'
         return seqOfAllStmts
+      // case sil.If(cond, thn, els) =>
+      //   comment = s"Translating statement: if ($cond)"
+      // case sil.While(cond, invs, body) =>
+      //   comment = s"Translating statement: while ($cond)"
       case _ =>
     }
 
@@ -324,6 +320,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
       }) ::
       Nil
 
+    //s"${comment}"
     translation
   }
 

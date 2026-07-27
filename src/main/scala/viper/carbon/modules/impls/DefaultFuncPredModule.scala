@@ -503,7 +503,6 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     * The generated frame includes freshly-generated variables
     */
   private def getFunctionFrame(fun: sil.Function, args: Seq[Expr]): (Expr, Seq[(Function, sil.Forall)]) = {
-    (TODO_Expr_bool("DefaultFuncPredModule", "getFunctionFrame"), Seq())
   val res =     getFrame(fun.name, fun.formalArgs, fun.pres map whenExhaling, functionFrames, args, true)
     res
   }

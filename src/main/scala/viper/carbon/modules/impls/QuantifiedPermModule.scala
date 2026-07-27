@@ -320,11 +320,9 @@ Nil/*B3 ADVANCED (QPerm)
 
   def staticGoodMask(ftvars: Seq[Type]) = FunctionCallExpr(goodMaskName(ftvars), IdExpr(maskName(ftvars), maskType(ftvars)), Bool)
 
-/*
-  private def permAdd(a: Exp, b: Exp): Exp = a + b
-  private def permSub(a: Exp, b: Exp): Exp = a - b
-  private def permDiv(a: Exp, b: Exp): Exp = a / b
-*/
+  private def permAdd(a: Expr, b: Expr): Expr = a + b
+  private def permSub(a: Expr, b: Expr): Expr = a - b
+  private def permDiv(a: Expr, b: Expr): Expr = a / b
 
   override def freshTempState(name: String): Seq[IdExpr] = {
     allFieldsTypVars map {ftvars => IdExpr(Identifier(s"${name}${maskName(ftvars)}"), maskType(ftvars))}
@@ -921,10 +919,7 @@ Nil/*B3 ADVANCED (QPerm)
 */
 
   override def inhaleExp(e: sil.Exp, error: PartialVerificationError): Stmt = {
-    LATER_Stmt("QuantifiedPermModule", "inhaleExp")
-/*
     inhaleAux(e, Assume, error)
-*/
   }
 
 /*
@@ -939,18 +934,19 @@ Nil/*B3 ADVANCED (QPerm)
       val curPerm = currentPermission(translateNull, wandRep)
       (if (!usingOldState) currentMaskAssignUpdate(translateNull, wandRep, permSub(curPerm, fullPerm)) else Nil)
   }
+*/
 
   /*
    * same as the original inhale except that it abstracts over the way assumptions are expressed in the
    * Boogie program
    * Note: right now (05.04.15) inhale AND transferAdd both use this function
    */
-  private def inhaleAux(e: sil.Exp, assmsToStmt: Exp => Stmt, error: PartialVerificationError):Stmt = {
+  private def inhaleAux(e: sil.Exp, assmsToStmt: Expr => Stmt, error: PartialVerificationError): Stmt = {
     e match {
       case sil.AccessPredicate(loc: LocationAccess, prm) =>
         val perm = PermissionHelper.normalizePerm(prm)
         val curPerm = currentPermission(loc)
-        val permVar = LocalVar(Identifier("perm"), permType)
+        val permVar = IdExpr(Identifier("perm"), permType)
 
         /*
       case sil.AccessPredicate(loc: LocationAccess, prm) =>
@@ -964,10 +960,13 @@ Nil/*B3 ADVANCED (QPerm)
 
 
 
-        val (permVal, stmts): (Exp, Stmt) =
+        val (permVal, stmts): (Expr, Stmt) =
           if (perm.isInstanceOf[WildcardPerm]) {
+            (ADVANCED_Expr_int("QuantifiedPermModule", "inhaleAux -> WildcardPerm"), ADVANCED_Stmt("QuantifiedPermModule", "inhaleAux -> WildcardPerm"))
+/*
             val w = LocalVar(Identifier("wildcard"), Real)
-            (w, LocalVarWhereDecl(w.name, w > noPerm) :: Havoc(w) :: Nil)
+            (w, LocalVarWhereDecl(w.name, w > noPerm) :: Reinit(w) :: Nil)
+*/
           } else {
             (translatePerm(perm), Nil)
           }
@@ -981,24 +980,31 @@ Nil/*B3 ADVANCED (QPerm)
           ) ++
           (if (!usingOldState) currentMaskAssignUpdate(loc, permAdd(curPerm, permVar)) else Nil)
       case w@sil.MagicWand(left,right) =>
+        ADVANCED_Stmt("QuantifiedPermModule", "inhaleAux -> sil.MagicWand-case")
+/*
         val wandRep = wandModule.getWandRepresentation(w)
         val curPerm = currentPermission(translateNull, wandRep)
         if (!usingOldState) currentMaskAssignUpdate(translateNull, wandRep, permAdd(curPerm, fullPerm)) else Nil
+*/
 
       //Quantified Permission Expression
       case fa@sil.Forall(_, _, _) =>
         if (fa.isPure) {
           Nil
         } else {
+          ADVANCED_Stmt("QuantifiedPermModule", "inhaleAux (sil.Forall-case -> variant: QPerm)")
+/*
           //Quantified Permission
           val stmt:Stmt = translateInhale(fa, error)
           stmt ++ Nil
+*/
         }
       case _ => Nil
 
     }
   }
 
+/*
   var varMap:Map[Identifier,Boolean] = Map()
 
   def containVars(n:Node): Unit = {
@@ -1497,14 +1503,15 @@ Nil/*B3 ADVANCED (QPerm)
     val setMaskStmt = tempMask := maskUpdate(zeroMask, rcv, loc, fullPerm)
     (tempMask, setMaskStmt)
   }
+*/
 
-  def rcvAndFieldExp(f: sil.LocationAccess) : (Exp, Exp) =
+  def rcvAndFieldExp(f: sil.LocationAccess) : (Expr, Expr) =
     f match {
       case sil.FieldAccess(rcv, _) => (translateExp(rcv), translateResource(f))
       case sil.PredicateAccess(_, _) => (translateNull, translateResource(f))
     }
 
-  def currentPermission(loc: sil.ResourceAccess): Exp = {
+  def currentPermission(loc: sil.ResourceAccess): Expr = {
     loc match {
       case fa@sil.FieldAccess(rcv, field) =>
         currentPermission(translateExp(rcv), translateResource(fa))
@@ -1514,7 +1521,6 @@ Nil/*B3 ADVANCED (QPerm)
         currentPermission(translateNull, translateResource(w))
     }
   }
-*/
 
   def currentPermission(rcv: Expr, location: Expr): Expr = {
     val maskTypVars = location.typ.asInstanceOf[NamedType].typVars //(location is always of Field type here)
@@ -1528,28 +1534,24 @@ Nil/*B3 ADVANCED (QPerm)
      )
   }
 
-/*
-  private def currentMaskAssignUpdate(loc: LocationAccess, newPerm: Exp) : Stmt = {
+  private def currentMaskAssignUpdate(loc: LocationAccess, newPerm: Expr) : Stmt = {
     val (rcv, field) = rcvAndFieldExp(loc)
     currentMaskAssignUpdate(rcv, field, newPerm)
   }
 
-  private def currentMaskAssignUpdate(rcv: Exp, field: Exp, newPerm: Exp) : Stmt = {
-    mask := maskUpdate(mask, rcv, field, newPerm)
+  private def currentMaskAssignUpdate(rcv: Expr, field: Expr, newPerm: Expr) : Stmt = {
+    val splitVariant = field.typ.asInstanceOf[NamedType].typVars
+    mask(splitVariant) := maskUpdate(mask(splitVariant), rcv, field, newPerm)
   }
 
-  private def maskUpdate(mask: Exp, loc: LocationAccess, newPerm: Exp) : Exp = {
+  private def maskUpdate(mask: Expr, loc: LocationAccess, newPerm: Expr) : Expr = {
     val (rcv, field) = rcvAndFieldExp(loc)
     maskUpdate(mask, rcv, field, newPerm)
   }
 
-  private def maskUpdate(mask: Exp, rcv: Exp, field: Exp, newPerm: Exp) : Exp = {
-    if(verifier.usePolyMapsInEncoding)
-      MapUpdate(mask, Seq(rcv, field), newPerm)
-    else
-      FuncApp(updateMaskName, Seq(mask, rcv, field, newPerm), maskType)
+  private def maskUpdate(mask: Expr, rcv: Expr, field: Expr, newPerm: Expr) : Expr = {
+    FunctionCallExpr(updateMaskName, Seq(mask, rcv, field, newPerm), mask.typ)
   }
-*/
 
   override def currentMask = maskExps
   override def staticMask(ftvars: Seq[Type]) = Binding(maskName(ftvars), maskType(ftvars))
@@ -1557,8 +1559,9 @@ Nil/*B3 ADVANCED (QPerm)
   override def staticPermissionPositive(rcv: Exp, loc: Exp) = {
     hasDirectPerm(staticMask(0).l, rcv, loc)
   }
+*/
 
-  def translatePerm(e: sil.Exp): Exp = {
+  def translatePerm(e: sil.Exp): Expr = {
     require(e isSubtype sil.Perm)
     e match {
       case sil.NoPerm() =>
@@ -1566,6 +1569,8 @@ Nil/*B3 ADVANCED (QPerm)
       case sil.FullPerm() =>
         fullPerm
       case sil.WildcardPerm() =>
+        ADVANCED_Expr_int("QuantifiedPermModule", "translatePerm (sil.WildcardPerm case)")
+/*
         if (assertReadPermOnly) {
           // We are in a context where permission amounts do not matter, so we can safely translate a wildcard to
           // a full permission.
@@ -1573,28 +1578,32 @@ Nil/*B3 ADVANCED (QPerm)
         } else {
           sys.error("cannot translate wildcard at an arbitrary position (should only occur directly in an accessibility predicate)")
         }
+*/
       case sil.EpsilonPerm() =>
         sys.error("epsilon permissions are not supported by this permission module")
       case sil.CurrentPerm(res: ResourceAccess) =>
         currentPermission(res)
       case sil.FractionalPerm(left, right) =>
-        BinExp(translateExp(left), Div, translateExp(right))
+        translateExp(left) / translateExp(right)
       case sil.PermMinus(a) =>
-        UnExp(Minus,translatePerm(a))
+        translatePerm(a).neg
       case sil.PermAdd(a, b) =>
         permAdd(translatePerm(a), translatePerm(b))
       case sil.PermSub(a, b) =>
         permSub(translatePerm(a), translatePerm(b))
       case sil.PermMul(a, b) =>
-        BinExp(translatePerm(a), Mul, translatePerm(b))
+        translatePerm(a) * translatePerm(b)
       case sil.PermDiv(a,b) =>
         permDiv(translatePerm(a), translateExp(b))
       case sil.PermPermDiv(a,b) =>
         permDiv(translatePerm(a), translatePerm(b))
       case sil.IntPermMul(a, b) =>
+        sys.error("B3 LATER: sil.IntPermMul currently not supported (in translatePerm)")
+/*
         val i = translateExp(a)
         val p = translatePerm(b)
-        BinExp(RealConv(i), Mul, p)
+        RealConv(i) * p
+*/
       case sil.CondExp(cond, thn, els) =>
         CondExp(translateExp(cond), translatePerm(thn), translatePerm(els))
       case _ //sil.LocalVar | _: sil.FuncLikeApp | _:sil.FieldAccess
@@ -1604,6 +1613,7 @@ Nil/*B3 ADVANCED (QPerm)
     }
   }
 
+/*
   def translatePermComparison(e: sil.Exp): Exp = {
     val t = translateExp(_)
     e match {
@@ -1616,12 +1626,15 @@ Nil/*B3 ADVANCED (QPerm)
       case _ => sys.error("not a permission comparison")
     }
   }
+*/
 
   val currentAbstractReads = collection.mutable.ListBuffer[String]()
 
+/*
   override def getCurrentAbstractReads(): ListBuffer[String] = {
     currentAbstractReads
   }
+*/
 
   private def isAbstractRead(exp: sil.Exp) = {
     exp match {
@@ -1630,6 +1643,7 @@ Nil/*B3 ADVANCED (QPerm)
     }
   }
 
+/*
   override def freshReads(vars: Seq[sil.LocalVar]): Stmt = {
     val bvs = vars map translateLocalVar
     Havoc(bvs) ++
@@ -1638,8 +1652,6 @@ Nil/*B3 ADVANCED (QPerm)
 */
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
-    stmts => TODO_Stmt("QuantifiedPermModule", s"handleStmt: ${s.toString().take(10)}")+++stmts
-/*
     stmts =>
       s match {
         case n@sil.NewStmt(target, fields) =>
@@ -1652,33 +1664,36 @@ Nil/*B3 ADVANCED (QPerm)
           //        (Nil, Nil)
           stmts
       }
-*/
   }
 
-/*
-  private def permEq(a: Exp, b: Exp): Exp = {
+  private def permEq(a: Expr, b: Expr): Expr = {
     a === b
   }
+/*
   private def permNe(a: Exp, b: Exp): Exp = {
     a !== b
   }
   private def permLt(a: Exp, b: Exp): Exp = {
     a < b
   }
-  private def permLe(a: Exp, b: Exp, forField : Boolean = false): Exp = {
+*/
+  private def permLe(a: Expr, b: Expr, forField: Boolean = false): Expr = {
     // simple optimization that helps in many cases
     if (forField && a == fullPerm) permEq(a, b)
     else a <= b
   }
+/*
   private def permGt(a: Exp, b: Exp, forField : Boolean = false): Exp = {
     // simple optimization that helps in many cases
     if (forField && b == fullPerm) permEq(a, b)
     else permLt(b, a)
   }
-  private def permGe(a: Exp, b: Exp, forField : Boolean = false): Exp = {
+*/
+  private def permGe(a: Expr, b: Expr, forField: Boolean = false): Expr = {
     permLe(b, a, forField)
   }
 
+/*
   override def simplePartialCheckDefinednessAfter(e: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): Stmt = {
 
     val stmt: Stmt = if(makeChecks) (
@@ -1730,9 +1745,11 @@ Nil/*B3 ADVANCED (QPerm)
   override def conservativeIsPositivePerm(e: sil.Exp): Boolean = PermissionHelper.conservativeStaticIsStrictlyPositivePerm(e)
 
   override def isStrictlyPositivePerm(e: sil.Exp): Exp = PermissionHelper.isStrictlyPositivePerm(e)
+*/
 
   object PermissionHelper {
-
+    
+/*
     def isStrictlyPositivePerm(e: sil.Exp): Exp = {
       require(e isSubtype sil.Perm, s"found ${e.typ} ($e), but required Perm")
       // Use backup lazily when needed only. This allows the function to work on WildcardPerms for which
@@ -1768,6 +1785,7 @@ Nil/*B3 ADVANCED (QPerm)
         case _ => backup()
       }
     }
+*/
 
     def conservativeStaticIsStrictlyPositivePerm(e: sil.Exp): Boolean = {
       require(e isSubtype sil.Perm, s"found ${e.typ} ($e), but required Perm")
@@ -1835,6 +1853,7 @@ Nil/*B3 ADVANCED (QPerm)
       }
     }
 
+/*
     def isStrictlyNegativePerm(e: sil.Exp): Exp = {
       require(e isSubtype sil.Perm)
       // Use backup lazily when needed only. This allows the function to work on WildcardPerms for which
@@ -1870,6 +1889,7 @@ Nil/*B3 ADVANCED (QPerm)
         case _ => backup()
       }
     }
+*/
 
     // Does this permission amount definitely denote a statically-known constant amount?
     // NOTE: this is conservative and so always returns false for local variables
@@ -2027,5 +2047,4 @@ Nil/*B3 ADVANCED (QPerm)
     }
 
   }
-*/
 }

@@ -192,19 +192,17 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         val init = stateModule.initBoogieState ++ assumeAllFunctionDefinitions ++
           (if (verifier.respectFunctionPrecPermAmounts) Nil else permModule.assumePermUpperBounds(true)) ++ stmtModule.initStmt(method.bodyOrAssumeFalse)
         //"Initializing the old state"
-        val initOld = TODO_Stmt("translateMethodDecl", "initOld")//stateModule.initOldState
+        val initOld = stateModule.initOldState
         //"Assumptions about method arguments"
-        val paramAssumptions = TODO_Stmt("translateMethodDecl", "paramAssumptions")//mWithLoopInfo.formalArgs map (a => allAssumptionsAboutValue(a.typ, translateLocalVarDeclToPParameter(a), true))
+        val paramAssumptions = mWithLoopInfo.formalArgs map (a => allAssumptionsAboutValue(a.typ, translateLocalVarDeclToPParameter(a), true))
         //""Checked inhaling of precondition"
-        val inhalePre = TODO_Stmt("translateMethodDecl", "inhalePre")//translateMethodDeclPre(pres)
+        val inhalePre = translateMethodDeclPre(pres)
         //"Checked inhaling of postcondition to check definedness"
-        val checkPost = TODO_Stmt("translateMethodDecl", "checkPost")  /* = if (posts.nonEmpty) {
-          translateMethodDeclCheckPosts(posts)
-        }
-        else Nil */
+        val checkPost: Stmt = if (posts.nonEmpty) translateMethodDeclCheckPosts(posts) else Nil
+
         val postsWithErrors = posts map (p => (p, errors.PostconditionViolated(p, mWithLoopInfo)))
         //"Exhaling postcondition"
-        val exhalePost = TODO_Stmt("translateMethodDecl", "exhalePost")//exhaleWithoutDefinedness(postsWithErrors)
+        val exhalePost = exhaleWithoutDefinedness(postsWithErrors)
         //Translate Method body -> Procedure body
         val mainBody = translateStmt(method.bodyOrAssumeFalse)
           /* TODO: Might be worth special-casing on methods with empty bodies */
@@ -223,7 +221,7 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         a subset of the outer VarDecl's scope, so the outer VarDecl's scope must go at least as far as needed for
         the inner VarDecls.) Maybe this is possible; at least in some situations? */
         /* B3 INFO: (ADVANCED) In PrettyPrinter we also see handling of LocalVarWhereDecl's. B3 doesn't have "where", 
-        so if we need tha twe would likely have to handle that somewhere else. But this is why it is missing here. */
+        so if we need that we would likely have to handle that somewhere else. But this is why it is missing here. */
 
         val bodyWithDecls = addLocalVarDeclarations(body, ins ++ outs ++ inouts)
       
@@ -258,7 +256,6 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
     }
   }
 
-/*
   private def translateMethodDeclCheckPosts(posts: Seq[sil.Exp]): Stmt = {
     val (freshStateStmtAux, state) = stateModule.freshTempState("Post", discardCurrent = true, initialise = true)
     val freshStateStmt = freshStateStmtAux ++ stateModule.assumeGoodState
@@ -278,22 +275,24 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
           errors.ContractNotWellformed(_)
         })
 
-        NondetIf(
+        Choose(
           freshStateStmt ++
-          MaybeComment("Checked inhaling of postcondition to check definedness",
-            MaybeCommentBlock("Do welldefinedness check of the inhale part.",
-              NondetIf(onlyInhalePosts ++ Assume(FalseLit()))) ++
-              MaybeCommentBlock("Normally inhale the exhale part.",
-                onlyExhalePosts)
-          ) ++
-          MaybeComment("Stop execution", Assume(FalseLit()))
+          //"Checked inhaling of postcondition to check definedness"
+            //"Do welldefinedness check of the inhale part."
+            Choose(onlyInhalePosts ++ Assume(FalseLit())) ++ 
+            //"Normally inhale the exhale part."
+            onlyExhalePosts ++ 
+          //"Stop execution"
+          Assume(FalseLit())
         )
       }
       else {
-        NondetIf(
+        Choose(
           freshStateStmt ++
-          MaybeComment("Checked inhaling of postcondition to check definedness", onlyExhalePosts) ++
-            MaybeComment("Stop execution", Assume(FalseLit()))
+            //"Checked inhaling of postcondition to check definedness"
+            onlyExhalePosts ++
+            //"Stop execution"
+            Assume(FalseLit())
         )
       })
 
@@ -315,24 +314,21 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
       pres, {
         errors.ContractNotWellformed(_)
       })
-      MaybeCommentBlock("Checked inhaling of precondition",
-        MaybeCommentBlock("Do welldefinedness check of the exhale part.",
-          NondetIf(onlyExhalePres ++ Assume(FalseLit()))) ++
-          MaybeCommentBlock("Normally inhale the inhale part.",
-            onlyInhalePres)
-      )
+      //"Checked inhaling of precondition"
+      Choose(onlyExhalePres ++ Assume(FalseLit())) ++ //"Do welldefinedness check of the exhale part."
+        onlyInhalePres //"Normally inhale the inhale part."
     }
     else {
       val inhalePres: Seq[Stmt] = inhaleModule.inhaleInhaleSpecWithDefinednessCheck(
       pres, {
         errors.ContractNotWellformed(_)
       })
-      MaybeCommentBlock("Checked inhaling of precondition", inhalePres)
+      //"Checked inhaling of precondition"
+      inhalePres
     }
 
     res
   }
-*/
 
   override def allAssumptionsAboutValue(typ:sil.Type, arg: LocalVarDecl, isParameter:Boolean): Stmt = {
     val tmp = verifier.allModules map (_.validValue(typ, arg.l, isParameter))

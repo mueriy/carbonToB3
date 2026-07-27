@@ -751,13 +751,16 @@ object B3Nodes {
     def +(other: Expr) = OpExpr(Add, Seq(this, other))
     def -(other: Expr) = OpExpr(Sub, Seq(this, other))
     def *(other: Expr) = OpExpr(Mul, Seq(this, other))
+    /** real division (currently just int division until real is supported) */
     def /(other: Expr) = OpExpr(Div, Seq(this, other))
+    /** int division */
     def div(other: Expr) = OpExpr(IntDiv, Seq(this, other))
     def %(other: Expr) = OpExpr(Mod, Seq(this, other))
     def <(other: Expr) = OpExpr(LtCmp, Seq(this, other))
     def >(other: Expr) = OpExpr(LtCmp, Seq(other, this)) // this > other => other < this
     def <=(other: Expr) = OpExpr(LeCmp, Seq(this, other))
     def >=(other: Expr) = OpExpr(LeCmp, Seq(other, this)) // this >= other => other <= this
+    /** negate/minus (-x) */
     def neg = OpExpr(Minus, Seq(this))
     def &&(other: Expr) = OpExpr(And, Seq(this, other))
     def ||(other: Expr) = OpExpr(Or, Seq(this, other))

@@ -154,6 +154,7 @@ trait HeapModule extends Module with CarbonStateComponent {
   def translateResource(f: sil.ResourceAccess): Expr
 /*
   def translateLocation(pred: sil.Predicate, args: Seq[Expr]): Expr
+*/
 
   /**
    * Translation of the null literal.
@@ -171,6 +172,7 @@ trait HeapModule extends Module with CarbonStateComponent {
     }
   }
 
+/*
   def checkNonNullReceiver(rcv: Expr): Expr = {
     rcv !== translateNull
   }
@@ -211,12 +213,12 @@ trait HeapModule extends Module with CarbonStateComponent {
 
   def currentHeap: Seq[Expr]
 
-/*
   /**
     * store {@code newVal} at {@code loc} in the current heap
     */
   def currentHeapAssignUpdate(loc: sil.LocationAccess, newVal: Expr): Stmt
 
+/*
   def identicalOnKnownLocations(heap:Seq[Expr],mask:Seq[Expr]):Expr
 
   /**
