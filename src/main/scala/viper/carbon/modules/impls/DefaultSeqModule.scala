@@ -11,6 +11,7 @@ import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.verifier.Verifier
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 import viper.carbon.modules.impls.dafny_axioms.SequenceAxiomatization
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState}
 import viper.silver.ast.{SeqIndex, SeqLength}
@@ -38,7 +39,8 @@ class DefaultSeqModule(val verifier: Verifier)
   implicit val namespace = verifier.freshNamespace("seq")
 
   override def preamble = {
-    Seq()//B3 LATER
+    addLATER("Seq", "DefaultSeqModule->preamble")
+    Seq()
 /*
     if (used) {
       LiteralDecl(SequenceAxiomatization.value)
@@ -48,14 +50,15 @@ class DefaultSeqModule(val verifier: Verifier)
 */
   }
 
-/*
   override def start(): Unit = {
+    addLATER("Seq", "DSeqM->start")
+/*
     expModule.register(this)
-  }
 */
+  }
 
   override def translateSeqExp(e: sil.Exp): Expr = {
-    LATER_Expr_bool("translateSeqExp", "some seq")
+    LATER_Expr_bool("Seq", "DefaultSeqModule->translateSeqExp")
 /*
     def t(e: sil.Exp) = translateExp(e)
     used = true
@@ -118,6 +121,7 @@ class DefaultSeqModule(val verifier: Verifier)
         FuncApp(Identifier("Seq#ContainsTrigger"),args,typ)
     })(_ => true) //  always recurse
   }
+*/
 
 
   override def simplePartialCheckDefinednessAfter(e: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): Stmt = {
@@ -127,13 +131,12 @@ class DefaultSeqModule(val verifier: Verifier)
         case si@SeqIndex(s,idx) => {
           val index = translateExp(idx)
           val length = translateSeqExp(SeqLength(s)(s.pos,s.info))
-          Assert(BinExp(index,GeCmp,IntLit(0)),error.dueTo(reasons.SeqIndexNegative(s,si))) ++ Assert(BinExp(index,LtCmp,length),error.dueTo(reasons.SeqIndexExceedsLength(s,si)))
+          Assert(index >= IntLit(0),error.dueTo(reasons.SeqIndexNegative(s,si))) ++ Assert(index < length,error.dueTo(reasons.SeqIndexExceedsLength(s,si)))
         }
         case _ => Nil
       }
     else Nil
   }
-*/
 
   /**
    * Reset the state of this module so that it can be used for new program. This method is called

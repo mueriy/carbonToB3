@@ -227,16 +227,16 @@ trait HeapModule extends Module with CarbonStateComponent {
   def equateWithCurrentHeap(s: Seq[IdExpr]): Stmt
 
   // returns wand#sm (secondary mask for the wand)
-//   def wandMaskIdentifier(f: Identifier): Identifier // B3 ADVANCED
+  def wandMaskIdentifier(f: Identifier): Identifier
 
   // returns wand#ft (footprint of the magic wand)
   // this is inhaled at the beginning of packaging a wand to frame fields while the wand being packaged (
   // as the permission to the wand is gained at the end of the package statement)
-//   def wandFtIdentifier(f: Identifier): Identifier  // B3 ADVANCED
+  def wandFtIdentifier(f: Identifier): Identifier
 
-//   def predicateMaskFieldTypeOfWand(wand: String): Type // B3 ADVANCED
+  def predicateMaskFieldTypeOfWand(wand: String): Type
 
-//   def predicateVersionFieldTypeOfWand(wand: String): Type // B3 ADVANCED
+  def predicateVersionFieldTypeOfWand(wand: String): Type
 
   // adds permission to field e to the secondary mask of the wand
   def addPermissionToWMask(wMask: Expr, e: sil.Exp): Stmt

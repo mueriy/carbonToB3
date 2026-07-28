@@ -25,7 +25,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
 
   def name = "State module"
 
-  private val isGoodState = "state" //B3 NOTE: This is a function name, so it can be a single name
+  private val isGoodState = "state"
 
   implicit val stateNamespace = verifier.freshNamespace("state")
 
@@ -76,7 +76,6 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   override def reset(): Unit = {
     curOldState = null
     curState = null
-    //B3 DEVELOPMENT NOTE: these were already commented away:
     //usingOldState = false
     //treatOldAsCurrent = false
     resetBoogieState
@@ -169,7 +168,7 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
       curState.put(c, tmpExps) // repopulate current state
       c.restoreState(tmpExps)
 
-      (if (initialise) TODO_Stmt("freshTempState", "replace with c.resetBoogieState")/* c.resetBoogieState */ else stmt)
+      (if (initialise) Block(c.resetBoogieState) else stmt)
     }
     usingOldState = false // we have now set up a temporary state in terms of "old" - this could happen when an unfolding expression is inside an "old"
     (s, previousState)

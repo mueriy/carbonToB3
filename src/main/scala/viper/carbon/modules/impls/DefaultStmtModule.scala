@@ -97,7 +97,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
   override def handleStmt(s: sil.Stmt, statesStackForPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
     s match {
       case s: sil.Fold => 
-        val (bef, aft) = (LATER_Stmt("handleStmt", "sil.Fold-case (predicates)"), LATER_Stmt())//translateFold(s, statesStackForPackageStmt, insidePackageStmt)
+        val (bef, aft) = (LATER_Stmt("predicates", "DStmtM->handleStmt->sil.Fold-case"), LATER_Stmt())//translateFold(s, statesStackForPackageStmt, insidePackageStmt)
         stmts => bef +++ stmts +++ aft // put new stmts in front and in back
       case _ =>  stmts => simpleHandleStmt(s, statesStackForPackageStmt, allStateAssms, insidePackageStmt) +++ stmts // put new stmts in front
     }
@@ -129,7 +129,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
         checkDefinedness(lhs, errors.AssignmentFailed(assign), insidePackageStmt = insidePackageStmt) ++
           checkDefinedness(rhs, errors.AssignmentFailed(assign), insidePackageStmt = insidePackageStmt) ++
         {if(insidePackageStmt)
-          ADVANCED_Stmt("simpleHandleStmt", "sil.LocalVarAssign")// Assign(translateExpInWand(lhs), translateExpInWand(rhs))
+          ADVANCED_Stmt("wand", "DStmtM->simpleHandleStmt->sil.LocalVarAssign")// Assign(translateExpInWand(lhs), translateExpInWand(rhs))
         else
           Assign(translateExp(lhs).asInstanceOf[IdExpr], translateExp(rhs))}
       case assign@sil.FieldAssign(lhs, rhs) =>
@@ -137,7 +137,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           checkDefinedness(rhs, errors.AssignmentFailed(assign))
       case fold@sil.Fold(e) => sys.error("Internal error: translation of fold statement cannot be handled by simpleHandleStmt code; found:" + fold.toString())
       case unfold@sil.Unfold(e) =>
-        LATER_Stmt("simpleHandleStmt", "sil.Unfold (predicates)") //translateUnfold(unfold, statesStack, insidePackageStmt)
+        LATER_Stmt("predicates", "DStmtM->simpleHandleStmt->sil.Unfold") //translateUnfold(unfold, statesStack, insidePackageStmt)
       case inh@sil.Inhale(e) =>
         inhaleWithDefinednessCheck(whenInhaling(e), errors.InhaleFailed(inh), statesStack, insidePackageStmt)
       case exh@sil.Exhale(e) =>
@@ -156,8 +156,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           val (backup, snapshot) = freshTempState("Assert")
           val exhaleStmt = exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), isAssert =  true, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt, havocHeap = false)
           replaceState(snapshot)
-          // B3 TODO: freshTempState must return a B3 backup Stmt! 
-          exhaleStmt //backup :: exhaleStmt :: Nil
+          backup :: exhaleStmt :: Nil
         }
       case mc@sil.MethodCall(methodName, args, targets) =>
         val method = verifier.program.findMethod(methodName)
@@ -209,8 +208,8 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           {
             stateModule.replaceOldState(preCallState)
             //"Inhaling postcondition"
-            val res = inhale(posts map (e => (e, errors.CallFailed(mc).withReasonNodeTransformed(renamingArguments))), addDefinednessChecks = false, statesStack, insidePackageStmt) //++
-              //B3 LATER: unfold: // executeUnfoldings(posts, (post => errors.Internal(post).withReasonNodeTransformed(renamingArguments)))
+            val res = inhale(posts map (e => (e, errors.CallFailed(mc).withReasonNodeTransformed(renamingArguments))), addDefinednessChecks = false, statesStack, insidePackageStmt) ++
+              LATER_Stmt("predicates", "DStmtM->simpleHandleStmt->'Inhaling postcondition'->unfold")//executeUnfoldings(posts, (post => errors.Internal(post).withReasonNodeTransformed(renamingArguments)))
             stateModule.replaceOldState(oldState)
             toUndefine map mainModule.env.undefine
             res
@@ -230,7 +229,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           translateStmt(thn, statesStack, allStateAssms, insidePackageStmt),
           translateStmt(els, statesStack, allStateAssms, insidePackageStmt))
       case sil.Label(name, _) => {
-        ADVANCED_Stmt("simpleHandleStmt", "sil.Label")
+        ADVANCED_Stmt("labels", "simpleHandleStmt->sil.Label")
 /*
         val labelState = LabelHelper.getLabelState[stateModule.StateSnapshot](
           name,
@@ -246,14 +245,14 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
         /* Handled by loop module, since the loop module decides whether the goto should be translated as a goto. */
         Nil
       case pa@sil.Package(wand, proof) => {
-        ADVANCED_Stmt("simpleHandleStmt", "sil.Package")
+        ADVANCED_Stmt("wand", "simpleHandleStmt->sil.Package")
 /*
         checkDefinedness(wand, errors.MagicWandNotWellformed(wand), insidePackageStmt = insidePackageStmt)
         translatePackage(pa, errors.PackageFailed(pa), statesStack, allStateAssms, insidePackageStmt)
 */
       }
       case a@sil.Apply(wand) =>
-        ADVANCED_Stmt("simpleHandleStmt", "sil.Apply")
+        ADVANCED_Stmt("wand", "simpleHandleStmt->sil.Apply")
 /*
         translateApply(a, errors.ApplyFailed(a), statesStack, allStateAssms, insidePackageStmt)
 */
@@ -271,11 +270,12 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
     * For more details see the general node in 'wandModule'
     */
   override def translateStmt(stmt: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), duringPackage: Boolean = false): Stmt = {
-/* B3 ADVANCED (wand)
     if(duringPackage) {
+      sys.error("B3 ADVANCED (wand): need to support init translating stmts in wand")
+/* B3 ADVANCED (wand)
         wandModule.translatingStmtsInWandInit()
-    }
 */
+    }
 
     //var comment = "Translating statement: " + stmt.toString.replace("\n", "\n  // ")
     // Seqn (sequence of stmts) => handle each Stmt individually, then return. Declare all local variables first
@@ -292,10 +292,10 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
         locals map (v => mainModule.env.undefine(v.localVar)) // remove local variables from environment
         // return to avoid the extra 'assumeGoodState'
         return seqOfAllStmts
-      // case sil.If(cond, thn, els) =>
-      //   comment = s"Translating statement: if ($cond)"
-      // case sil.While(cond, invs, body) =>
-      //   comment = s"Translating statement: while ($cond)"
+      //case sil.If(cond, thn, els) =>
+        //comment = s"Translating statement: if ($cond)"
+      //case sil.While(cond, invs, body) =>
+        //comment = s"Translating statement: while ($cond)"
       case _ =>
     }
 
@@ -310,12 +310,12 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
       assert(assertion = false, "Translation of " + stmt + " is not defined")
     }
     val translation = stmts +++
-      (if(duringPackage){  //[[B3 temp: remove heap-state assumptions after statements]]
-        ADVANCED_Stmt("DefaultStmtModule", "translateStmt -> good state if Wand")
+      (if (duringPackage) {
+        ADVANCED_Stmt("wand", "DStmtM->translateStmt -> good state if Wand")
 /*
         exchangeAssumesWithBoolean(assumeGoodState, statesStack.head.asInstanceOf[StateRep].boolVar)
 */
-      }else{
+      } else {
         assumeGoodState
       }) ::
       Nil
@@ -329,7 +329,7 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
     if(makeChecks) {
       e match {
         case labelOld@sil.LabelledOld(_, labelName) =>
-          ADVANCED_Stmt("simplePartialCheckDefinednessBefore", "sil.LabelledOld") //(sil.LabelledOld => old state of a var at a certain (specifically designed/labeled) position)
+          ADVANCED_Stmt("LabelledOld", "simplePartialCheckDefinednessBefore->sil.LabelledOld") //(sil.LabelledOld => old state of a var at a certain (specifically designed/labeled) position)
 /*
           labelBooleanGuards.get(labelName) match {
             case Some(labelGuardDecl) =>

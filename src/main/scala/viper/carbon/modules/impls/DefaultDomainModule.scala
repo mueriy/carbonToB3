@@ -32,7 +32,7 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
 
 /*
   override def translateDomain(domain: sil.Domain): Seq[Decl] = {
-    sys.error("LATER: translateDomainFunction")
+    sys.error("B3 LATER: translateDomainFunction")
     /*
     val prevState = stateModule.state
     stateModule.replaceState(stateModule.pureState)
@@ -46,7 +46,7 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
   }
 
   private def translateDomainFunction(f: sil.DomainFunc): Seq[Decl] = {
-    sys.error("LATER: translateDomainFunction")
+    sys.error("B3 LATER: translateDomainFunction")
     /*
     env = Environment(verifier, f)
     val t = translateType(f.typ)
@@ -64,7 +64,7 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
   }
 
   private def translateDomainAxiom(axiom: sil.DomainAxiom): Seq[Decl] = {
-    sys.error("LATER: translateDomainAxiom")
+    sys.error("B3 LATER: translateDomainAxiom")
     /*
     env = Environment(verifier, axiom)
     //(AS): I believe this is not needed, as locals are introduced in the translation
@@ -81,7 +81,7 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
   }
 
   override def translateDomainFuncApp(fa: sil.DomainFuncApp): Expr = {
-    sys.error("LATER: translateDomainFuncApp")
+    sys.error("B3 LATER: translateDomainFuncApp")
     /*
     val funct = verifier.program.findDomainFunction(fa.funcname)
     if (funct.unique) {
@@ -95,7 +95,7 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
   }
 
   override def translateDomainTyp(typ: sil.DomainType): Type = {
-    sys.error("LATER: translateDomainTyp")
+    sys.error("B3 LATER: translateDomainTyp")
     /*
     val domain = verifier.program.findDomain(typ.domainName)
     val typArgs = domain.typVars map (tv => typ.typVarsMap.getOrElse(tv, tv))

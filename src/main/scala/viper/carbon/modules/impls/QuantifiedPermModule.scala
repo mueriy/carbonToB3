@@ -124,9 +124,9 @@ class QuantifiedPermModule(val verifier: Verifier)
   private var inverseFuncs: ListBuffer[Func] = new ListBuffer[Func](); //list of inverse functions used for inhale/exhale qp
   private var rangeFuncs: ListBuffer[Func] = new ListBuffer[Func](); //list of inverse functions used for inhale/exhale qp
   private var triggerFuncs: ListBuffer[Func] = new ListBuffer[Func](); //list of inverse functions used for inhale/exhale qp
+*/
 
   private var assertReadPermOnly: Boolean = false
-*/
 
   private val readMaskName = Identifier("readMask")
   private val updateMaskName = Identifier("updMask")
@@ -284,25 +284,23 @@ Nil/*B3 ADVANCED (QPerm)
   }
 
   override def reset() = {
-    addADVANCED("QuantifiedPermModule", "reset")
     originalMasks = allFieldsTypVars map {ftvars => IdExpr(maskName(ftvars), maskType(ftvars))}
     masks = originalMasks
+    addADVANCED("QPerm", "QPM->reset")
 /*
     qpId = 0
     inverseFuncs = new ListBuffer[Func]();
     rangeFuncs = new ListBuffer[Func]();
     triggerFuncs = new ListBuffer[Func]();
-    assertReadPermOnly = false
 */
+    assertReadPermOnly = false
   }
-/*
 
   override def setCheckReadPermissionOnly(readOnly: Boolean): Boolean = {
     val oldValue = assertReadPermOnly
     assertReadPermOnly = readOnly
     oldValue
   }
-*/
 
   override def usingOldState = stateModuleIsUsingOldState
 
@@ -332,16 +330,20 @@ Nil/*B3 ADVANCED (QPerm)
     masks = s
   }
 
-/*
   /**
    * Can a location on a given receiver be read?
    */
-  private def hasDirectPerm(mask: Exp, obj: Exp, loc: Exp): Exp =
-    FuncApp(hasDirectPermName, Seq(maskExp, obj, loc), Bool)
+  private def hasDirectPerm(mask: Expr, obj: Expr, loc: Expr): Expr = {
+    val fieldVariant = mask.typ.asInstanceOf[NamedType].typVars
+    FunctionCallExpr(hasDirectPermName, Seq(maskExp(fieldVariant), obj, loc), Bool)
+  }
 
-  private def hasDirectPerm(obj: Exp, loc: Exp): Exp = hasDirectPerm(maskExp, obj, loc)
+  private def hasDirectPerm(obj: Expr, loc: Expr): Expr = {
+    val fieldVariant = loc.typ.asInstanceOf[NamedType].typVars
+    hasDirectPerm(maskExp(fieldVariant), obj, loc)
+  }
 
-  override def hasDirectPerm(ra: sil.ResourceAccess): Exp = {
+  override def hasDirectPerm(ra: sil.ResourceAccess): Expr = {
     hasDirectPerm(translateReceiver(ra), translateResource(ra))
   }
 
@@ -352,7 +354,7 @@ Nil/*B3 ADVANCED (QPerm)
     * @param setToPermState permission state in which the permission is checked
     * @return
     */
-  private def hasDirectPerm(la: sil.LocationAccess, setToPermState: () => Unit): Exp = {
+  private def hasDirectPerm(la: sil.LocationAccess, setToPermState: () => Unit): Expr = {
     val translatedRcv = translateReceiver(la)
     val translatedLoc = translateResource(la)
 
@@ -364,14 +366,13 @@ Nil/*B3 ADVANCED (QPerm)
     res
   }
 
-  private def translateReceiver(la: sil.ResourceAccess) : Exp  = {
+  private def translateReceiver(la: sil.ResourceAccess): Expr  = {
     la match {
       case sil.FieldAccess(rcv, _) => translateExp(rcv)
       case sil.PredicateAccess(_, _) => translateNull
       case sil.MagicWand(_, _) => translateNull
     }
   }
-*/
 
   /**
    * Expression that expresses that 'permission' is positive. 'silPerm' is used to
@@ -404,17 +405,19 @@ Nil/*B3 ADVANCED (QPerm)
       case _ => false
     }
   }
+*/
 
   override def exhaleExp(e: sil.Exp, error: PartialVerificationError, definednessCheckOpt: Option[DefinednessState]): Stmt = {
+    
     e match {
       case sil.AccessPredicate(loc: LocationAccess, prm) =>
         val curPerm = currentPermission(loc)
         val p = PermissionHelper.normalizePerm(prm)
 
-        def subtractFromMask(permToExhale: Exp) : Stmt =
+        def subtractFromMask(permToExhale: Expr) : Stmt =
           (if (!usingOldState) currentMaskAssignUpdate(loc, permSub(curPerm, permToExhale)) else Nil)
 
-        val permVar = LocalVar(Identifier("perm"), permType)
+        val permVar = IdExpr(Identifier("perm"), permType)
         if (assertReadPermOnly || !p.isInstanceOf[sil.WildcardPerm]) {
           val prmTranslated = if (p.isInstanceOf[sil.WildcardPerm]) {
             // We are in a context where permission amounts do not matter, so we can safely translate a wildcard to
@@ -436,6 +439,8 @@ Nil/*B3 ADVANCED (QPerm)
               subtractFromMask(permVar)
           }
         } else {
+          ADVANCED_Stmt("wildcards", "QPM: exhaleExp->sil.AccessPredicate->wildcard-part")
+/*
           val curPerm = currentPermission(loc)
           val wildcard = LocalVar(Identifier("wildcard"), Real)
 
@@ -444,8 +449,11 @@ Nil/*B3 ADVANCED (QPerm)
             Havoc(wildcard) ++
             Assume(wildcard < curPerm) ++
             subtractFromMask(wildcard)
+*/
         }
       case w@sil.MagicWand(_,_) =>
+        ADVANCED_Stmt("wand", "QPM->exhaleExp->sil.MagicWand")
+/*
         val wandRep = wandModule.getWandRepresentation(w)
         val curPerm = currentPermission(translateNull, wandRep)
         val sufficientPermExp = if (assertReadPermOnly)
@@ -456,20 +464,25 @@ Nil/*B3 ADVANCED (QPerm)
           Assert(sufficientPermExp, error.dueTo(reasons.MagicWandChunkNotFound(w))) ++
           (if (!usingOldState && !assertReadPermOnly) currentMaskAssignUpdate(translateNull, wandRep, permSub(curPerm, fullPerm)) else Nil)
 
+*/
       case fa@sil.Forall(v, cond, expr) =>
 
         if (fa.isPure) {
           Nil
         } else {
+          ADVANCED_Stmt("QPerm", "QPM->exhaleExp->sil.Forall->QPerm-variant")
+/* 
           //Quantified Permission
           val stmt = translateExhale(fa, error)
           stmt
+*/
         }
       case _ => Nil
     }
   }
 
 
+/*
   /*For QP \forall x:T :: c(x) ==> acc(e(x),p(x)) this case class describes an instantiation of the QP where
    * cond = c(expr), recv = e(expr) and perm = p(expr) and expr is of type T and may be dependent on the variable given by v. */
   case class QuantifiedFieldComponents( translatedVar:LocalVarDecl,
@@ -962,7 +975,7 @@ Nil/*B3 ADVANCED (QPerm)
 
         val (permVal, stmts): (Expr, Stmt) =
           if (perm.isInstanceOf[WildcardPerm]) {
-            (ADVANCED_Expr_int("QuantifiedPermModule", "inhaleAux -> WildcardPerm"), ADVANCED_Stmt("QuantifiedPermModule", "inhaleAux -> WildcardPerm"))
+            (ADVANCED_Expr_int("wildcards", "QPM->inhaleAux -> WildcardPerm"), ADVANCED_Stmt("wildcards", "QPM->inhaleAux -> WildcardPerm"))
 /*
             val w = LocalVar(Identifier("wildcard"), Real)
             (w, LocalVarWhereDecl(w.name, w > noPerm) :: Reinit(w) :: Nil)
@@ -980,7 +993,7 @@ Nil/*B3 ADVANCED (QPerm)
           ) ++
           (if (!usingOldState) currentMaskAssignUpdate(loc, permAdd(curPerm, permVar)) else Nil)
       case w@sil.MagicWand(left,right) =>
-        ADVANCED_Stmt("QuantifiedPermModule", "inhaleAux -> sil.MagicWand-case")
+        ADVANCED_Stmt("wand", "QPM->inhaleAux -> sil.MagicWand-case")
 /*
         val wandRep = wandModule.getWandRepresentation(w)
         val curPerm = currentPermission(translateNull, wandRep)
@@ -992,7 +1005,7 @@ Nil/*B3 ADVANCED (QPerm)
         if (fa.isPure) {
           Nil
         } else {
-          ADVANCED_Stmt("QuantifiedPermModule", "inhaleAux (sil.Forall-case -> variant: QPerm)")
+          ADVANCED_Stmt("QPerm", "QPM->inhaleAux (sil.Forall-case, QPerm-variant)")
 /*
           //Quantified Permission
           val stmt:Stmt = translateInhale(fa, error)
@@ -1569,7 +1582,7 @@ Nil/*B3 ADVANCED (QPerm)
       case sil.FullPerm() =>
         fullPerm
       case sil.WildcardPerm() =>
-        ADVANCED_Expr_int("QuantifiedPermModule", "translatePerm (sil.WildcardPerm case)")
+        ADVANCED_Expr_int("wildcards", "QPM->translatePerm (sil.WildcardPerm case)")
 /*
         if (assertReadPermOnly) {
           // We are in a context where permission amounts do not matter, so we can safely translate a wildcard to
@@ -1643,13 +1656,11 @@ Nil/*B3 ADVANCED (QPerm)
     }
   }
 
-/*
   override def freshReads(vars: Seq[sil.LocalVar]): Stmt = {
     val bvs = vars map translateLocalVar
-    Havoc(bvs) ++
+    Reinit(bvs) ++
       (bvs map (v => Assume((v > noPerm) && (v < fullPerm))))
   }
-*/
 
   override def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block) = {
     stmts =>
@@ -1673,10 +1684,10 @@ Nil/*B3 ADVANCED (QPerm)
   private def permNe(a: Exp, b: Exp): Exp = {
     a !== b
   }
-  private def permLt(a: Exp, b: Exp): Exp = {
+*/
+  private def permLt(a: Expr, b: Expr): Expr = {
     a < b
   }
-*/
   private def permLe(a: Expr, b: Expr, forField: Boolean = false): Expr = {
     // simple optimization that helps in many cases
     if (forField && a == fullPerm) permEq(a, b)
@@ -1693,7 +1704,6 @@ Nil/*B3 ADVANCED (QPerm)
     permLe(b, a, forField)
   }
 
-/*
   override def simplePartialCheckDefinednessAfter(e: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): Stmt = {
 
     val stmt: Stmt = if(makeChecks) (
@@ -1712,6 +1722,7 @@ Nil/*B3 ADVANCED (QPerm)
     stmt
   }
 
+/*
   /*For QP \forall x:T :: c(x) ==> acc(e(x),p(x)) this case class describes an instantiation of the QP where
    * cond = c(expr), recv = e(expr) and perm = p(expr) and expr is of type T and may be dependent on the variable given by v. */
   case class QPComponents(v:LocalVarDecl,cond: Exp, recv: Exp, perm: Exp)
@@ -1741,9 +1752,11 @@ Nil/*B3 ADVANCED (QPerm)
     triggerFuncs += triggerFun
     (invFuns.toSeq, rangeFun, triggerFun)
   }
+*/
 
   override def conservativeIsPositivePerm(e: sil.Exp): Boolean = PermissionHelper.conservativeStaticIsStrictlyPositivePerm(e)
 
+/*
   override def isStrictlyPositivePerm(e: sil.Exp): Exp = PermissionHelper.isStrictlyPositivePerm(e)
 */
 

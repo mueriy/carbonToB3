@@ -17,8 +17,6 @@ import scala.collection.mutable
 
  */
 trait FuncPredModule extends Module {
-  val TODO_REMOVE_assumeFunctionsAboveName: Identifier
-  val TODO_REMOVE_emptyFrameName: Identifier
   /* Translate a function. If the second parameter is defined, also record the B3 names of all translated Viper
    * variables to the given map.
    */
@@ -29,12 +27,12 @@ trait FuncPredModule extends Module {
   // wrap an expression in a dummy function with "true" value (sometimes useful for triggering)
   def dummyFuncApp(e: Expr): Expr
 
-/*
   /* Translate a predicate. If the second parameter is defined, also record the Boogie names of all translated Viper
    * variables to the given map.
    */
   def translatePredicate(p: sil.Predicate, names: Option[mutable.Map[String, String]]): Seq[Decl]
 
+/*
   def predicateVersionType: Type
 */
 
@@ -71,6 +69,6 @@ trait FuncPredModule extends Module {
 
 
   def translateBackendFuncApp(fa: sil.BackendFuncApp): Expr
-  def translateBackendFunc(f: sil.DomainFunc): Seq[Decl]
 */
+  def translateBackendFunc(f: sil.DomainFunc): Seq[Decl]
 }

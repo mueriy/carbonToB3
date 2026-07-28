@@ -69,7 +69,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
       case sil.BoolLit(b) =>
         BoolLit(b)
       case sil.NullLit() =>
-        TODO_Expr_bool("translateExp(sil.NullLit)", "TODO2")//translateNull
+        translateNull
       case l@sil.LocalVar(_, _) =>
         translateLocalVar(l)
       case r@sil.Result(typ) =>
@@ -79,9 +79,9 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
       case sil.InhaleExhaleExp(_, _) =>
         sys.error("should not occur here (either, we inhale or exhale this expression, in which case whenInhaling/whenExhaling should be used, or the expression is not allowed to occur.")
       case p@sil.PredicateAccess(_, _) =>
-        LATER_Expr_bool("translateExp", "sil.PredicateAccess")//translateResourceAccess(p)
+        LATER_Expr_bool("predicates", "translateExp->sil.PredicateAccess")//translateResourceAccess(p)
       case w: sil.MagicWand =>
-        ADVANCED_Expr_bool("translateExp", "sil.MagicWand")//translateResourceAccess(w)
+        ADVANCED_Expr_bool("wand", "translateExp->sil.MagicWand")//translateResourceAccess(w)
       case sil.Unfolding(_, exp) =>
         translateExp(exp)
       case sil.Applying(_, exp) => translateExp(exp)
@@ -94,7 +94,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         stateModule.replaceState(prevState)
         res
       case sil.LabelledOld(exp, oldLabel) =>
-        LATER_Expr_bool("translateExp", "sil.LabelledOld")
+        LATER_Expr_bool("LabelledOld", "translateExp->sil.LabelledOld")
 /*
         var findLabel = oldLabel
         if(findLabel.equals("lhs"))
@@ -110,7 +110,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         res
 */
       case sil.Let(lvardecl, exp, body) =>
-        ADVANCED_Expr_bool("translateExp", "sil.Let; might not be an advanced feature...")
+        ADVANCED_Expr_bool("Let", "DExpM->translateExp->sil.Let")
 /*
         val translatedExp = translateExp(exp) // expression to bind "v" to
       val v = env.makeUniquelyNamed(lvardecl) // choose a fresh "v" binder
@@ -278,9 +278,9 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
       case fa@sil.FuncApp(_, _) =>
         translateFuncApp(fa)
       case fa@sil.DomainFuncApp(_, _, _) =>
-        LATER_Expr_bool("translateExp", "DomainFuncApp")//translateDomainFuncApp(fa)
+        LATER_Expr_bool("domains", "translateExp->DomainFuncApp")//translateDomainFuncApp(fa)
       case fa@sil.BackendFuncApp(_, _) =>
-        TODO_Expr_bool("translateExp", "sil.BackendFuncApp")
+        TODO_Expr_bool("Backend", "translateExp->sil.BackendFuncApp")
 /*         
         translateBackendFuncApp(fa)
  */
@@ -361,7 +361,8 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
 
     val oldCurState = stateModule.state
     if(duringPackageStmt) {
-/*B3 ADVANCED
+      sys.error("B3 ADVANCED (wand): DefaultExpModule -> checkDefinedness -> duringPackageStmt is true?!")
+/*
       stateModule.replaceState(wandModule.UNIONState.asInstanceOf[StateRep].state)
 */
     }
@@ -377,9 +378,11 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
     val stmt = checkDefinednessImpl(e, error, makeChecks = makeChecks, definednessStateOpt)
 
     if(duringPackageStmt) {
-      ADVANCED_Stmt("checkDefinedness (DefExpMod)", "only if duringPackageStmt")
-      // stateModule.replaceState(oldCurState)
-      // If(wandModule.getCurOpsBoolvar(), stmt, Statements.EmptyStmt)
+      ADVANCED_Stmt("wand", "DExpM->checkDefinedness->wand-part")
+/*
+      stateModule.replaceState(oldCurState)
+      If(wandModule.getCurOpsBoolvar(), stmt, Statements.EmptyStmt)
+*/
     }else stmt
   }
 
@@ -413,7 +416,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         val checkEDefined = checkDefinedness(e, error, makeChecks = makeChecks)
         checkAssDefined :: stateStmt :: checkAssHolds :: checkEDefined :: Nil
       case w@sil.MagicWand(_, _) =>
-        ADVANCED_Stmt("checkDefinednessImpl", "sil.MagicWand")
+        ADVANCED_Stmt("wand", "DExpM->checkDefinednessImpl->sil.MagicWand")
         // checkDefinednessWand(w, error, makeChecks = makeChecks)
       case sil.Let(v, e, body) =>
         checkDefinednessImpl(e, error, makeChecks = makeChecks, definednessStateOpt) ::
@@ -475,7 +478,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
             stateModule.replaceState(prevState)
             res
           case sil.LabelledOld(_, oldLabel) =>
-            ADVANCED_Stmt("checkDefinednessimpl", "sil.LabelledOld")
+            ADVANCED_Stmt("LabelledOld", "DExpM->checkDefinednessimpl->sil.LabelledOld")
 /*
             var findLabel = oldLabel
             if(findLabel.equals("lhs"))

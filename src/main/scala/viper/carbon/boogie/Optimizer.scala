@@ -21,9 +21,6 @@ object Optimizer {
    * Constant folding partly taken from  Transformer.simplify from SIL, but added more optimizations.
    */
   def optimize(n: Node): Node = {
-    // B3 LATER: can also do these optimisations
-    n
-    /*
     /* Always optimize children first, then treat parent. */
     Transformer.transform(n)(_ => true, {
       case UnExp(Not, BoolLit(literal)) =>
@@ -146,6 +143,5 @@ object Optimizer {
       case Assert(TrueLit(), _) => Statements.EmptyStmt
       case Assume(TrueLit()) => Statements.EmptyStmt
     })
-  */
   }
 }

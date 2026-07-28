@@ -185,7 +185,6 @@ class DefaultHeapModule(val verifier: Verifier)
         ConstDecl(dummyHeapName(ftVars), heapTyp(ftVars)) ++
         TypeDecl(heapTyp(ftVars))
       }}) ++ 
-// /* B3 LATER (alloc): This must be redesigned, because it contains "HeapNormalBool[o, $allocated] ==> HeapNormalBool[HeapNormalRef[o, f], $allocated]", but obviously only one Bound Heaptype, and the pattern would need to be extended when adding a second one, which could make it no longer work => check
       (if(!enableAllocationEncoding) Nil else {
         ConstDecl(allocName, allocType, Some(fieldTagName(fieldTypeOf(Bool).typVars))) ++
         // all heap-lookups yield allocated objects or null
@@ -201,7 +200,6 @@ class DefaultHeapModule(val verifier: Verifier)
               Pattern(Seq(validReference(obj_refField)))),
           validReference(obj.l) ==> validReference(obj_refField)))
       }) ++
-// */
 /* B3 ADVANCED (QPerm)
       Func(succHeapName,
         Seq(LocalVarDecl(heap0Name, heapTyp), LocalVarDecl(heap1Name, heapTyp)),
@@ -577,7 +575,7 @@ class DefaultHeapModule(val verifier: Verifier)
     heaps = originalHeaps
     permModule.reset()
 
-    // TODO: find less ugly way to do this whole "nicer-name thing".
+    // B3 TODO: find less ugly way to do this whole "nicer-name thing".
     heapTypVarsToIdx = fieldIdxMap
     specialFunctionReadHeapName = readHeapName
     specialFunctionUpdateHeapName = updateHeapName
@@ -720,12 +718,8 @@ class DefaultHeapModule(val verifier: Verifier)
   def rcvAndFieldExp(f: sil.ResourceAccess) : (Expr, Expr) =
     f match {
       case sil.FieldAccess(rcv, _) => (translateExp(rcv), translateResource(f))
-/* B3 LATER (predicates)
       case sil.PredicateAccess(_, _) => (nullLit, translateResource(f))
-*/
-/* B3 ADVANCED (wand)
       case w: sil.MagicWand => (nullLit, translateResource(f))
-*/
     }
 
   override def currentHeapAssignUpdate(f: sil.LocationAccess, newVal: Expr): Stmt = {
@@ -763,12 +757,8 @@ class DefaultHeapModule(val verifier: Verifier)
   override def translateResourceAccess(f: sil.ResourceAccess): Expr = {
     val heapTypVars = f match {
       case sil.FieldAccess(_, field) => Seq(normalFieldType, translateType(field.typ))
-/* B3 LATER (predicates)
-      case sil.PredicateAccess(_, _) => ...
-*/
-/* B3 ADVANCED (wand)
-      case w: sil.MagicWand => ... 
-*/
+      case sil.PredicateAccess(_, _) => sys.error("B3 LATER (predicates): need to implement translation for resource-type sil.PredicateAccess")
+      case w: sil.MagicWand => sys.error("B3 ADVANCED (wand): need to implement translation for resource-type sil.MagicWand")
     } 
     val fieldExp = translateResource(f)
     translateResourceAccess(f, heapExp(heapTypVars))
@@ -789,7 +779,7 @@ class DefaultHeapModule(val verifier: Verifier)
   override def translateResource(l: sil.ResourceAccess): Expr = {
     l match {
       case sil.PredicateAccess(args, predName) =>
-        LATER_Expr_bool("DefaultHeapModule", "translateResource(predicates)")
+        LATER_Expr_bool("predicates", "DHeapM->translateResource")
 /*
         val pred = verifier.program.findPredicate(predName)
         val t = predicateMetaTypeOf(pred)
@@ -798,7 +788,7 @@ class DefaultHeapModule(val verifier: Verifier)
       case sil.FieldAccess(rcv, field) =>
         Const(locationIdentifier(field), fieldTypeOf(translateType(field.typ)))
       case w: sil.MagicWand =>
-        ADVANCED_Expr_bool("DefaultHeapModule", "translateResource(wand)")
+        ADVANCED_Expr_bool("wand", "DHeapM->translateResource->sil.MagicWand")
 /*
         wandModule.getWandRepresentation(w)
 */
@@ -822,7 +812,7 @@ class DefaultHeapModule(val verifier: Verifier)
                 Assume(validReference(t))
             })
           case sil.Fold(sil.PredicateAccessPredicate(loc, perm)) => // AS: this should really be taken care of in the FuncPredModule (and factored out to share code with unfolding case, if possible)
-            LATER_Stmt("DefaultHeapModule", "handleStmt -> sil.Fold-case (predicates)") +++ stmt
+            LATER_Stmt("predicates", "DHeapM->handleStmt->sil.Fold-case") +++ stmt
 /* 
             if(usingOldState) sys.error("heap module: fold is executed while using old state")
             stmt ++ ({val newVersion = LocalVar(Identifier("freshVersion"), funcPredModule.predicateVersionType)
@@ -860,15 +850,18 @@ class DefaultHeapModule(val verifier: Verifier)
     }
   }
 
-/*
   override def freeAssumptions(e: sil.Exp): Stmt = {
     e match {
       case sil.Unfolding(sil.PredicateAccessPredicate(loc, _), _) if !usingOldState =>
+        LATER_Stmt("predicates", "DefaultHeapModule->freeAssumptions")
+/*
         addPermissionToPMask(loc) ++ assumeGoodState
+*/
       case _ => Nil
     }
   }
 
+/*
   override def addPermissionToWMask(wMaskField: Exp, e: sil.Exp): Stmt = {
     if(usingOldState) { sys.error("Updating wand mask while using old state") }
     e match {
@@ -992,7 +985,7 @@ class DefaultHeapModule(val verifier: Verifier)
 
 /*
   def equateWithCurrentHeap(s: Seq[IdExpr]): Stmt = {
-    LATER_Stmt("equateWithCurrentHeap", "need to implement Heap") //Assume(heap === s(0))
+    Assume(heap === s(0))
   }
 */
 
@@ -1009,7 +1002,7 @@ class DefaultHeapModule(val verifier: Verifier)
     if (!usingOldState) { 
       allFieldsTypVars flatMap { ftvars =>
         Reinit(exhaleHeap(ftvars)) ++
-//B3 LATER (predicates): Assume(FunctionCallExpr(identicalOnKnownLocsName, Seq(heapExp(ftvars), exhaleHeap(ftvars)) ++ currentMask(fieldIdx(ftvars)), Bool)) ++
+          LATER_Stmt("predicates", "DHeapM->endExhale (identicalOnKnownLocsName-part)") // Assume(FunctionCallExpr(identicalOnKnownLocsName, Seq(heapExp(ftvars), exhaleHeap(ftvars)) ++ currentMask(fieldIdx(ftvars)), Bool)) ++
           (heapVar(ftvars) := exhaleHeap(ftvars))
       }
     } else Nil
@@ -1020,7 +1013,7 @@ class DefaultHeapModule(val verifier: Verifier)
    * after verifier gets a new program.
    */
   override def reset() = {
-    addADVANCED("DefaultHeapModule", "reset")
+    addADVANCED("predicates", "DHeapM->reset")
 /*
     PredIdMap = Map()
     NextPredicateId = 0

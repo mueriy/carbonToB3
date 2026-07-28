@@ -51,16 +51,15 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
     // creating a new temp state if we are inside a package statement
     val curState = stateModule.state
     var initStmtWand: Seq[Stmt] = Seq()
-/* B3 ADVANCED (wand)
     if(insidePackageStmt){ 
+      sys.error("B3 ADVANCED (wand) DefaultExhaleModule -> exhale -> insidePackageStmt is true?!")
+/* B3 ADVANCED (wand)
       val StateSetup(tempState, initStmt) = wandModule.createAndSetState(None)
       wandModule.tempCurState = tempState
       initStmtWand = initStmt
-    }
 */
-// /* B3 LATER
+    }
     val tempState: StateRep = wandModule.tempCurState.asInstanceOf[StateRep]
-// */
 
     val exhaleStmt = exps map (e =>
         {
@@ -90,10 +89,8 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
       // print("2:", initStmtWand) // [[B3 tests]]
       // print("3:", exhaleStmt) // [[B3 tests]]
       // print("4:", assumptions) // [[B3 tests]]
-      info("exhale", "1")
       wellDefStateInitStmtOpt ++ initStmtWand ++ exhaleStmt ++ assumptions
     } else {
-      info("exhale", "2")
       beginExhale ++
       wellDefStateInitStmtOpt ++
       initStmtWand ++
@@ -133,7 +130,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
         val defCheck = maybeDefCheck(e1, definednessCheckData)
         val exhaleTranslation : Stmt =
           if (insidePackageStmt) {
-            ADVANCED_Stmt("DefaultExhaleModule", "exhaleConnective: sil.Implies (wand)")
+            ADVANCED_Stmt("wand", "DExhM->exhaleConnective->sil.Implies->wand-part")
 /*
             val res =
               If(wandModule.getCurOpsBoolvar() ==> translateExpInWand(e1),
@@ -154,7 +151,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
         val defCheck = maybeDefCheck(c, definednessCheckData)
         val exhaleTranslation : Stmt =
           if(insidePackageStmt) {
-            ADVANCED_Stmt("DefaultExhaleModule", "exhaleConnective: sil.CondExp (wand)")
+            ADVANCED_Stmt("wand", "DExhM->exhaleConnective->sil.CondExp->wand-part")
 /*
             If(wandModule.getCurOpsBoolvar(),
               If(translateExpInWand(c), exhaleConnective(e1, error, definednessCheckData, havocHeap, statesStackForPackageStmt, insidePackageStmt, isAssert, currentStateForPackage = currentStateForPackage),
@@ -247,7 +244,7 @@ class DefaultExhaleModule(val verifier: Verifier) extends ExhaleModule {
         val defCheck = maybeDefCheck(e, definednessCheckData)
 
         if(insidePackageStmt) {  // handling exhales during packaging a wand
-          ADVANCED_Stmt("DefaultExhaleModule", "exhaleConnective: case _ (wand)")
+          ADVANCED_Stmt("wand", "DExhM->exhaleConnective->case_->wand-part")
 /*B3 ADVANCED (wand)
           // currently having wild cards and 'constraining' expressions are not supported during packaging a wand.
           if(!permModule.getCurrentAbstractReads().isEmpty) {

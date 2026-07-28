@@ -611,8 +611,24 @@ object B3Nodes {
   /** Scala representation of a B3 RawAst Assert-Stmt node. (Assert = "Check + Assume")
    * @param error Currently not supported by B3, but we require it for when that changes */
   case class Assert(expr: Expr, error: VerificationError) extends Stmt {
-    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Assert(expr.b3fy)
+    override def b3fy: RawAst.Stmt = {
+      this match {
+        // B3 NOTE: We transform 'Assert false' to 'Check labeled: false' to make it easier to
+        //  differentiate between the different asserts and to allow checks in multiple positions
+        // B3 QUEST: we could probably also always create a label and use the error as that label.
+        //  (Expr-labels can be anything here, although automatically reading out the error might
+        //   still be tricky. Maybe replace all ':'s with something else and then the first ':' in
+        //   the "Error: Failed to prove ..."-message is between the label and the un-verified
+        //   expression. And then transform back the ':'s. Unless ':' is definitely never used,  
+        //   then this could be done in one step.) 
+        case Assert(FalseLit(), error) => 
+          checkCounter += 1
+          Check(LabeledExpr(s"FalseCheck_${checkCounter}", FalseLit()), error).b3fy
+        case _ => new RawAst.Stmt_Assert(expr.b3fy)
+      }
+    }
   }
+  var checkCounter = 0
 
   /** (not documented enough to use) */
   // case class AForall(name: String?, typ: Type, body: Stmt) extends Stmt
@@ -682,6 +698,10 @@ object B3Nodes {
     override def b3fy: RawAst.AExpr = new RawAst.AExpr_AAssertion(stmt.b3fy)
   }
 
+/* TODO:
+Check definedness of [[y.g + x.g > 1]] (stmt assert; same for inhale, but only "HasDirectPerm" once)
+
+*/
 
 
   // EXPRESSION NODES
@@ -817,8 +837,8 @@ object B3Nodes {
    * 
    * B3 LATER (real) change to: "Scala representation of a B3 RawAst RLiteral-Expr node. (Real values)"
    */
-  case class RealLit(x: BigInt) extends Expr {
-    override def b3fy: RawAst.Expr = new RawAst.Expr_ILiteral(x.bigInteger)
+  case class RealLit(x: Double) extends Expr {
+    override def b3fy: RawAst.Expr = new RawAst.Expr_ILiteral(BigDecimal(x).setScale(0, BigDecimal.RoundingMode.HALF_UP).toBigInt.bigInteger)
     override def typ: Type = Real
   }
 

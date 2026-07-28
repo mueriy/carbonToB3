@@ -7,6 +7,7 @@
 package viper.carbon.modules.impls
 
 import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Development._
 import viper.carbon.modules.MapModule
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState}
 import viper.carbon.modules.impls.map_axioms.MapAxiomatization
@@ -58,6 +59,7 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
   // private val mapBuildName = Identifier("Map#Build")
 
   override def preamble : Seq[Decl] = {
+    addLATER("Map", "DefaultMapModule->preamble")
     Seq()
     // if (used) Seq(LiteralDecl(MapAxiomatization.value)) else Seq()
 
@@ -256,10 +258,10 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
 
   }
 
-  override def start() : Unit = expModule.register(this)
+  override def start(): Unit = expModule.register(this)
 
-  override def translateMapExp(exp : sil.Exp) : Expr = {
-    sys.error("LATER: translateMapExp")
+  override def translateMapExp(exp: sil.Exp): Expr = {
+    sys.error("B3 LATER: translateMapExp")
 /*
     used = true
 
@@ -305,7 +307,7 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
   }
 
   override def translateMapType(mapType : sil.MapType) : Type = {
-    sys.error("LATER: translateMapType")
+    sys.error("B3 LATER: translateMapType")
     // used = true
     // NamedType("Map", Seq(translateType(mapType.keyType), translateType(mapType.valueType)))
   }

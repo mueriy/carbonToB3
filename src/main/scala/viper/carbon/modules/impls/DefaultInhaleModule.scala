@@ -37,7 +37,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
   override def inhale(exps: Seq[(sil.Exp, PartialVerificationError)], addDefinednessChecks: Boolean, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt = {
     val current_state = stateModule.state
     if(insidePackageStmt && !addDefinednessChecks) { // replace currentState with the correct state in which the inhale occurs during packaging the wand
-      ADVANCED_Stmt("inhale", "only necessairy for wands (1)")
+      ADVANCED_Stmt("wand", "inhale->wand-part(1)")
 /*
       stateModule.replaceState(statesStackForPackageStmt(0).asInstanceOf[StateRep].state)
 */
@@ -51,7 +51,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
     if(insidePackageStmt && !addDefinednessChecks) {
          /* all the assumptions made during packaging a wand (except assumptions about the global state before the package statement)
           * should be replaced by updates to state booleans (see documentation for 'exchangeAssumesWithBoolean') */
-      ADVANCED_Stmt("inhale", "only necessairy for wands (2)")
+      ADVANCED_Stmt("wand", "inhale->wand-part(2)")
 /*
       stateModule.replaceState(current_state)
       wandModule.exchangeAssumesWithBoolean(stmt, statesStackForPackageStmt.head.asInstanceOf[StateRep].boolVar)
@@ -101,13 +101,13 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
             Nil
         case sil.Implies(e1, e2) =>
           val defCheck = maybeDefCheck(e1)
-          val lhsTranslation = translateExp(e1)//B3 ADVANCED: use the following to support wands: if(insidePackageStmt && addDefinednessChecks) { wandModule.getCurOpsBoolvar() ==> translateExpInWand(e1) } else { translateExp(e1) }
+          val lhsTranslation = if(insidePackageStmt && addDefinednessChecks) { ADVANCED_Expr_bool("wand", "DefaultInhaleModule->inhaleConnective->sil.Implies")/* wandModule.getCurOpsBoolvar() ==> translateExpInWand(e1) */ } else { translateExp(e1) }
 
           defCheck ++
           If(lhsTranslation, inhaleConnective(e2, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt), EmptyStmt)
         case sil.CondExp(c, e1, e2) =>
           val defCheck = maybeDefCheck(c)
-          val condTranslation = translateExp(c)//B3 ADVANCED: use the following to support wands: if(insidePackageStmt && addDefinednessChecks) { wandModule.getCurOpsBoolvar() ==> translateExpInWand(c) } else { translateExp(c) }
+          val condTranslation = if(insidePackageStmt && addDefinednessChecks) { ADVANCED_Expr_bool("wand", "DefaultInhaleModule->inhaleConnective->sil.CondExp")/* wandModule.getCurOpsBoolvar() ==> translateExpInWand(c) */ } else { translateExp(c) }
 
           defCheck ++
           If(condTranslation, inhaleConnective(e1, error, addDefinednessChecks, statesStackForPackageStmt, insidePackageStmt),
@@ -128,7 +128,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
         case _ =>
           def transformStmtInsidePackage(s: Stmt): Stmt = {
             if(insidePackageStmt && addDefinednessChecks) {
-              ADVANCED_Stmt("inhaleConnective", "only necessairy for wands (1)")
+              ADVANCED_Stmt("wands", "inhaleConnective->wand-part(1)")
 /*
               wandModule.exchangeAssumesWithBoolean(s, statesStackForPackageStmt.head.asInstanceOf[StateRep].boolVar)
 */
@@ -154,7 +154,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
           retStmt
       }
     if(insidePackageStmt && addDefinednessChecks) {
-      ADVANCED_Stmt("inhaleConnective", "only necessairy for wands (2)")
+      ADVANCED_Stmt("wands", "inhaleConnective->wand-part(2)")
 /*
       If(wandModule.getCurOpsBoolvar(), res, Statements.EmptyStmt)
 */
@@ -167,7 +167,7 @@ class DefaultInhaleModule(val verifier: Verifier) extends InhaleModule with Stat
     if (e.isPure) {
       Assume(translateExp(e))
     } else {
-      Nil //B3 CHECK: this could lead to problems, check uses.
+      Nil
     }
   }
 }

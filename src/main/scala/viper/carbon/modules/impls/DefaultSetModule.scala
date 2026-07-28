@@ -9,6 +9,7 @@ package viper.carbon.modules.impls
 import viper.carbon.modules.SetModule
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
+import viper.carbon.b3.B3Development._
 import viper.carbon.verifier.Verifier
 import viper.carbon.boogie.Implicits._
 import viper.carbon.modules.impls.dafny_axioms.SetAxiomatization
@@ -34,6 +35,7 @@ class DefaultSetModule(val verifier: Verifier)
   def name = "Set module"
   implicit val namespace = verifier.freshNamespace("set")
 
+// (B3 NOTE: these two def's were already commended out:)
   //override def freeAssumptions(e: sil.Exp): Stmt = {
   //  e match {
   //    case _ if e.typ.isInstanceOf[sil.MultisetType] =>
@@ -47,7 +49,8 @@ class DefaultSetModule(val verifier: Verifier)
  // }
 
   override def preamble = {
-    Seq() //B3 LATER
+    addLATER("Set", "DefaultSetModule->preamble")
+    Seq() //B3 LATER (Set)
     /*
     if (used || verifier.mapModule.isUsed()) {
       LiteralDecl(SetAxiomatization.value)
@@ -58,7 +61,7 @@ class DefaultSetModule(val verifier: Verifier)
   }
 
   override def translateSetExp(e: sil.Exp): Expr = {
-    TODO_Expr_bool("translateSetExp", "some set expr")
+    LATER_Expr_bool("Set", "DefaultSetModule->translateSetExp")
 /*      
     def t(e: sil.Exp) = translateExp(e)
     val isMultiset = ((x:sil.Exp) => x.typ match {
@@ -131,12 +134,12 @@ class DefaultSetModule(val verifier: Verifier)
 */
   }
 
+/*
   override def translateSetType(setType: sil.SetType): Type = {
     used = true
     NamedType("Set", translateType(setType.elementType))
   }
 
-/*
   override def translateMultisetType(setType: sil.MultisetType): Type = {
     used = true
     NamedType("MultiSet", translateType(setType.elementType))

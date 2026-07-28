@@ -59,7 +59,6 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   private var checkingDefinednessOfFunction: Option[String] = None // used to flag special behaviour when checking function definitions
 
   private val assumeFunctionsAboveName = Identifier("AssumeFunctionsAbove")
-  override val TODO_REMOVE_assumeFunctionsAboveName = assumeFunctionsAboveName
   private val assumeFunctionsAbove: FunctionCallExpr = Const(assumeFunctionsAboveName, Int)
 /*
   private val specialRefName = Identifier("special_ref")
@@ -77,7 +76,6 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   private val frameTypeName = "FrameType"
   private val frameType = NamedType(frameTypeName)
   private val emptyFrameName = Identifier("EmptyFrame")
-  override val TODO_REMOVE_emptyFrameName = emptyFrameName
   private val emptyFrame = Const(emptyFrameName, frameType)
   private val combineFramesName = Identifier("CombineFrames")
   //B3 REMOVED: private val frameFirstName = Identifier("FrameFirst")
@@ -214,9 +212,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     
     // B3 QUEST: technically we only need to use the Heap/Mask-splits where we have read permission to when translating a function
 
-/* B3 LATER (perm)
     val oldCheckReadPermOnly = permModule.setCheckReadPermissionOnly(!verifier.respectFunctionPrecPermAmounts)
-*/
     //s"Translation of function ${f.name}"
     val res = 
       functionDefinitions(f) ++ //"Uninterpreted function definitions"
@@ -232,9 +228,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       // add all local vars
       names.get ++= usedNames
     }
-/* B3 LATER (perm)
     permModule.setCheckReadPermissionOnly(oldCheckReadPermOnly)
-*/
     env = null
     ErrorMemberMapping.currentMember = null
     res
@@ -308,6 +302,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     val recursiveCallsAndUnfoldings : Seq[(silverFuncApp,Seq[Unfolding])] = Functions.recursiveCallsAndSurroundingUnfoldings(f)
     val outerUnfoldings : Seq[Unfolding] = recursiveCallsAndUnfoldings.map((pair) => pair._2.headOption).flatten
 
+    addLATER("predicates", "DFPM->definitionalAxiom pred-part")
 /* B3 LATER (predicates):
     val predicateTriggers : Seq[Expr] = if (recursiveCallsAndUnfoldings.isEmpty) {
       // then any predicate in the precondition that does not contain bound variables will do (at the moment, regardless of position - seems OK since there is no recursion)
@@ -453,6 +448,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     val funcFrameInfo = getFunctionFrame(f, args map (_.l))
     val funcApp = FunctionCallExpr(name, funcFrameInfo._1 ++ (realArgs map (_.l)), typ)
     val funcApp2 = translateFuncApp(f.name, args map (_.l), f.typ, true)
+    addLATER("predicates", "DFPM->framingAxiom")
 /* B3 LATER (predicates)
     val outerUnfoldings : Seq[Unfolding] = Functions.recursiveCallsAndSurroundingUnfoldings(f).map((pair) => pair._2.headOption).flatten
 
@@ -467,12 +463,13 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       case _ => None}.flatten
 */
 
+    addADVANCED("QPerm", "DFPM->framingAxiom")
     Seq(func) ++
       Seq(Axiom(Forall(
         ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ realArgs) map {_.toQ},
         Seq(Pattern((allFieldsTypVars map staticGoodState) ++ transformFuncAppsToLimitedForm(funcApp2))) /* B3 LATER (predicates): ++ (if (predicateTriggers.isEmpty) Seq()  else Seq(Pattern(Seq(staticGoodState, triggerFuncStatelessApp(f,realArgs map (_.l))) ++ predicateTriggers))) */,
         andAll(allFieldsTypVars map staticGoodState) ==> (transformFuncAppsToLimitedForm(funcApp2) === funcApp))) ) 
-/* B3 LATER (QPerm): ++
+/* B3 ADVANCED (QPerm): ++
       translateCondAxioms("function "+f.name, f.formalArgs, funcFrameInfo._2)
 */
   }
@@ -575,13 +572,14 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       FunctionCallExpr(frameFragmentName, Seq(e), frameType)
     }
     assertion match {
-/* B3 LATER
       case s@sil.AccessPredicate(la, perm) =>
         val fragmentBody = translateResourceAccess(renaming(la).asInstanceOf[sil.LocationAccess])
         val fragment = if (s.isInstanceOf[PredicateAccessPredicate]) fragmentBody else frameFragment(fragmentBody)
         if (permModule.conservativeIsPositivePerm(perm)) fragment else
         FunctionCallExpr(condFrameName, Seq(translatePerm(renaming(perm)),fragment),frameType)
       case QuantifiedPermissionAssertion(forall, _, _ : sil.AccessPredicate) => // works the same for fields and predicates
+        ADVANCED_Expr_bool("QPerm", "DFPM->computeFrameHelper QuantifiedPermissionAssertion-case")
+/*
         qpPrecondId = qpPrecondId+1
         val heap = heapModule.staticStateContributions(true, true)
         val condName = Identifier(name + qpCondPostfix + qpPrecondId.toString)
@@ -880,10 +878,11 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 */
 
   private var tmpStateId = -1
-/*
   override def partialCheckDefinedness(e: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): (() => Stmt, () => Stmt) = {
     e match {
       case sil.Unfolding(acc@sil.PredicateAccessPredicate(_, _), _) =>
+        (() => LATER_Stmt("predicates", "DFPM->partialCheckDefinedness->Unfolding-case (1st)"), () => TODO_Stmt("predicates", "DFPM->partialCheckDefinedness->Unfolding-case (2nd)"))
+/*
         tmpStateId += 1
         val tmpStateName = if (tmpStateId == 0) "Unfolding" else s"Unfolding$tmpStateId"
 
@@ -913,45 +912,48 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
           Nil
         }
         (before _, after _)
+*/
       case fa@sil.FuncApp(f, args) => {
         (() => Nil, if(makeChecks) () => {
         val funct = verifier.program.findFunction(f);
         val pres = funct.pres map (e => Expressions.instantiateVariables(e, funct.formalArgs, args, env.allDefinedNames(program)))
         //if (pres.isEmpty) noStmt // even for empty pres, the assumption made below is important
-        NondetIf(
+        Choose(Seq(
           // This is where termination checks could/should be added
-          MaybeComment("Exhale precondition of function application", {
-              val executeExhale = () => exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInAppFalse(fa))))
+          ({//"Exhale precondition of function application"
+            val executeExhale = () => exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInAppFalse(fa))))
 
-              definednessStateOpt match {
-                case Some(defState) =>
-                  //need to exhale precondition in the definedness state
-                  /** FIXME:
-                    * Here we are doing the entire precondition exhale in the definedness state. This means that expressions that
-                    * are part of the function call (e.g., function arguments) are evaluated in the definedness state instead of the
-                    * evaluation state (i.e., the main state before the function call). This can lead to discrepancies if the expressions
-                    * contain permission introspection.
-                    */
-                  val curState = stateModule.state
-                  val oldCheckReadPermOnly = permModule.setCheckReadPermissionOnly(!verifier.respectFunctionPrecPermAmounts)
-                  defState.setDefState()
-                  val res = executeExhale()
-                  permModule.setCheckReadPermissionOnly(oldCheckReadPermOnly)
-                  stateModule.replaceState(curState)
-                  res
-                case None =>
-                  val oldCheckReadPermOnly = permModule.setCheckReadPermissionOnly(!verifier.respectFunctionPrecPermAmounts)
-                  val res = executeExhale()
-                  permModule.setCheckReadPermissionOnly(oldCheckReadPermOnly)
-                  res
-              }
+            definednessStateOpt match {
+              case Some(defState) =>
+                //need to exhale precondition in the definedness state
+                /** FIXME:
+                  * Here we are doing the entire precondition exhale in the definedness state. This means that expressions that
+                  * are part of the function call (e.g., function arguments) are evaluated in the definedness state instead of the
+                  * evaluation state (i.e., the main state before the function call). This can lead to discrepancies if the expressions
+                  * contain permission introspection.
+                  */
+                val curState = stateModule.state
+                val oldCheckReadPermOnly = permModule.setCheckReadPermissionOnly(!verifier.respectFunctionPrecPermAmounts)
+                defState.setDefState()
+                val res = executeExhale()
+                permModule.setCheckReadPermissionOnly(oldCheckReadPermOnly)
+                stateModule.replaceState(curState)
+                res
+              case None =>
+                val oldCheckReadPermOnly = permModule.setCheckReadPermissionOnly(!verifier.respectFunctionPrecPermAmounts)
+                val res = executeExhale()
+                permModule.setCheckReadPermissionOnly(oldCheckReadPermOnly)
+                res
             }
-          ) ++
-            MaybeComment("Stop execution", Assume(FalseLit()))
+          }) ++
+            //"Stop execution" 
+            Assume(FalseLit())
           , checkingDefinednessOfFunction match {
-            case Some(name) if name.equals(f) => MaybeComment("Enable postcondition for recursive call", Assume(triggerFuncApp(funct,heapModule.currentStateExps,args map translateExp)))
+            case Some(name) if name.equals(f) => 
+              //"Enable postcondition for recursive call"
+              Assume(triggerFuncApp(funct,heapModule.currentStateExps,args map translateExp))
             case _ => Nil
-          })} else () => Nil
+          }))} else () => Nil
         )
       }
       case _ =>
@@ -961,7 +963,6 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         )
     }
   }
-*/
 
   override def toExpressionsUsedInTriggers(inputs: Seq[Expr]): Seq[Seq[Expr]] = {
     val res = if (inputs.isEmpty) Seq()
@@ -991,9 +992,9 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
   // --------------------------------------------
 
-/*
   override def translatePredicate(p: sil.Predicate, names: Option[mutable.Map[String, String]]): Seq[Decl] = {
-
+    addLATER("predicates", "DFPM: translatePredicate"); Seq()
+/*
     env = Environment(verifier, p)
     ErrorMemberMapping.currentMember = p
     val args = p.formalArgs
@@ -1038,8 +1039,8 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         }
       }
     }
-  }
 */
+  }
 
   private var duringFold = false
   private var foldInfo: sil.PredicateAccessPredicate = null
@@ -1109,11 +1110,14 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     duringUnfolding = oldDuringUnfolding
     stmt
   }
+*/
 
   override def exhaleExpBeforeAfter(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState]): (() => Stmt, () => Stmt) = {
     e match {
 
       case sil.Unfolding(acc, _) =>
+        (() => LATER_Stmt("predicates", "DFPM->exhaleExpBeforeAfter (case 1)"), () => Nil)
+/* 
         if (definednessStateOpt.isEmpty || duringUnfoldingExtraUnfold) {
           /* If we do not have a definedness state, then we do not perform an unfolding operation to gain more information,
              because the unfolding operation can only be safely performed in the definedness state.
@@ -1163,7 +1167,10 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 
           (before, after)
       }
+*/
       case pap@sil.PredicateAccessPredicate(loc@sil.PredicateAccess(args, predicateName), _) if duringUnfold =>
+        (() => LATER_Stmt("predicates", "DFPM->exhaleExpBeforeAfter (case 2)"), () => Nil)
+/* 
         val oldVersion = LocalVar(Identifier("oldVersion"), predicateVersionType)
         val newVersion = LocalVar(Identifier("newVersion"), predicateVersionType)
         val stmt: Stmt = if (exhaleTmpStateId >= 0 || duringUnfolding) Nil else //(oldVersion := curVersion) ++
@@ -1172,14 +1179,19 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
               currentHeapAssignUpdate(loc, newVersion)
         ( () => MaybeCommentBlock("Update version of predicate",
           If(UnExp(Not,hasDirectPerm(loc)), stmt, Nil)), () => Nil)
+*/
       case pap@sil.PredicateAccessPredicate(loc@sil.PredicateAccess(_, _), _) if duringFold =>
+        (() => LATER_Stmt("predicates", "DFPM->exhaleExpBeforeAfter (case 3)"), () => Nil)
+/* 
         ( () => MaybeCommentBlock("Record predicate instance information",
           insidePredicate(foldInfo, pap)), () => Nil)
+*/
 
       case _ => (() => Nil, () => Nil)
     }
   }
 
+/*
   override def predicateVersionType : Type = {
     frameType
   }
@@ -1195,7 +1207,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   override def inhaleExp(e: sil.Exp, error: PartialVerificationError): Stmt = {
     e match {
       case sil.Unfolding(acc, _) =>
-        LATER_Stmt("DefaultFuncPredModule", "inhaleExp -> sil.Unfolding (predicates)")
+        LATER_Stmt("predicates", "DFPM->inhaleExp->sil.Unfolding")
 /*
         if (duringUnfoldingExtraUnfold) {
           Nil
@@ -1215,7 +1227,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 */
 
       case pap@sil.PredicateAccessPredicate(loc@sil.PredicateAccess(_, _), perm) =>
-        LATER_Stmt("DefaultFuncPredModule", "inhaleExp -> ...(sil.PredicateAccess) (predicates)")
+        LATER_Stmt("predicates", "DFPM->inhaleExp->sil.PredicateAccess")
 /* 
         val res: Stmt = if (extraUnfolding) {
           exhaleTmpStateId += 1
@@ -1243,8 +1255,11 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     res.showReturnType = true
     res
   }
+*/
 
   def translateBackendFunc(f: sil.DomainFunc): Seq[Decl] = {
+    addLATER("domains", "DFPM: translateBackendFunc"); Seq()
+/*
     // We do not use the funcpred namespace because based on the namespace, the funcpred module
     // decides whether to stuff meant only for heap-dependent functions (like heights computation
     // and limited functions).
@@ -1258,6 +1273,6 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     val res = MaybeCommentedDecl(s"Translation of SMT function ${f.name}", func, size = 1)
     env = null
     res
-  }
 */
+  }
 }

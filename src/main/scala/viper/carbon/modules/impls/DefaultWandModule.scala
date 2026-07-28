@@ -114,8 +114,7 @@ DefaultWandModule(val verifier: Verifier) extends WandModule with StmtComponent 
     lazyWandToShapes = None
   }
 
-/*
-  override def preamble = wandToShapes.values.collect({
+  override def preamble = {addADVANCED("wand", "DWandM->preamble"); Seq()} /*wandToShapes.values.collect({
     case fun@Func(name,args,typ,_) =>
       val vars = args.map(decl => decl.l)
       val args2 = args map (
@@ -685,7 +684,7 @@ case class PackageSetup(hypState: StateRep, usedState: StateRep, initStmt: Stmt)
     */
   override  def handleStmt(s: sil.Stmt, statesStack: List[Any] = null, allStateAssms: Expr = TrueLit(), inWand: Boolean = false): (Block => Block) = {
     if(wandModule.nestingDepth > 0) // if 's' is inside a package statement
-      stmt => ADVANCED_Stmt("DefaultWandModule", "handleStmt (nesting depth > 0)")+++stmt
+      stmt => ADVANCED_Stmt("wand", "DefaultWandModule->handleStmt (nesting depth > 0)")+++stmt
 /*
       stmt => If(allStateAssms, modifyAssert(stmt, OPS.boolVar), Statements.EmptyStmt)::Nil
 */
@@ -695,7 +694,7 @@ case class PackageSetup(hypState: StateRep, usedState: StateRep, initStmt: Stmt)
 
 
   override def start(): Unit = {
-    addADVANCED("DefaultWandModule", "start")
+    addADVANCED("wand", "DWandM->start")
 /*
     stmtModule.register(this, before = Seq(verifier.heapModule,verifier.permModule, verifier.stmtModule)) // checks for field assignment should be made before the assignment itself
     expModule.register(this)
@@ -765,10 +764,13 @@ case class PackageSetup(hypState: StateRep, usedState: StateRep, initStmt: Stmt)
   // =============================================== Checking definedness ===============================================
 
   private var tmpStateId = -1
+*/
   /**
     * Checking definedness for applying statement
     */
   override def partialCheckDefinedness(e: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): (() => Stmt, () => Stmt) = {
+    (() => ADVANCED_Stmt("wand", "DWandM->partialCheckDefinedness (1st)"), () => ADVANCED_Stmt("wand", "DWandM->partialCheckDefinedness (2nd)"))
+/*
     e match {
       case a@sil.Applying(wand, exp) =>
         tmpStateId += 1
@@ -789,8 +791,10 @@ case class PackageSetup(hypState: StateRep, usedState: StateRep, initStmt: Stmt)
           () => simplePartialCheckDefinednessAfter(e, error, makeChecks, definednessStateOpt)
         )
     }
+*/
   }
 
+/*
   // =========================================== End Of Checking Definedness ============================================
 
   // =========================================== Getters ============================================

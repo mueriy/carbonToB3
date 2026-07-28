@@ -30,6 +30,6 @@ trait SimpleStmtComponent extends StmtComponent {
     * These wand-related parameters (mentioned above) are used when translating statements during packaging a wand.
     * For more details refer to the general note in 'wandModule'.
     */
-  override def handleStmt(s: sil.Stmt, statesStackForPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false) : (Block => Block)
+  override def handleStmt(s: sil.Stmt, statesStackForPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): (Block => Block)
 //  = (simpleHandleStmt(s),Statements.EmptyStmt )
 }

@@ -24,12 +24,12 @@ trait PermModule extends Module with CarbonStateComponent {
    */
   def permType: Type
 
-/*
   /**
    * Translate a permission amount
    */
   def translatePerm(e: sil.Exp): Expr
 
+/*
   /**
    * Translate a permission comparison
    */
@@ -45,9 +45,9 @@ trait PermModule extends Module with CarbonStateComponent {
    */
   def permissionPositive(permission: Expr, zeroOK : Boolean = false): Expr
 
-/*
   def conservativeIsPositivePerm(e: sil.Exp): Boolean
 
+/*
   /**
     * Returns an expression representing that a permission amount is positive.
     * Similar to [[permissionPositive]], but works directly on Viper expressions, *including* ones containing
@@ -105,9 +105,9 @@ trait PermModule extends Module with CarbonStateComponent {
 
   def zeroPMask(ftvars: Seq[Type]): Expr
 
-/*
   def hasDirectPerm(ra: sil.ResourceAccess): Expr
 
+/*
   /**
    * The expression for the current permission at a location.
    */
@@ -165,9 +165,9 @@ trait PermModule extends Module with CarbonStateComponent {
 
   // removes permission to w#ft (footprint of the magic wand) (See Heap module for w#ft description)
   def exhaleWandFt(w: sil.MagicWand): Stmt
+*/
 
   def setCheckReadPermissionOnly(readOnly: Boolean): Boolean
-*/
 
   def assumePermUpperBounds(doAssume: Boolean): Stmt
 

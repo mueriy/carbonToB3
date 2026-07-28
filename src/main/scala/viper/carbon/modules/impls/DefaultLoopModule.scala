@@ -435,48 +435,49 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   }
 
   private def handleWhile(w: sil.While): Stmt = {
-        val guard = translateExp(w.cond)
-        val (invs, writtenVars) = getWhileInformation(w)
+    val guard = translateExp(w.cond)
+    val (invs, writtenVars) = getWhileInformation(w)
+    println(invs)
 
-        beforeLoopHead(invs, w.info.getUniqueInfo[LoopInfo].map(loopInfo => loopInfo.head.get)) ++
-        //"Havoc loop written variables (except locals)"
-        Reinit((writtenVars map translateExp).asInstanceOf[Seq[IdExpr]]) ++
-            (writtenVars map (v => mainModule.allAssumptionsAboutValue(v.typ,mainModule.translateLocalVarSigToFParameter(v.typ, v),false))
-        ) ++
-        //"Check definedness of invariant"
-        Choose(Block(
-          (invs map (inv => inhaleWithDefinednessCheck(inv, errors.ContractNotWellformed(inv)))) ++
-            Assume(FalseLit())
-        )) ++
-        //"Check the loop body"
-        Choose(Block({
-          val (freshStateStmt, prevState) = stateModule.freshTempState("loop")
-          val stmts = 
-            //"Reset state"
-            freshStateStmt ++ stateModule.initBoogieState ++ 
-            //"Inhale invariant"
-            inhale(invs map (x => (x, errors.WhileFailed(x))), addDefinednessChecks = false) ++ executeUnfoldings(invs, (inv => errors.Internal(inv))) ++
-            //"Check and assume guard"
-            checkDefinedness(w.cond, errors.WhileFailed(w.cond)) ++
-            Assume(guard) ++ stateModule.assumeGoodState ++
-            //"Translate loop body"
-            stmtModule.translateStmt(w.body) ++
-            //"Exhale invariant"
-            executeUnfoldings(invs, (inv => errors.LoopInvariantNotPreserved(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotPreserved(e)))) ++
-            //"Terminate execution"
-            Assume(FalseLit())
-          stateModule.replaceState(prevState)
-          stmts
-        })) ++
-        //"Inhale loop invariant after loop, and assume guard"
-        Assume(guard.not) ++ stateModule.assumeGoodState ++
-          inhale(invs map (x => (x, errors.WhileFailed(x))), addDefinednessChecks = false) ++ executeUnfoldings(invs, (inv => errors.Internal(inv))
-        )
+    beforeLoopHead(invs, w.info.getUniqueInfo[LoopInfo].map(loopInfo => loopInfo.head.get)) ++
+    //"Havoc loop written variables (except locals)"
+    Reinit((writtenVars map translateExp).asInstanceOf[Seq[IdExpr]]) ++
+        (writtenVars map (v => mainModule.allAssumptionsAboutValue(v.typ,mainModule.translateLocalVarSigToFParameter(v.typ, v),false))
+    ) ++
+    //"Check definedness of invariant"
+    Choose(Block(
+      (invs map (inv => inhaleWithDefinednessCheck(inv, errors.ContractNotWellformed(inv)))) ++
+        Assume(FalseLit())
+    )) ++
+    //"Check the loop body"
+    Choose(Block({
+      val (freshStateStmt, prevState) = stateModule.freshTempState("loop")
+      val stmts = 
+        //"Reset state"
+        freshStateStmt ++ stateModule.initBoogieState ++ 
+        //"Inhale invariant"
+        inhale(invs map (x => (x, errors.WhileFailed(x))), addDefinednessChecks = false) ++ executeUnfoldings(invs, (inv => errors.Internal(inv))) ++
+        //"Check and assume guard"
+        checkDefinedness(w.cond, errors.WhileFailed(w.cond)) ++
+        Assume(guard) ++ stateModule.assumeGoodState ++
+        //"Translate loop body"
+        stmtModule.translateStmt(w.body) ++
+        //"Exhale invariant"
+        executeUnfoldings(invs, (inv => errors.LoopInvariantNotPreserved(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotPreserved(e)))) ++
+        //"Terminate execution"
+        Assume(FalseLit())
+      stateModule.replaceState(prevState)
+      stmts
+    })) ++
+    //"Inhale loop invariant after loop, and assume guard"
+    Assume(guard.not) ++ stateModule.assumeGoodState ++
+      inhale(invs map (x => (x, errors.WhileFailed(x))), addDefinednessChecks = false) ++ executeUnfoldings(invs, (inv => errors.Internal(inv))
+    )
   }
 
   override def handleStmt(s: sil.Stmt, statesStackOfPackageStmt: List[Any] = null, allStateAssms: Expr = TrueLit(), insidePackageStmt: Boolean = false): (Block => Block) = {
     if(useLoopDetector) {
-      inner => ADVANCED_Stmt("DefaultLoopModule", "handleStmt with useLoopDetector==true; but this should only happen if method has Goto's")+++inner
+      inner => ADVANCED_Stmt("Goto", "DLoopM -> handleStmt with useLoopDetector=true")+++inner
 /*
       handleStmtLoopDetector(s, statesStackOfPackageStmt, allStateAssms,insidePackageStmt)
 */
@@ -580,16 +581,17 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
 
   private def beforeLoopHead(invs: Seq[sil.Exp], loopIdOpt: Option[Int]): Stmt = {
     //"Before loop head" + loopIdOpt.fold("")(i => Integer.toString(i)
-    //"Exhale loop invariant before loop"
-    executeUnfoldings(invs, (inv => errors.LoopInvariantNotEstablished(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotEstablished(e)))
-    ) ++
-    loopIdOpt.fold(Nil:Stmt)(loopId => {
-      getFrame(loopId) flatMap { 
-        case (frameMask, frameHeap) =>
-          Seq(Assign(frameMask.l, currentMask(0)),
-              Assign(frameHeap.l, currentHeap(0)))
-      }
-    })
+      //"Exhale loop invariant before loop"
+      println(loopIdOpt)
+      executeUnfoldings(invs, (inv => errors.LoopInvariantNotEstablished(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotEstablished(e)))
+      ) ++
+      loopIdOpt.fold(Nil:Stmt)(loopId => {
+        getFrame(loopId).zipWithIndex flatMap { //B3 NOTE: the field-variant-order is (/must be) the same everywhere, so this works. However, if we were to ignore unused splits in the future then we would have to ensure here that the same sets of splits is used here.
+          case ((frameMask, frameHeap), idx) =>
+            Seq(Assign(frameMask.l, currentMask(idx)),
+                Assign(frameHeap.l, currentHeap(idx)))
+        } // B3 TODO: this "should" be wrong; it should be implemented for all splits (or target a specific split)
+      })
   }
 
 /*
