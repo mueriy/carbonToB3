@@ -66,7 +66,7 @@ object Transformer {
             case Check(e, error) => Check(go(e), error)
             case Assume(e) => Assume(go(e))
             case Assert(e, error) => Assert(go(e), error)
-            case Choose(branches) => Choose(branches map go)
+            case Choose(thn, els) => Choose(go(thn), go(els))
             case If(cond, thn, els) => If(go(cond), go(thn), go(els))
             case LabeledStmt(lbl, body) => LabeledStmt(lbl, go(body))
           }
@@ -189,7 +189,7 @@ object DuplicatingTransformer {
             case Check(e, error) => go(e) map (Check(_, error))
             case Assume(e) => go(e) map (Assume(_))
             case Assert(e, error) => go(e) map (Assert(_, error))
-            case Choose(branches) => goSeq(branches) map (Choose(_))
+            case Choose(thn, els) => for {thnResult <- go(thn); elsResult <- go(els)} yield Choose(thnResult, elsResult)
             case If(cond, thn, els) =>
               for {condResult <- go(cond); thnResult <- go(thn); elsResult <- go(els)} yield
                 (If(condResult, thnResult, elsResult))

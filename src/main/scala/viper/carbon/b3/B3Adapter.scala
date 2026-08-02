@@ -580,7 +580,10 @@ object B3Nodes {
 
   /** Scala representation of a B3 RawAst Reinit-Stmt node. (= Havoc) */
   case class Reinit(vars: Seq[IdExpr]) extends Stmt {
-    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Reinit(daf(vars map {v => idName(v.name)}))
+    override def b3fy: RawAst.Stmt = vars match {
+      case Seq() => Block(Seq()).b3fy
+      case _ => new RawAst.Stmt_Reinit(daf(vars map {v => idName(v.name)}))
+    }
   }
 
   /** Scala representation of a B3 RawAst Block-Stmt node. (= Seqn) */
@@ -636,16 +639,12 @@ object B3Nodes {
 
   //Control flow
   /** 
-   * Scala representation of a B3 RawAst Choose-Stmt node. (This is basically an "If(\*) {} else if (\*) {} ... "/NondetIf - Stmt).
-   * 
-   * Careful! Implicit liftSeq (Seq -> Block) does NOT work here (since we expect Seq, not Block!)
-   * 
-   * @param branches If only a single Stmt is given, an empty branch is automatically added as alternative branch-option. 
-   *  (If you want to only use one option, then you have no need for Choose!) 
+   * Scala representation of a B3 RawAst Choose-Stmt node. However, while B3 allows using any number of branches,
+   * we only allow two branches here. This matches how Viper's "if(*)" works. If no els stmt is given, then this
+   * corresponds to do nothing (empty stmt block).
    */
-  case class Choose(branches: Seq[Stmt]) extends Stmt {
-    private def addElse = if (branches.length == 1) {Seq(EmptyStmt.b3fy)} else {Seq()} //If only 1 stmt is given then the idea is ALWAYS
-    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Choose(daf((branches map {_.b3fy}) ++ addElse))
+  case class Choose(thn: Stmt, els: Stmt = EmptyStmt) extends Stmt {
+    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Choose(daf(Seq(thn.b3fy, els.b3fy)))
   }
   
   /** Scala representation of a B3 RawAst If-Stmt node. */

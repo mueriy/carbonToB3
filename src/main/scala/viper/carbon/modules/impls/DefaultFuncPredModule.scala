@@ -112,7 +112,13 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       //"Declarations for function framing"
       TypeDecl(frameType) ++ 
       ConstDecl(emptyFrameName, frameType) ++ 
-//B3 LATER (predicates): Function(frameFragmentName, Seq(FParameter(Identifier("t"), TypeVar("T"), true)), frameType) ++
+/* B3 LATER (predicates): [needs fucntion concretization system]
+      { registerFunction(frameFragmentName, Seq(0))
+        // Since the frame fragment may or may not be used, it makes more sense to create it parametrically and concretizing
+        //  it later. This can never cause initiation loops, as it is not used in any axioms because we use 'injective' instead.
+        Function(frameFragmentName, Seq(FParameter(Identifier("t"), TypeVar("T"), true)), frameType)
+      } ++
+*/
       Function(condFrameName, Seq(FParameter(Identifier("p"), permType), FParameter(Identifier("f"), frameType)), frameType) ++
       { registerFunction(dummyTriggerName, Seq(0))
         // Now we can directly define and return the concrete versions
@@ -217,7 +223,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     val res = 
       functionDefinitions(f) ++ //"Uninterpreted function definitions"
         (if (f.isAbstract) Nil else definitionalAxiom(f)) ++ //"Definitional axiom"
-        framingAxiom(f) ++ //"Framing axioms"
+        // framingAxiom(f) ++ //"Framing axioms"
         postconditionAxiom(f) ++ //"Postcondition axioms"
         triggerFunction(f) ++ //"Trigger function (controlling recursive postconditions)"
         triggerFunctionStateless(f) ++ //"State-independent trigger function"
@@ -918,7 +924,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         val funct = verifier.program.findFunction(f);
         val pres = funct.pres map (e => Expressions.instantiateVariables(e, funct.formalArgs, args, env.allDefinedNames(program)))
         //if (pres.isEmpty) noStmt // even for empty pres, the assumption made below is important
-        Choose(Seq(
+        Choose(
           // This is where termination checks could/should be added
           ({//"Exhale precondition of function application"
             val executeExhale = () => exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInAppFalse(fa))))
@@ -953,7 +959,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
               //"Enable postcondition for recursive call"
               Assume(triggerFuncApp(funct,heapModule.currentStateExps,args map translateExp))
             case _ => Nil
-          }))} else () => Nil
+          })} else () => Nil
         )
       }
       case _ =>
@@ -1258,7 +1264,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 */
 
   def translateBackendFunc(f: sil.DomainFunc): Seq[Decl] = {
-    addLATER("domains", "DFPM: translateBackendFunc"); Seq()
+    addADVANCED("domains", "DFPM: translateBackendFunc"); Seq()
 /*
     // We do not use the funcpred namespace because based on the namespace, the funcpred module
     // decides whether to stuff meant only for heap-dependent functions (like heights computation

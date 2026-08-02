@@ -59,20 +59,10 @@ class DefaultHeapModule(val verifier: Verifier)
   override def fieldTypeOf(t: Type) = NamedType(fieldTypeName, Seq(normalFieldType, t))
   override def refType = NamedType("Ref")
 
-  /** Only interact with this using 'allFieldsTypVars' and 'registerFieldType'! */
-  private lazy val _allFieldTypeVarsSet = if (enableAllocationEncoding) {
-      collection.mutable.Set[Seq[Type]](fieldTypeOf(Bool).typVars, fieldTypeOf(refType).typVars)
-    } else { collection.mutable.Set.empty[Seq[Type]] }
-
   private val noFieldReplacement: Seq[Seq[Type]] = Seq(Seq(NamedType(""), NamedType("")))
   private var allFieldsTypVarsSeq: Seq[Seq[Type]] = noFieldReplacement
 
-  override def allFieldsTypVars: Seq[Seq[Type]] = {
-    // if (allFieldsTypVarsSeq.size != 3) {
-    //   sys.error("ha HA!")
-    // } 
-    allFieldsTypVarsSeq
-  }
+  override def allFieldsTypVars: Seq[Seq[Type]] = allFieldsTypVarsSeq
 
   private var fieldIdxMap = allFieldsTypVars.zipWithIndex.toMap
   override def fieldIdx(ftvars: Seq[Type]) = fieldIdxMap.getOrElse(ftvars, sys.error("non-field types versions cannot be indexed: "+ftvars))
@@ -120,9 +110,19 @@ class DefaultHeapModule(val verifier: Verifier)
   private val nullLit = Const(nullName, refType)
   private val freshObjectName = Identifier("freshObj")
   private val freshObjectVar = IdExpr(freshObjectName, refType)
+
+  // B3 NOTE: the old allocated, which was located on the Field NormalField Bool part of the heap
+  // has the problem of not beeing on the same split as the references. It is hard to make an axiom
+  // that uses different heap-splits to only use heap-splits from the same heap. Therefore, 
+  // 'allocated' was relocated to the same split as the Refs. Instead of the allocated field storing
+  // 'true' or 'false' it either stores 'isAlloc' or not, repectively. 'isAlloc' is just a randomly
+  // defined reference. [keep this note above 'allocName']
   private lazy val allocName = if(enableAllocationEncoding) Identifier("$allocated")(fieldNamespace) else null
-  private lazy val allocFieldVal = if(enableAllocationEncoding) Const(allocName, fieldTypeOf(Bool)) else null
-  private lazy val allocType = if(enableAllocationEncoding) fieldTypeOf(Bool) else null
+  private lazy val allocType = if(enableAllocationEncoding) fieldTypeOf(refType) else null
+  private lazy val isAllocName = if(enableAllocationEncoding) Identifier("$isAllocated")(fieldNamespace) else null
+  private lazy val isAllocType = if(enableAllocationEncoding) refType else null
+  private lazy val isAlloc = if(enableAllocationEncoding) Const(isAllocName, isAllocType) else null
+
 /*
   private val succHeapName = Identifier("succHeap")
   private val succHeapTransName = Identifier("succHeapTrans")
@@ -186,18 +186,15 @@ class DefaultHeapModule(val verifier: Verifier)
         TypeDecl(heapTyp(ftVars))
       }}) ++ 
       (if(!enableAllocationEncoding) Nil else {
-        ConstDecl(allocName, allocType, Some(fieldTagName(fieldTypeOf(Bool).typVars))) ++
+        // B3 NOTE: see note above val allocName
+        ConstDecl(isAllocName, isAllocType) ++
+        ConstDecl(allocName, allocType, Some(fieldTagName(allocType.typVars))) ++
         // all heap-lookups yield allocated objects or null
         Axiom(Forall(
           Seq(obj,
               refField,
-              normalHeap(fieldTypeOf(Bool)),
               normalHeap(fieldTypeOf(refType))),
-          // B3 NOTE: changed "Pattern(obj_refField)" to the following two variants. Needed   
-          // because the second heap split needs to be included in the pattern too. If this 
-          // does not work then we will need to add a special "dummy"-trigger instead.
-          Seq(Pattern(Seq(obj_refField, validReference(obj.l))),
-              Pattern(Seq(validReference(obj_refField)))),
+          Pattern(obj_refField),
           validReference(obj.l) ==> validReference(obj_refField)))
       }) ++
 /* B3 ADVANCED (QPerm)
@@ -543,7 +540,7 @@ class DefaultHeapModule(val verifier: Verifier)
   override def resetFields(program: sil.Program, config: CarbonConfig): Unit = {
     // Initialize temp collection
     val allFieldTypeVarsSet = if (config == null || !config.disableAllocEncoding.isSupplied) {
-      collection.mutable.Set[Seq[Type]](fieldTypeOf(Bool).typVars, fieldTypeOf(refType).typVars)
+      collection.mutable.Set[Seq[Type]](allocType.typVars)
     } else { collection.mutable.Set.empty[Seq[Type]] }
 
     // Helpers
@@ -691,10 +688,10 @@ class DefaultHeapModule(val verifier: Verifier)
    * Returns a heap-lookup of the allocated field of an object. 
    * (should only be used for known-non-null references) 
    */
-  private def alloc(o: Expr) = lookup(heapExp(fieldTypeOf(Bool).typVars), o, allocFieldVal)
+  private def alloc(o: Expr) = lookup(heapExp(allocType.typVars), o, Const(allocName, allocType)) // B3 NOTE: see note above val allocName
 
   /** Returns assignment that updates heap to reflect that @{code ref} is assigned  */
-  private def allocUpdateRef(ref: Expr): Stmt = currentHeapAssignUpdate(ref, Const(allocName, allocType), TrueLit())
+  private def allocUpdateRef(ref: Expr): Stmt = currentHeapAssignUpdate(ref, Const(allocName, allocType), isAlloc)
 
   /** 
    * Returns a heap-lookup for o.f in a given heap h.
@@ -844,7 +841,7 @@ class DefaultHeapModule(val verifier: Verifier)
           // earlier. Note that "validReference" must be used in appropriate places
           // in the encoding to get this fact (e.g. below for method targets, and also
           // for loops (see the StateModule implementation)
-          Assume(if(enableAllocationEncoding) (freshObjectVar !== nullLit) && alloc(freshObjectVar).not else (freshObjectVar !== nullLit)) ::
+          Assume(if(enableAllocationEncoding) (freshObjectVar !== nullLit) && validReference(freshObjectVar).not else (freshObjectVar !== nullLit)) ::
           (if(enableAllocationEncoding) allocUpdateRef(freshObjectVar) :: (translateExp(target) := freshObjectVar) :: Nil else (translateExp(target) := freshObjectVar) :: Nil)
       case _ => EmptyStmt
     }
@@ -954,7 +951,7 @@ class DefaultHeapModule(val verifier: Verifier)
   }
 
   private def validReference(exp: Expr): Expr = {
-    /*exp === nullLit ||*/ alloc(exp)
+    /*exp === nullLit ||*/ alloc(exp) === isAlloc // B3 NOTE: see note above val allocName
   }
 
   override def translateNull: Expr = nullLit
@@ -1002,7 +999,7 @@ class DefaultHeapModule(val verifier: Verifier)
     if (!usingOldState) { 
       allFieldsTypVars flatMap { ftvars =>
         Reinit(exhaleHeap(ftvars)) ++
-          LATER_Stmt("predicates", "DHeapM->endExhale (identicalOnKnownLocsName-part)") // Assume(FunctionCallExpr(identicalOnKnownLocsName, Seq(heapExp(ftvars), exhaleHeap(ftvars)) ++ currentMask(fieldIdx(ftvars)), Bool)) ++
+          LATER_Stmt("predicates", "DHeapM->endExhale (identicalOnKnownLocsName-part)") ++ // Assume(FunctionCallExpr(identicalOnKnownLocsName, Seq(heapExp(ftvars), exhaleHeap(ftvars)) ++ currentMask(fieldIdx(ftvars)), Bool)) ++
           (heapVar(ftvars) := exhaleHeap(ftvars))
       }
     } else Nil

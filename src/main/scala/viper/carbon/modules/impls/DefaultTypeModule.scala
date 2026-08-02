@@ -50,7 +50,7 @@ class DefaultTypeModule(val verifier: Verifier) extends TypeModule with Stateles
       case t@sil.DomainType(_, _) =>
         sys.error("B3 LATER: DomainType not supported yet.") //translateDomainTyp(t)
       case sil.BackendType(_, interpretations) if interpretations.contains("Boogie") => 
-        sys.error("B3 ADVANCED?: BackendType (with interpretation for 'Boogie') not supported yet.") //NamedType(interpretations("Boogie"))
+        sys.error("B3 ADVANCED: BackendType (with interpretation for 'Boogie') not supported yet.") //NamedType(interpretations("Boogie"))
       case sil.BackendType(_, _) => sys.error("Found non-Boogie-compatible backend type.")
       case _ => sys.error("Viper type didn't match any existing case.")
     }

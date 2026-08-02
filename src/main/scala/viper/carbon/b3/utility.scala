@@ -6,9 +6,7 @@
 
 package viper.carbon.b3
 import viper.carbon.b3.B3Nodes._
-import viper.carbon.b3.B3Naming._
 import viper.carbon.b3.B3Implicits._
-import viper.carbon.b3.B3Development._
 
 
 /**
@@ -28,7 +26,7 @@ object Statements {
   def children(s: Stmt): Seq[Stmt] = {
     s match {
       case If(_, thn, els) => Seq(s) ++ children(thn) ++ children(els)
-      case Choose(branches) => Seq(s) ++ (branches flatMap children)
+      case Choose(thn, els) => Seq(s) ++ children(thn) ++ children(els)
       case Block(stmts) => stmts flatMap children
       case LabeledStmt(_, body) => Seq(s) ++ children(body) // B3 NOTE: maybe we should also add Seq(s) (?)
       case _ => List(s)
@@ -119,7 +117,7 @@ object Nodes {
           case Check(e, error) => e
           case Assume(e) => e
           case Assert(e, error) => e
-          case Choose(branches) => branches
+          case Choose(thn, els) => Seq(thn, els)
           case If(cond, thn, els) => Seq(cond, thn, els)
           case LabeledStmt(_, body) => body
         }
@@ -129,6 +127,7 @@ object Nodes {
         e match {
           case BoolLit(_) => Nil
           case IntLit(_) => Nil
+          case RealLit(_) => Nil
           case IdExpr(_,_,_) => Nil
           case OpExpr(_, es) => es
           case CondExp(cond, thn, els) => Seq(cond, thn, els)

@@ -206,8 +206,8 @@ class QuantifiedPermModule(val verifier: Verifier)
         // good mask
         Function(goodMaskName(ftvar), FParameter(maskName(ftvar), maskType(ftvar)), Bool) ++
         Axiom(Forall((stateModule.staticStateContributions(ftvar) map {_.toQ}),
-          Pattern(staticGoodState(ftvar)(0)),
-          staticGoodState(ftvar)(0) ==> staticGoodMask(ftvar)))
+          Pattern(staticGoodState(ftvar)),
+          staticGoodState(ftvar) ==> staticGoodMask(ftvar)))
       }) ++ 
       {allFieldsTypVars flatMap {ftvar =>
         val perm = currentPermission(obj.l, field(ftvar).l)

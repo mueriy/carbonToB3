@@ -11,7 +11,6 @@ import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
 import viper.carbon.b3.B3Development._
-import viper.carbon.b3.Statements
 import viper.carbon.verifier.Verifier
 import viper.silver.verifier.PartialVerificationError
 import org.scalactic.PrettyMethods

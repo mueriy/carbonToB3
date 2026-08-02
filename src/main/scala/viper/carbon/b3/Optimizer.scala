@@ -160,13 +160,7 @@ object Optimizer {
           case Seq(singleStmt) => singleStmt
           case seqOfStmtsOrEmpty => Block(seqOfStmtsOrEmpty)
         }
-      }
-
-      // The Choose-Stmt (in contrast to "If(*)..."/"NondetIf") can have more than two options, so lets make use of that.
-      case Choose(Seq(Choose(branches1), Choose(branches2))) => Choose(branches1 ++ branches2) 
-      case Choose(Seq(Choose(branches1), branch2)) => Choose(branches1 ++ Seq(branch2))
-      case Choose(Seq(branch1, Choose(branches2))) => Choose(Seq(branch1) ++ branches2)
-      
+      }      
     })
   }
 }

@@ -7,8 +7,7 @@
 package viper.carbon.modules
 
 import viper.silver.{ast => sil}
-import viper.carbon.b3.B3Nodes.{Decl, Expr, Type, Stmt, Pattern}
-import viper.carbon.b3.B3Naming.Identifier
+import viper.carbon.b3.B3Nodes.{Decl, Expr, Type, Stmt, Pattern, Function}
 
 import scala.collection.mutable
 

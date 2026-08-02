@@ -590,7 +590,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
           case ((frameMask, frameHeap), idx) =>
             Seq(Assign(frameMask.l, currentMask(idx)),
                 Assign(frameHeap.l, currentHeap(idx)))
-        } // B3 TODO: this "should" be wrong; it should be implemented for all splits (or target a specific split)
+        }
       })
   }
 
