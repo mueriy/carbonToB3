@@ -437,7 +437,6 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   private def handleWhile(w: sil.While): Stmt = {
     val guard = translateExp(w.cond)
     val (invs, writtenVars) = getWhileInformation(w)
-    println(invs)
 
     beforeLoopHead(invs, w.info.getUniqueInfo[LoopInfo].map(loopInfo => loopInfo.head.get)) ++
     //"Havoc loop written variables (except locals)"
@@ -582,7 +581,6 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   private def beforeLoopHead(invs: Seq[sil.Exp], loopIdOpt: Option[Int]): Stmt = {
     //"Before loop head" + loopIdOpt.fold("")(i => Integer.toString(i)
       //"Exhale loop invariant before loop"
-      println(loopIdOpt)
       executeUnfoldings(invs, (inv => errors.LoopInvariantNotEstablished(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotEstablished(e)))
       ) ++
       loopIdOpt.fold(Nil:Stmt)(loopId => {

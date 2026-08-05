@@ -184,7 +184,7 @@ case class CarbonVerifier(override val reporter: Reporter,
 
     val t = System.currentTimeMillis()
     val (tProg, translatedNames) = mainModule.translate(program, reporter)
-    _translated = tProg.b3fy
+    _translated = tProg
 
 
     val options = if (config == null) {
@@ -224,7 +224,7 @@ case class CarbonVerifier(override val reporter: Reporter,
 
 
 
-  private var _translated: RawAst.Program = null
+  private var _translated: viper.carbon.b3.B3Nodes.Program = null
   def translated = _translated
 
   private var _program: Program = null

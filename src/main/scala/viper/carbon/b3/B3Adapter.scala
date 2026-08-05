@@ -227,6 +227,38 @@ object B3Nodes {
     def reduce[C, R](context: C, enter: (Node, C) => C, combine: (Node, C, Seq[R]) => R) = {
       Visitor.reduce[C, R](this)(context, enter, combine)
     }
+
+    /**
+     * Applies the function `f` to the AST node, then visits all subnodes.
+     */
+    def visit(f: PartialFunction[Node, Unit]): Unit = {
+      Visitor.visit(this)(f)
+    }
+
+    /**
+     * Applies the function `f1` to the AST node, then visits all subnodes,
+     * and finally calls `f2` to the AST node.
+     */
+    def visit(n: Node, f1: PartialFunction[Node, Unit], f2: PartialFunction[Node, Unit]): Unit = {
+      Visitor.visit(this, f1, f2)
+    }
+
+    /**
+     * Applies the function `f` to the AST node, then visits all subnodes if `f`
+     * returned true.
+     */
+    def visitOpt(n: Node)(f: Node => Boolean): Unit = {
+      Visitor.visitOpt(this)(f)
+    }
+
+    /**
+     * Applies the function `f1` to the AST node, then visits all subnodes if `f1`
+     * returned true, and finally calls `f2` to the AST node.
+     */
+    def visitOpt(n: Node, f1: Node => Boolean, f2: Node => Unit): Unit = {
+      Visitor.visitOpt(this, f1, f2)
+    }
+
     /** 
      * 
      * This extra level of indirection (not calling transform directly), appears to affect the type-checking. We need to look into this.
@@ -597,10 +629,32 @@ object B3Nodes {
 
 
   //Assertions
-  /** Scala representation of a B3 RawAst Check-Stmt node. (Check = Assert, then forget; see B3 manual)
-   * @param error currently not supported by B3; we still require it for when that changes */
-  case class Check(expr: Expr, error: VerificationError) extends Stmt {
-    override def b3fy: RawAst.Stmt = new RawAst.Stmt_Check(expr.b3fy)
+  /** Scala representation of a B3 RawAst Check-Stmt node. (Check = Assert, then forget; see B3 manual) */
+  case class CheckImpl(expr: Expr, error: VerificationError) extends Stmt {
+    var id = AssertAndCheckIds.next // Used for mapping errors in the output back to VerificationErrors
+    override def b3fy: RawAst.Stmt = {
+      this match {
+        // B3 NOTE: We transform the check [[expr]] into a labeled expression where the label is the error message.
+        //   This results in error messages of the form s"Error: Failed to prove check ${showError(error, id)}: ${expr}"
+        //   This might not yet be enough to automatically get the correct error from the output, as the label could contain
+        //   ':'s, which would make it hard to find the ':' that separates the label from the expr. B3 ADVANCED: if this is used
+        //   to better show errors, the label must always be correctly extracted. => Need to ensure that that is the case.
+        // B3 TODO: implement a flag that enables/disables this labeling.
+        case _ => new RawAst.Stmt_Check(LabeledExpr(showError(error, id), expr).b3fy)
+      }
+    }
+  }
+  object Check {
+    def apply(expr: Expr, error: VerificationError) = {
+      if (error == null) Statements.EmptyStmt
+      else {
+        if (ErrorMemberMapping.currentMember != null) {
+          ErrorMemberMapping.mapping.update(error, ErrorMemberMapping.currentMember)
+        }
+        CheckImpl(expr, error)
+      }
+    }
+    def unapply(a: CheckImpl) = Some((a.expr, a.error))
   }
 
   /** Scala representation of a B3 RawAst Assume-Stmt node. */
@@ -611,27 +665,53 @@ object B3Nodes {
   /** Advanced Feature (checks if any valid trace exists that reaches that position) */
   // case class Reach extends Stmt
 
-  /** Scala representation of a B3 RawAst Assert-Stmt node. (Assert = "Check + Assume")
-   * @param error Currently not supported by B3, but we require it for when that changes */
-  case class Assert(expr: Expr, error: VerificationError) extends Stmt {
+  /** Scala representation of a B3 RawAst Assert-Stmt node. (Assert = "Check + Assume") */
+  case class AssertImpl(expr: Expr, error: VerificationError) extends Stmt {
+    var id = AssertAndCheckIds.next // Used for mapping errors in the output back to VerificationErrors
     override def b3fy: RawAst.Stmt = {
       this match {
-        // B3 NOTE: We transform 'Assert false' to 'Check labeled: false' to make it easier to
-        //  differentiate between the different asserts and to allow checks in multiple positions
-        // B3 QUEST: we could probably also always create a label and use the error as that label.
-        //  (Expr-labels can be anything here, although automatically reading out the error might
-        //   still be tricky. Maybe replace all ':'s with something else and then the first ':' in
-        //   the "Error: Failed to prove ..."-message is between the label and the un-verified
-        //   expression. And then transform back the ':'s. Unless ':' is definitely never used,  
-        //   then this could be done in one step.) 
-        case Assert(FalseLit(), error) => 
-          checkCounter += 1
-          Check(LabeledExpr(s"FalseCheck_${checkCounter}", FalseLit()), error).b3fy
-        case _ => new RawAst.Stmt_Assert(expr.b3fy)
+        // B3 NOTE: We transform 'Assert false && false' to 'Check false && false' to allow checks in multiple positions
+        // B3 NOTE: We transform the assert [[expr]] into a labeled expression where the label is the error message.
+        //   This results in error messages of the form s"Error: Failed to prove assert ${showError(error, id)}: ${expr}"
+        //   This might not yet be enough to automatically get the correct error from the output, as the label could contain
+        //   ':'s, which would make it hard to find the ':' that separates the label from the expr. B3 ADVANCED: if this is used
+        //   to better show errors, the label must always be correctly extracted. => Need to ensure that that is the case.
+        // B3 TODO: implement a flag that enables/disables this labeling.
+        case Assert(OpExpr(And, Seq(FalseLit(), FalseLit())), _) => new RawAst.Stmt_Check(LabeledExpr(showError(error, id), expr).b3fy)
+        case _ => new RawAst.Stmt_Assert(LabeledExpr(showError(error, id), expr).b3fy)
       }
     }
   }
+  object ErrorMemberMapping {
+    // The "weak" hash map is necessary to avoid leaking memory.
+    // See issue https://github.com/viperproject/carbon/issues/444
+    val mapping = mutable.WeakHashMap[VerificationError, Member]()
+    var currentMember : Member = null
+  }
+  object Assert {
+    def apply(expr: Expr, error: VerificationError) = {
+      if (error == null) Statements.EmptyStmt
+      else {
+        if (ErrorMemberMapping.currentMember != null) {
+          ErrorMemberMapping.mapping.update(error, ErrorMemberMapping.currentMember)
+        }
+        AssertImpl(expr, error)
+      }
+    }
+    def unapply(a: AssertImpl) = Some((a.expr, a.error))
+  }
+  object AssertAndCheckIds {
+    var id = 0
+    def next = {
+      id += 1
+      id - 1
+    }
+  }
   var checkCounter = 0
+
+  def showError(error: VerificationError, id: Int) = {
+    s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
+  }
 
   /** (not documented enough to use) */
   // case class AForall(name: String?, typ: Type, body: Stmt) extends Stmt

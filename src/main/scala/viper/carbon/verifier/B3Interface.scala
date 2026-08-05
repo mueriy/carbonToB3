@@ -6,14 +6,14 @@
 
 package viper.carbon.verifier
 
-import RawAst.Program // import viper.carbon.boogie.{Assert, Program}
+import viper.carbon.b3.B3Nodes.{Assert, Check, Program}
 import viper.carbon.b3.B3Adapter.{runB3, printRawAst}
 import viper.carbon.b3.B3Naming
 import viper.carbon.b3.B3Development
-// import viper.silver.reporter.BackendSubProcessStages._
+import viper.silver.reporter.BackendSubProcessStages._
 import viper.silver.reporter.Reporter // import viper.silver.reporter.{BackendSubProcessReport, Reporter}
-// import viper.silver.verifier.errors.Internal
-// import viper.silver.verifier.reasons.InternalReason                //TODO/LATER? reimplement the error reporting system in the same way as done for Boogie
+import viper.silver.verifier.errors.Internal
+import viper.silver.verifier.reasons.InternalReason
 import viper.silver.verifier._
 
 import java.io._
@@ -58,6 +58,8 @@ trait B3Interface {
   def z3Path: String
 
 
+  var errormap: Map[Int, VerificationError] = Map()
+  var models : collection.mutable.ListBuffer[String] = new collection.mutable.ListBuffer[String]
   /**
    * This will setup and run B3 on the given program using the specified options. 
    * Timeout currently not suppported.
@@ -68,6 +70,15 @@ trait B3Interface {
    * @return Currently always ("?", Success), because we dont do error parsing yet
    */
   def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {
+    // find all errors and assign everyone a unique id
+    errormap = Map()
+    program.visit {
+      case a@Assert(_, error) =>
+        errormap += (a.id -> error)
+      case a@Check(_, error) =>
+        // B3 ADVANCED: Maybe need to go over the "VerificationError"s (Check != Assert => Check might need its own VerificationError type)
+        errormap += (a.id -> error)
+    }
 
     // invoke B3 and capture any output in outStream (-> output)
     val outStream = new ByteArrayOutputStream()
@@ -76,7 +87,7 @@ trait B3Interface {
     println("=============== NOW RUNNING B3 VERIFIER ===============")
     try {
       System.setOut(newOut)
-      runB3(program, b3defaultOptions ++ options) // [B3 todo?: currently no timeout mechanism]
+      runB3(program.b3fy, b3defaultOptions ++ options) // B3 ADVANCED: timeout mechanism
       newOut.flush()
     } finally {
       System.setOut(oldOut)
@@ -89,13 +100,71 @@ trait B3Interface {
 
     // Output B3 output
     println("*************************")
-    print(output) // [B3 base: an extension goal would be to implement error parsing here, see BoogieInterface.scala -> parse]
+    print(output) // B3 ADVANCED: remove this or output parts of it optionally depending on flag 
     println("*************************")
+
+    // parse B3 output (B3 ADVANCED: improve this)
+    val parsedOutputResult = parse(output.toString()) match {
+      case (version, Nil) =>
+        (version, Success)
+      case (version, errorIds) => {
+        val errors = (0 until errorIds.length).map(i => {
+          val id = errorIds(i)
+          val error = errormap.get(id).get
+          if (models.nonEmpty) {
+            error.failureContexts = Seq(FailureContextImpl(Some(SimpleCounterexample(Model(models(i))))))
+          }
+          error
+        })
+        (version, Failure(errors))
+      }
+    }
 
     // (printing some additional infos for development)
     B3Development.printALL()
     
     // cannot get b3 version. Since we currently don't parse/handle errors we always return Success
-    ("?", Success)
+    parsedOutputResult
+  }
+
+  /**
+    * Parse the output of Boogie. Returns a pair of the detected version number and a sequence of error identifiers.
+    */
+  private def parse(output: String): (String, Seq[Int]) = {
+    // val LogoPattern = "Boogie program verifier version ([0-9.]+),.*".r
+    // val SummaryPattern = "Boogie program verifier finished with ([0-9]+) verified, ([0-9]+) error.*".r
+    val ErrorPattern = ".+ \\[([0-9]+)\\]: .+".r
+    val CurrentProcedurePattern = "Verifying (.+) ...".r
+    val AlternativePattern = "  choose alternative ([0-9]+)".r
+    val errors = collection.mutable.ListBuffer[Int]()
+    var otherErrId = 0
+    var version_found: String = "?" // B3 ADVANCED: check if we can get B3's version somehow
+    var procName: String = null
+
+    val unexpected : (String => Unit) = (msg:String) => {
+      otherErrId -= 1
+      errors += otherErrId
+      val internalError = Internal(InternalReason(DummyNode, msg))
+      errormap += (otherErrId -> internalError)
+    }
+
+    var ignoreNonVerification = true
+    for (l <- output.linesIterator) {
+      // B3 ADVANCED: add cases for errors in B3 (e.g. if some type/function/... is not declared)
+      l match {
+        case CurrentProcedurePattern(n) =>
+          ignoreNonVerification = false
+          procName = n
+        case _ if ignoreNonVerification => //ignore everything before verification begins (e.g. printout of program)
+        case ErrorPattern(id) =>
+          errors += id.toInt
+        case AlternativePattern(_) =>
+          null // B3 ADVANCED: show the different "paths" of the traces that lead to verification errors
+        case "" => // ignore empty lines
+        case _ =>
+          unexpected(s"Found an unparsable output from B3: $l")
+      }
+    }
+    (version_found,errors.toSeq)
   }
 }
