@@ -464,9 +464,11 @@ object B3Nodes {
       ax.expr match {
         case Forall(vars, patterns, expr, _, _) => patterns match {
           case Seq(Pattern(pExprs)) => pExprs map {expr => funcName(expr.asInstanceOf[FunctionCallExpr])}
-          case _ => B3Development.addLATER("axiomExplanations", "multiple (alternative) patterns currently not supported"); Seq()
+          case patterns => 
+            val allPatternResults = patterns map {case Pattern(pExprs) => (pExprs map {expr => funcName(expr.asInstanceOf[FunctionCallExpr])}).toSet}
+            allPatternResults.reduce(_ intersect _).toSeq
         }
-        case _ => B3Development.addLATER("axiomExplanations", "axioms containing not just a forall currently not supported"); Seq()
+        case _ => B3Development.addADVANCED("axiomExplanations", "Only axioms with a 'forall'-expression as body are currently supported"); Seq()
       }
     }
   }
