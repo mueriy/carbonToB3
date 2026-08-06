@@ -10,6 +10,7 @@ import viper.carbon.modules.{ExpModule, StatelessComponent}
 import viper.silver.{ast => sil}
 import viper.carbon.b3.B3Nodes._
 import viper.carbon.b3.B3Implicits._
+import viper.carbon.b3.B3Development._
 import viper.carbon.b3.B3Naming.Identifier
 import viper.carbon.b3.Transformer
 import viper.carbon.verifier.Verifier
@@ -340,11 +341,11 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
     val stmt: Stmt = (if (makeChecks)
       e match {
         case sil.Div(_, b) =>
-            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)))
+            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)), 4)
         case sil.Mod(_, b) =>
-            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)))
+            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)), 4)
         case sil.FractionalPerm(_, b) =>
-            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)))
+            Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)), 4)
         case _ => Nil
       }
     else Nil)
@@ -411,7 +412,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
         val checkAssDefined = checkDefinedness(assertion, error, makeChecks = makeChecks)
         val (stateStmt, state) = stateModule.freshTempState("asserting")
         //"Exhale assertion of asserting"
-        val checkAssHolds = exhale(Seq((assertion, error, Some(error))))
+        val checkAssHolds = exhale(Seq((assertion, error, Some(error))), B3Code = +0)
         stateModule.replaceState(state)
         val checkEDefined = checkDefinedness(e, error, makeChecks = makeChecks)
         checkAssDefined :: stateStmt :: checkAssHolds :: checkEDefined :: Nil

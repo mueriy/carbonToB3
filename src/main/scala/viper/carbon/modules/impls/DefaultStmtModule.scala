@@ -10,6 +10,7 @@ import viper.carbon.modules.{StatelessComponent, StmtModule}
 import viper.carbon.modules.components.{DefinednessComponent, DefinednessState, SimpleStmtComponent}
 import viper.silver.ast.utility.Expressions.{whenExhaling, whenInhaling}
 import viper.silver.{ast => sil}
+import viper.carbon.b3.B3Development._
 import viper.carbon.b3.B3Implicits._
 import viper.carbon.b3.B3Naming._
 import viper.carbon.b3.B3Nodes._
@@ -77,11 +78,9 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
    * performed, because the code for that is an exhale. Because of this, it may be necessary to make sure that this operation is
    * called before/after the corresponding exhale/inhale of the assertions.
    */
-/*
   def executeUnfoldings(exps: Seq[sil.Exp], exp_error: (sil.Exp => PartialVerificationError)): Stmt = {
-    (exps map (exp => (if (exp.existsDefined[Unit]({case sil.Unfolding(_,_) => })) checkDefinedness(exp, exp_error(exp), false) else Nil:Stmt)))
+    (exps map (exp => (if (exp.existsDefined[Unit]({case sil.Unfolding(_,_) => })) LATER_Stmt("predicates", "DStmtM->executeUnfoldings (sil.Unfolding)") /* checkDefinedness(exp, exp_error(exp), false) */ else Nil:Stmt)))
   }
-*/
 
   /**
     * Returns a function that takes a Stmt and then adds specific stmts in front of them. If the original stmt was a
@@ -143,18 +142,18 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
       case exh@sil.Exhale(e) =>
         val transformedExp = whenExhaling(e)
         val defErrorOpt = maybeDefError(errors.ExhaleFailed(exh))
-        exhale(Seq((transformedExp, errors.ExhaleFailed(exh), defErrorOpt)), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
+        exhale(Seq((transformedExp, errors.ExhaleFailed(exh), defErrorOpt)), B3Code = +4, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
       case a@sil.Assert(e) =>
         val transformedExp = whenExhaling(e)
         val defErrorOpt = maybeDefError(errors.AssertFailed(a))
 
         if (transformedExp.isPure) {
           // if e is pure, then assert and exhale are the same
-          exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
+          exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), B3Code = +2, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt)
         } else {
           // we create a temporary state to ignore the side-effects
           val (backup, snapshot) = freshTempState("Assert")
-          val exhaleStmt = exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), isAssert =  true, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt, havocHeap = false)
+          val exhaleStmt = exhale(Seq((transformedExp, errors.AssertFailed(a), defErrorOpt)), B3Code = +3, isAssert = true, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt, havocHeap = false)
           replaceState(snapshot)
           backup :: exhaleStmt :: Nil
         }
@@ -201,15 +200,15 @@ class DefaultStmtModule(val verifier: Verifier) extends StmtModule with SimpleSt
           (args map (e => checkDefinedness(e, errors.CallFailed(mc), insidePackageStmt = insidePackageStmt))) ++
           (actualArgs map (_._2)) ++
           //"Exhaling precondition"
-          //B3 LATER: unfolding: executeUnfoldings(pres, (pre => errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))) ++
-            exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))), statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt) ++
+          executeUnfoldings(pres, (pre => errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))) ++
+            exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInCallFalse(mc).withReasonNodeTransformed(renamingArguments))), B3Code = +5, statesStackForPackageStmt = statesStack, insidePackageStmt = insidePackageStmt) ++
           //"Havocing target variables"
           Reinit((targets map translateExp).asInstanceOf[Seq[IdExpr]]) ++
           {
             stateModule.replaceOldState(preCallState)
             //"Inhaling postcondition"
             val res = inhale(posts map (e => (e, errors.CallFailed(mc).withReasonNodeTransformed(renamingArguments))), addDefinednessChecks = false, statesStack, insidePackageStmt) ++
-              LATER_Stmt("predicates", "DStmtM->simpleHandleStmt->'Inhaling postcondition'->unfold")//executeUnfoldings(posts, (post => errors.Internal(post).withReasonNodeTransformed(renamingArguments)))
+              executeUnfoldings(posts, (post => errors.Internal(post).withReasonNodeTransformed(renamingArguments)))
             stateModule.replaceOldState(oldState)
             toUndefine map mainModule.env.undefine
             res

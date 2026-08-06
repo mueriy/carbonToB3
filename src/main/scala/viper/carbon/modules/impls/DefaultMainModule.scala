@@ -173,7 +173,7 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
 
         val postsWithErrors = posts map (p => (p, errors.PostconditionViolated(p, mWithLoopInfo)))
         //"Exhaling postcondition"
-        val exhalePost = exhaleWithoutDefinedness(postsWithErrors)
+        val exhalePost = exhaleWithoutDefinedness(postsWithErrors, B3Code = +9)
         //Translate Method body -> Procedure body
         val mainBody = translateStmt(method.bodyOrAssumeFalse)
           /* TODO: Might be worth special-casing on methods with empty bodies */

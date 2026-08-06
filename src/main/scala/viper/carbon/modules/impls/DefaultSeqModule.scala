@@ -129,9 +129,12 @@ class DefaultSeqModule(val verifier: Verifier)
     if(makeChecks)
       e match {
         case si@SeqIndex(s,idx) => {
+          ADVANCED_Stmt("Seq", "DSeqM->simplePartialCheckDefinednessAfter")
+/*
           val index = translateExp(idx)
           val length = translateSeqExp(SeqLength(s)(s.pos,s.info))
           Assert(index >= IntLit(0),error.dueTo(reasons.SeqIndexNegative(s,si))) ++ Assert(index < length,error.dueTo(reasons.SeqIndexExceedsLength(s,si)))
+*/
         }
         case _ => Nil
       }

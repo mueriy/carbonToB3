@@ -49,13 +49,17 @@ trait B3Interface {
 
   def reporter: Reporter
 
-  def b3defaultOptions = Seq("--print") //<-for now, to definitely have an output; later replace with: Seq.empty[String]  // There are no default options needed for B3
-
   /** The (resolved) path where B3 is supposed to be located. */
   def verifierPath: String
 
   /** The (resolved) path where Z3 is supposed to be located. */
   def z3Path: String
+
+  /** The level of development information to be shown. */
+  def devLvl: Int
+
+  /** Whether or not the B3 code should be printed. */
+  def printOut: Boolean
 
 
   var errormap: Map[Int, VerificationError] = Map()
@@ -69,16 +73,18 @@ trait B3Interface {
    * @param timeout Currently does nothing. (B3 ADVANCED)
    * @return Currently always ("?", Success), because we dont do error parsing yet
    */
-  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {
+  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {   
     // find all errors and assign everyone a unique id
     errormap = Map()
     program.visit {
-      case a@Assert(_, error) =>
+      case a@Assert(_, error, _) =>
         errormap += (a.id -> error)
       case a@Check(_, error) =>
         // B3 ADVANCED: Maybe need to go over the "VerificationError"s (Check != Assert => Check might need its own VerificationError type)
         errormap += (a.id -> error)
     }
+
+    val rawB3Ast = program.b3fy
 
     // invoke B3 and capture any output in outStream (-> output)
     val outStream = new ByteArrayOutputStream()
@@ -87,21 +93,30 @@ trait B3Interface {
     println("=============== NOW RUNNING B3 VERIFIER ===============")
     try {
       System.setOut(newOut)
-      runB3(program.b3fy, b3defaultOptions ++ options) // B3 ADVANCED: timeout mechanism
+      runB3(rawB3Ast, options) // B3 ADVANCED: timeout mechanism
       newOut.flush()
     } finally {
       System.setOut(oldOut)
     }
     val output = outStream
 
-    // Show Field Mappings (when using shortened form)
-    println("Field Mappings:")
-    B3Naming.printTypVarMapping
+    //Possibly print RawAst //B3 ADVANCED: save this to a file instead of printing it to output. (Only B3's --print flag should actually print it, not carbons --print flag.)
+    if (printOut) {
+      // Show Field Mappings (when using shortened form)
+      println("//Field Mappings:")
+      B3Naming.printTypVarMapping
+      println()
+      printRawAst(rawB3Ast)
+    }
 
-    // Output B3 output
-    println("*************************")
-    print(output) // B3 ADVANCED: remove this or output parts of it optionally depending on flag 
-    println("*************************")
+    // Print B3's output
+    if (devLvl >= 1) {
+      // If --print is used then this info will be helpful! //B3 ADVANCED: dont print this if names are not shortened with numbers
+      if (options.contains("--print")) B3Naming.printTypVarMapping
+      println("//*************************")
+      print(output)
+      println("//*************************")
+    }
 
     // parse B3 output (B3 ADVANCED: improve this)
     val parsedOutputResult = parse(output.toString()) match {
@@ -121,7 +136,9 @@ trait B3Interface {
     }
 
     // (printing some additional infos for development)
-    B3Development.printALL()
+    if (devLvl >= 1) {
+      B3Development.printALL()
+    }
     
     // cannot get b3 version. Since we currently don't parse/handle errors we always return Success
     parsedOutputResult

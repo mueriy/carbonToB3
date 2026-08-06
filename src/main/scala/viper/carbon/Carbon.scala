@@ -144,17 +144,25 @@ class CarbonConfig(args: Seq[String]) extends SilFrontendConfig(args, "Carbon") 
     noshort = true
   )
 
-  // val backendMode = opt[String]("mode",
-  //   descr = "Choose between Boogie and B3 (default: Boogie)",
-  //   default = None,
-  //   noshort = true
-  // )
+  val checkNumbers = opt[List[Int]]("check",
+    descr = "Given comma-separated list of integers (e.g. '1, 5, 6'), all Assert-Stmts matching that number will be transformed into a Check-Stmt.",
+    default = None,
+    noshort = true
+  )
 
-  // val printPlus = opt[String]("printplus",
-  //   descr = "Print info about what Viper code resulted in the following statement(s) (default: False)",
-  //   default = Some(false),
-  //   noshort = true
-  // )
+  val developerLevel = opt[Int]("dev",
+    descr = "The amount of development information shown. (0 = none, 1 = some (allows running B3 on printed code without changes), 2 = reserve, 3 = all)",
+    default = Some(3),
+    noshort = true
+  )
+
+  val printOut = opt[Boolean]("printOut", // B3 ADVANCED: change this to previous print, i.e. save output to the given file.
+    descr = "If used, the B3 program is printed.",
+    default = Some(false),
+    noshort = true
+  )
+
+  // B3 ADVANCED: clean up these config option & add other options (e.g. whether names should be shortened to a number or not ("HeapType%%NormalField%Ref" vs "HeapType%%0"))
 
 
   verify()

@@ -762,7 +762,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
                 Some(errors.ContractNotWellformed(e))
               )
             })
-          )
+          , B3Code = +1)
       }
       //"Do welldefinedness check of the inhale part."
       val inhaleCheck = Choose(Block(onlyInhalePosts ++ Assume(FalseLit())))
@@ -798,7 +798,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
                   Some(errors.ContractNotWellformed(e))
                 )
               })
-            )
+            , B3Code = +1)
         //"Exhaling postcondition (with checking)"
         posts
       }
@@ -927,7 +927,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
         Choose(
           // This is where termination checks could/should be added
           ({//"Exhale precondition of function application"
-            val executeExhale = () => exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInAppFalse(fa))))
+            val executeExhale = () => exhaleWithoutDefinedness(pres map (e => (e, errors.PreconditionInAppFalse(fa))), B3Code = +6)
 
             definednessStateOpt match {
               case Some(defState) =>
@@ -1118,7 +1118,7 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
   }
 */
 
-  override def exhaleExpBeforeAfter(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState]): (() => Stmt, () => Stmt) = {
+  override def exhaleExpBeforeAfter(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState], B3Code: Int): (() => Stmt, () => Stmt) = {
     e match {
 
       case sil.Unfolding(acc, _) =>

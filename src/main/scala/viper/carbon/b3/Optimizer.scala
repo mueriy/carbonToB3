@@ -136,7 +136,7 @@ object Optimizer {
       case If(_, thn, els) if thn.children.isEmpty && els.children.isEmpty =>
         Statements.EmptyStmt
 
-      case Assert(TrueLit(), _) => Statements.EmptyStmt
+      case Assert(TrueLit(), _, _) => Statements.EmptyStmt
       case Assume(TrueLit()) => Statements.EmptyStmt
 
       // --- New B3 optimizations ---

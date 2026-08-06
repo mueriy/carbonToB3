@@ -177,7 +177,7 @@ object B3Adapter {
 
     //Possibly print RawAst
     if (options.contains("--print")) {
-      printRawAst(rawB3Ast);
+      printRawAst(rawB3Ast)
     }
 
     // Transform RawAst -> Ast
@@ -197,6 +197,7 @@ object B3Adapter {
 object B3Nodes {
   import viper.carbon.b3.DafnyHelper._
   import viper.carbon.b3.B3Naming._
+  import viper.carbon.b3.B3Development.devLvl
 
   /** 
    * The root of the Scala-B3 AST.
@@ -536,30 +537,7 @@ object B3Nodes {
   }
 
 
-  import viper.silver.verifier.errors.AssertFailed
-  import viper.silver.verifier.reasons.FeatureUnsupported
-  import viper.silver.ast.{Assert=>SilAssert, TrueLit=>SilTrueLit}
-  def fakeError(msg: String) = AssertFailed(SilAssert(SilTrueLit()())(), FeatureUnsupported(SilAssert(SilTrueLit()())(), msg)) 
   // STATEMENT NODES
-  /** Corresponds to the Stmt: "'TODO_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but you dont want to implement it yet. */
-  def TODO_Stmt(info1: String = "", info2: String = ""): Stmt = {
-    B3Development.addTODO(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
-    LabeledStmt(s"TODO_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
-  }
-  /** Corresponds to the Stmt: "'LATER_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but it is actually an advanced feature. */
-  def LATER_Stmt(info1: String = "", info2: String = ""): Stmt = {
-    B3Development.addLATER(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
-    LabeledStmt(s"LATER_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
-  }
-  /** Corresponds to the Stmt: "'ADVANCED_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but it is actually an advanced feature. */
-  def ADVANCED_Stmt(info1: String = "", info2: String = ""): Stmt = {
-    B3Development.addADVANCED(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
-    LabeledStmt(s"ADVANCED_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
-  }
-
   /** An empty statement. */
   val EmptyStmt: Stmt = Block(Seq())
 
@@ -640,7 +618,7 @@ object B3Nodes {
         //   ':'s, which would make it hard to find the ':' that separates the label from the expr. B3 ADVANCED: if this is used
         //   to better show errors, the label must always be correctly extracted. => Need to ensure that that is the case.
         // B3 TODO: implement a flag that enables/disables this labeling.
-        case _ => new RawAst.Stmt_Check(LabeledExpr(showError(error, id), expr).b3fy)
+        case _ => new RawAst.Stmt_Check(LabeledExpr(showCheckError(error, id), expr).b3fy)
       }
     }
   }
@@ -665,8 +643,10 @@ object B3Nodes {
   /** Advanced Feature (checks if any valid trace exists that reaches that position) */
   // case class Reach extends Stmt
 
+  /** Asserts whose 'B3Code' is in this set are translated to a Check */
+  var checkSet = Set.empty[Int]
   /** Scala representation of a B3 RawAst Assert-Stmt node. (Assert = "Check + Assume") */
-  case class AssertImpl(expr: Expr, error: VerificationError) extends Stmt {
+  case class AssertImpl(expr: Expr, error: VerificationError, B3Code: Int) extends Stmt {
     var id = AssertAndCheckIds.next // Used for mapping errors in the output back to VerificationErrors
     override def b3fy: RawAst.Stmt = {
       this match {
@@ -677,7 +657,8 @@ object B3Nodes {
         //   ':'s, which would make it hard to find the ':' that separates the label from the expr. B3 ADVANCED: if this is used
         //   to better show errors, the label must always be correctly extracted. => Need to ensure that that is the case.
         // B3 TODO: implement a flag that enables/disables this labeling.
-        case Assert(OpExpr(And, Seq(FalseLit(), FalseLit())), _) => new RawAst.Stmt_Check(LabeledExpr(showError(error, id), expr).b3fy)
+        case Assert(_, _, b3Code) if checkSet.contains(b3Code) => new RawAst.Stmt_Check(LabeledExpr(showCheckError(error, id), expr).b3fy)
+        case Assert(OpExpr(And, Seq(FalseLit(), FalseLit())), _, _) => new RawAst.Stmt_Check(LabeledExpr(showError(error, id), expr).b3fy)
         case _ => new RawAst.Stmt_Assert(LabeledExpr(showError(error, id), expr).b3fy)
       }
     }
@@ -689,16 +670,16 @@ object B3Nodes {
     var currentMember : Member = null
   }
   object Assert {
-    def apply(expr: Expr, error: VerificationError) = {
+    def apply(expr: Expr, error: VerificationError, B3Code: Int) = {
       if (error == null) Statements.EmptyStmt
       else {
         if (ErrorMemberMapping.currentMember != null) {
           ErrorMemberMapping.mapping.update(error, ErrorMemberMapping.currentMember)
         }
-        AssertImpl(expr, error)
+        AssertImpl(expr, error, B3Code)
       }
     }
-    def unapply(a: AssertImpl) = Some((a.expr, a.error))
+    def unapply(a: AssertImpl) = Some((a.expr, a.error, a.B3Code))
   }
   object AssertAndCheckIds {
     var id = 0
@@ -710,7 +691,14 @@ object B3Nodes {
   var checkCounter = 0
 
   def showError(error: VerificationError, id: Int) = {
-    s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
+    if (devLvl >= 2) // B3 ADVANCED: maybe use a different flag than devLvl (dev) for these at some point in the future
+      s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
+    else s"[$id]"
+  }
+  def showCheckError(error: VerificationError, id: Int) = {
+    if (devLvl >= 2)
+      s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
+    else s"[$id]"
   }
 
   /** (not documented enough to use) */
@@ -777,58 +765,10 @@ object B3Nodes {
     override def b3fy: RawAst.AExpr = new RawAst.AExpr_AAssertion(stmt.b3fy)
   }
 
-/* TODO:
-Check definedness of [[y.g + x.g > 1]] (stmt assert; same for inhale, but only "HasDirectPerm" once)
 
-*/
 
 
   // EXPRESSION NODES
-  val INLCUDE_SECOND_MSG = true
-  /** Corresponds to the "'TODO_Expr_bool_info1': true" (labeled) bool-Expr. 
-   * Use these if a bool expr is required, but you dont want to implement it yet. */
-  def TODO_Expr_bool(info1: String = "", info2: String = ""): Expr = {
-    B3Development.addTODO(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
-    LabeledExpr(s"TODO_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
-  }
-  /** Corresponds to the "'TODO_Expr_int_info1': 666" (labeled) int-Expr. 
-   * Use these if a int expr is required, but you dont want to implement it yet. */
-  def TODO_Expr_int(info1: String = "", info2: String = ""): Expr = {
-    B3Development.addTODO(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
-    LabeledExpr(s"TODO_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
-  }
-  /** Corresponds to the "'LATER_Expr_bool_info1': true" (labeled) bool-Expr. 
-   * Use these if a bool expr is required, but you dont want to implement it yet. */
-  def LATER_Expr_bool(info1: String = "", info2: String = ""): Expr = {
-    B3Development.addLATER(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
-    LabeledExpr(s"LATER_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
-  }
-  /** Corresponds to the "'LATER_Expr_int_info1': 666" (labeled) int-Expr. 
-   * Use these if a int expr is required, but you dont want to implement it yet. */
-  def LATER_Expr_int(info1: String = "", info2: String = ""): Expr = {
-    B3Development.addLATER(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
-    LabeledExpr(s"LATER_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
-  }
-  /** Corresponds to the "'ADVANCED_Expr_bool_info1': true" (labeled) bool-Expr. 
-   * Use these if a bool expr is required, but you dont want to implement it yet. */
-  def ADVANCED_Expr_bool(info1: String = "", info2: String = ""): Expr = {
-    B3Development.addADVANCED(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
-    LabeledExpr(s"ADVANCED_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
-  }
-  /** Corresponds to the "'ADVANCED_Expr_int_info1': 666" (labeled) int-Expr. 
-   * Use these if a int expr is required, but you dont want to implement it yet. */
-  def ADVANCED_Expr_int(info1: String = "", info2: String = ""): Expr = {
-    B3Development.addADVANCED(info1, info2)
-    val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
-    LabeledExpr(s"ADVANCED_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
-  }
-
-
   sealed trait Expr extends Node {
     def b3fy: RawAst.Expr
     def typ: Type
@@ -1090,6 +1030,7 @@ Check definedness of [[y.g + x.g > 1]] (stmt assert; same for inhale, but only "
 
 /** For development purposes */
 object B3Development {
+  var devLvl = 0
   val infos = mutable.Set.empty[(String, String)]
   val todos = mutable.Set.empty[(String, String)]
   val laters = mutable.Set.empty[(String, String)]
@@ -1121,7 +1062,7 @@ object B3Development {
   }
   def printInfo(): Unit = {
     val grouped = infos.groupMap(_._1)(_._2)
-    println("=== OTHER INFOS ===")
+    println("========== OTHER INFOS ==========")
     grouped.foreach { case (main, detailSet) =>
       println(s"==> $main:\n  - ${detailSet.mkString("\n  - ")}")
     }
@@ -1156,6 +1097,120 @@ object B3Development {
     printLATER()
     printADVANCED()
     printInfo()
+  }
+
+  import viper.silver.verifier.errors.AssertFailed
+  import viper.silver.verifier.reasons.FeatureUnsupported
+  import viper.silver.ast.{Assert=>SilAssert, TrueLit=>SilTrueLit}
+  import B3Nodes._
+  def fakeError(msg: String) = AssertFailed(SilAssert(SilTrueLit()())(), FeatureUnsupported(SilAssert(SilTrueLit()())(), msg)) 
+  /** Corresponds to the Stmt: "'TODO_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but you dont want to implement it yet. */
+  def TODO_Stmt(info1: String = "", info2: String = ""): Stmt = {
+    if (devLvl == 0) return EmptyStmt
+    B3Development.addTODO(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
+      LabeledStmt(s"TODO_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
+    } else {
+      LabeledStmt("TODO_Stmt", Block(Seq()))
+    }
+  }
+  /** Corresponds to the Stmt: "'LATER_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but it is actually an advanced feature. */
+  def LATER_Stmt(info1: String = "", info2: String = ""): Stmt = {
+    if (devLvl == 0) return EmptyStmt
+    B3Development.addLATER(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
+      LabeledStmt(s"LATER_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
+    } else {
+      LabeledStmt("LATER_Stmt", Block(Seq()))
+    }
+  }
+  /** Corresponds to the Stmt: "'ADVANCED_Stmt_info1': {}" ({} = empty Block-stmt). Use this if a Stmt is required, but it is actually an advanced feature. */
+  def ADVANCED_Stmt(info1: String = "", info2: String = ""): Stmt = {
+    if (devLvl == 0) return EmptyStmt
+    B3Development.addADVANCED(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""}
+      LabeledStmt(s"ADVANCED_Stmt(\"$info1\"$info2inlc)", Block(Seq()))
+    } else {
+      LabeledStmt("ADVANCED_Stmt", Block(Seq()))
+    }
+  }
+
+
+  val INLCUDE_SECOND_MSG = true
+  /** Corresponds to the "'TODO_Expr_bool_info1': true" (labeled) bool-Expr. 
+   * Use these if a bool expr is required, but you dont want to implement it yet. */
+  def TODO_Expr_bool(info1: String = "", info2: String = ""): Expr = {
+    if (devLvl == 0) return TrueLit()
+    B3Development.addTODO(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+      LabeledExpr(s"TODO_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
+    } else {
+      LabeledExpr("TODO_Expr_bool", TrueLit())
+    }
+  }
+  /** Corresponds to the "'TODO_Expr_int_info1': 666" (labeled) int-Expr. 
+   * Use these if a int expr is required, but you dont want to implement it yet. */
+  def TODO_Expr_int(info1: String = "", info2: String = ""): Expr = {
+    if (devLvl == 0) return IntLit(666)
+    B3Development.addTODO(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+      LabeledExpr(s"TODO_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
+    } else {
+      LabeledExpr("TODO_Expr_int", IntLit(666))
+    }
+  }
+  /** Corresponds to the "'LATER_Expr_bool_info1': true" (labeled) bool-Expr. 
+   * Use these if a bool expr is required, but you dont want to implement it yet. */
+  def LATER_Expr_bool(info1: String = "", info2: String = ""): Expr = {
+    if (devLvl == 0) return TrueLit()
+    B3Development.addLATER(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+      LabeledExpr(s"LATER_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
+    } else {
+      LabeledExpr("LATER_Expr_bool", TrueLit())
+    }
+  }
+  /** Corresponds to the "'LATER_Expr_int_info1': 666" (labeled) int-Expr. 
+   * Use these if a int expr is required, but you dont want to implement it yet. */
+  def LATER_Expr_int(info1: String = "", info2: String = ""): Expr = {
+    if (devLvl == 0) return IntLit(666)
+    B3Development.addLATER(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+      LabeledExpr(s"LATER_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
+    } else {
+      LabeledExpr("LATER_Expr_int", IntLit(666))
+    }
+  }
+  /** Corresponds to the "'ADVANCED_Expr_bool_info1': true" (labeled) bool-Expr. 
+   * Use these if a bool expr is required, but you dont want to implement it yet. */
+  def ADVANCED_Expr_bool(info1: String = "", info2: String = ""): Expr = {
+    if (devLvl == 0) return TrueLit()
+    B3Development.addADVANCED(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+      LabeledExpr(s"ADVANCED_Expr_bool(\"$info1\"$info2inlc)", TrueLit())
+    } else {
+      LabeledExpr("ADVANCED_Expr_bool", TrueLit())
+    }
+  }
+  /** Corresponds to the "'ADVANCED_Expr_int_info1': 666" (labeled) int-Expr. 
+   * Use these if a int expr is required, but you dont want to implement it yet. */
+  def ADVANCED_Expr_int(info1: String = "", info2: String = ""): Expr = {
+    if (devLvl == 0) return IntLit(666)
+    B3Development.addADVANCED(info1, info2)
+    if (devLvl >= 2) {
+      val info2inlc = if(INLCUDE_SECOND_MSG){s", \"$info2\""} else {""} 
+      LabeledExpr(s"ADVANCED_Expr_int(\"$info1\"$info2inlc)", IntLit(666))
+    } else {
+      LabeledExpr("ADVANCED_Expr_int", IntLit(666))
+    }
   }
 }
 
@@ -1324,7 +1379,7 @@ object B3Naming {
   var specialFunctionReadHeapName = Identifier("x")(Namespace("wrong", -666))
   var specialFunctionUpdateHeapName = Identifier("y")(Namespace("wrong", -666))
   var heapTypVarsToIdx: Map[Seq[B3Nodes.Type],Int] = Map()
-  def printTypVarMapping = heapTypVarsToIdx map {case (typvars, idx) => println(s"${idx} <-> ${(typvars map {_.b3fy}).mkString(" ")}")}
+  def printTypVarMapping = heapTypVarsToIdx map {case (typvars, idx) => println(s"// ${idx} <-> ${(typvars map {_.b3fy}).mkString(" ")}")}
   /** 
    * Returns the correct name to use for the given Identifier, args, and output Type. 
    * For non-parametric functions, this corresponds to the name defined by the Identifier.

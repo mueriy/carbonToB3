@@ -41,24 +41,24 @@ trait ExhaleModule extends Module with ExhaleComponent with ComponentRegistry[Ex
     * The 'statesStackForPackageStmt' and 'insidePackageStmt' are used when translating statements during packaging a wand.
     * For more details refer to the note in the wand module.
     */
-  def exhale(exp: Seq[(sil.Exp, PartialVerificationError, Option[PartialVerificationError])], havocHeap: Boolean = true,
+  def exhale(exp: Seq[(sil.Exp, PartialVerificationError, Option[PartialVerificationError])], B3Code: Int, havocHeap: Boolean = true,
              isAssert: Boolean = false, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt
 
   /** convenience methods */
 
-  def exhaleWithoutDefinedness(exp: Seq[(sil.Exp, PartialVerificationError)], havocHeap: Boolean = true,
+  def exhaleWithoutDefinedness(exp: Seq[(sil.Exp, PartialVerificationError)], B3Code: Int, havocHeap: Boolean = true,
                                isAssert: Boolean = false, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt = {
-    exhale(exp.map(eError => (eError._1, eError._2, None)), havocHeap = havocHeap, isAssert = isAssert, statesStackForPackageStmt, insidePackageStmt = insidePackageStmt)
+    exhale(exp.map(eError => (eError._1, eError._2, None)), B3Code = B3Code, havocHeap = havocHeap, isAssert = isAssert, statesStackForPackageStmt, insidePackageStmt = insidePackageStmt)
   }
 
   def exhaleSingleWithoutDefinedness(exp: sil.Exp, exhaleError: PartialVerificationError, havocHeap: Boolean = true,
                                      isAssert: Boolean = false, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false): Stmt = {
-    exhale(Seq((exp, exhaleError, None)), havocHeap = havocHeap, isAssert = isAssert, statesStackForPackageStmt, insidePackageStmt = insidePackageStmt)
+    exhale(Seq((exp, exhaleError, None)), B3Code = sys.error("Who managed to call exhaleSingleWithoutDefinedness? (Only foldPredicate (B3 LATER) or applyWand (B3 ADVANCED) should be able to do this.)"), havocHeap = havocHeap, isAssert = isAssert, statesStackForPackageStmt, insidePackageStmt = insidePackageStmt)
   }
 
   def exhaleSingleWithDefinedness(exp: sil.Exp, exhaleError: PartialVerificationError, definednessError: PartialVerificationError,
                                   havocHeap: Boolean = true, isAssert: Boolean = false, statesStackForPackageStmt: List[Any] = null, insidePackageStmt: Boolean = false) = {
-    exhale(Seq((exp, exhaleError, Some(definednessError))), havocHeap = havocHeap, isAssert = isAssert,
+    exhale(Seq((exp, exhaleError, Some(definednessError))), B3Code = sys.error("Who managed to call exhaleSingleWithDefinedness? (Should not be possible)"), havocHeap = havocHeap, isAssert = isAssert,
       statesStackForPackageStmt, insidePackageStmt = insidePackageStmt)
   }
 

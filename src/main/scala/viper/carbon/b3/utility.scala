@@ -116,7 +116,7 @@ object Nodes {
           case Block(s) => s
           case Check(e, error) => e
           case Assume(e) => e
-          case Assert(e, error) => e
+          case Assert(e, error, _) => e
           case Choose(thn, els) => Seq(thn, els)
           case If(cond, thn, els) => Seq(cond, thn, els)
           case LabeledStmt(_, body) => body

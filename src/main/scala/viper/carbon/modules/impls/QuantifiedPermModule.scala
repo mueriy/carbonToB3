@@ -407,7 +407,7 @@ Nil/*B3 ADVANCED (QPerm)
   }
 */
 
-  override def exhaleExp(e: sil.Exp, error: PartialVerificationError, definednessCheckOpt: Option[DefinednessState]): Stmt = {
+  override def exhaleExp(e: sil.Exp, error: PartialVerificationError, definednessCheckOpt: Option[DefinednessState], B3Code: Int): Stmt = {
     
     e match {
       case sil.AccessPredicate(loc: LocationAccess, prm) =>
@@ -428,13 +428,13 @@ Nil/*B3 ADVANCED (QPerm)
           }
           if (assertReadPermOnly) {
             (permVar := prmTranslated) ++
-              Assert(permissionPositiveInternal(permVar, Some(p), true), error.dueTo(reasons.NegativePermission(p))) ++
-              Assert(permLt(noPerm, permVar) ==> permLt(noPerm, curPerm), error.dueTo(reasons.InsufficientPermission(loc)))
+              Assert(permissionPositiveInternal(permVar, Some(p), true), error.dueTo(reasons.NegativePermission(p)), 15+B3Code) ++
+              Assert(permLt(noPerm, permVar) ==> permLt(noPerm, curPerm), error.dueTo(reasons.InsufficientPermission(loc)), 5+B3Code)
           } else {
             (permVar := prmTranslated) ++
-              Assert(permissionPositiveInternal(permVar, Some(p), true), error.dueTo(reasons.NegativePermission(p))) ++
+              Assert(permissionPositiveInternal(permVar, Some(p), true), error.dueTo(reasons.NegativePermission(p)), 15+B3Code) ++
               If(permVar !== noPerm,
-                Assert(permLe(permVar, curPerm), error.dueTo(reasons.InsufficientPermission(loc))),
+                Assert(permLe(permVar, curPerm), error.dueTo(reasons.InsufficientPermission(loc)), 5+B3Code),
                 Nil) ++
               subtractFromMask(permVar)
           }
@@ -988,7 +988,7 @@ Nil/*B3 ADVANCED (QPerm)
           (if (perm.isInstanceOf[WildcardPerm])
             assmsToStmt(checkNonNullReceiver(loc))
           else
-            Assert(permissionPositiveInternal(permVar, Some(perm), true), error.dueTo(reasons.NegativePermission(perm))) ++
+            Assert(permissionPositiveInternal(permVar, Some(perm), true), error.dueTo(reasons.NegativePermission(perm)), 3) ++
             assmsToStmt(permissionPositiveInternal(permVar, Some(perm), false) ==> checkNonNullReceiver(loc))
           ) ++
           (if (!usingOldState) currentMaskAssignUpdate(loc, permAdd(curPerm, permVar)) else Nil)
@@ -1670,7 +1670,7 @@ Nil/*B3 ADVANCED (QPerm)
             currentMaskAssignUpdate(sil.FieldAccess(target, field)(), currentPermission(sil.FieldAccess(target, field)()) + fullPerm)
           })
         case assign@sil.FieldAssign(fa, rhs) =>
-           stmts ++ Assert(permGe(currentPermission(fa), fullPerm, true), errors.AssignmentFailed(assign).dueTo(reasons.InsufficientPermission(fa))) // add the check after the definedness checks for LHS/RHS (in heap module)
+           stmts ++ Assert(permGe(currentPermission(fa), fullPerm, true), errors.AssignmentFailed(assign).dueTo(reasons.InsufficientPermission(fa)), 2) // add the check after the definedness checks for LHS/RHS (in heap module)
         case _ =>
           //        (Nil, Nil)
           stmts
@@ -1710,11 +1710,11 @@ Nil/*B3 ADVANCED (QPerm)
       e match {
         case fa@sil.LocationAccess(_) =>
           val hasDirectPermExp = definednessStateOpt.fold(hasDirectPerm(fa))(defState => hasDirectPerm(fa, defState.setDefState))
-          Assert(hasDirectPermExp, error.dueTo(reasons.InsufficientPermission(fa)))
+          Assert(hasDirectPermExp, error.dueTo(reasons.InsufficientPermission(fa)), 0)
         case sil.PermDiv(a, b) =>
-          Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)))
+          Assert(translateExp(b) !== IntLit(0), error.dueTo(reasons.DivisionByZero(b)), 1)
         case sil.PermPermDiv(a, b) =>
-          Assert(translatePerm(b) !== RealLit(0.0), error.dueTo(reasons.DivisionByZero(b)))
+          Assert(translatePerm(b) !== RealLit(0.0), error.dueTo(reasons.DivisionByZero(b)), 1)
         case _ => Nil
       }
       ) else Nil

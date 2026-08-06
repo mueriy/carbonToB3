@@ -19,7 +19,7 @@ trait ExhaleComponent extends Component {
   /**
    * Exhale a single expression.
    */
-  def exhaleExp(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState]): Stmt = EmptyStmt
+  def exhaleExp(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState], B3Code: Int): Stmt = EmptyStmt
 
   /**
     */
@@ -36,7 +36,7 @@ trait ExhaleComponent extends Component {
     *                            state is updated (and restored) correctly.
     * @return
     */
-  def exhaleExpBeforeAfter(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState]): (() => Stmt, () => Stmt) =
-    (() => exhaleExp(e, error, definednessStateOpt), () => EmptyStmt)
+  def exhaleExpBeforeAfter(e: sil.Exp, error: PartialVerificationError, definednessStateOpt: Option[DefinednessState], B3Code: Int): (() => Stmt, () => Stmt) =
+    (() => exhaleExp(e, error, definednessStateOpt, B3Code), () => EmptyStmt)
 
 }

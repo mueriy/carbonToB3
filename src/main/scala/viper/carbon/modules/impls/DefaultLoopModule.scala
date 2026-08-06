@@ -462,7 +462,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
         //"Translate loop body"
         stmtModule.translateStmt(w.body) ++
         //"Exhale invariant"
-        executeUnfoldings(invs, (inv => errors.LoopInvariantNotPreserved(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotPreserved(e)))) ++
+        executeUnfoldings(invs, (inv => errors.LoopInvariantNotPreserved(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotPreserved(e))), B3Code = +7) ++
         //"Terminate execution"
         Assume(FalseLit())
       stateModule.replaceState(prevState)
@@ -581,7 +581,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
   private def beforeLoopHead(invs: Seq[sil.Exp], loopIdOpt: Option[Int]): Stmt = {
     //"Before loop head" + loopIdOpt.fold("")(i => Integer.toString(i)
       //"Exhale loop invariant before loop"
-      executeUnfoldings(invs, (inv => errors.LoopInvariantNotEstablished(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotEstablished(e)))
+      executeUnfoldings(invs, (inv => errors.LoopInvariantNotEstablished(inv))) ++ exhaleWithoutDefinedness(invs map (e => (e, errors.LoopInvariantNotEstablished(e))), B3Code = +8
       ) ++
       loopIdOpt.fold(Nil:Stmt)(loopId => {
         getFrame(loopId).zipWithIndex flatMap { //B3 NOTE: the field-variant-order is (/must be) the same everywhere, so this works. However, if we were to ignore unused splits in the future then we would have to ensure here that the same sets of splits is used here.

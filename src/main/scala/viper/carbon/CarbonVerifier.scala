@@ -103,6 +103,16 @@ case class CarbonVerifier(override val reporter: Reporter,
   }
   else false
 
+  def devLvl = if (config != null) config.developerLevel.toOption match {
+    case Some(lvl) => lvl
+    case None => 0
+  } else 0
+
+  def printOut = if (config != null) config.printOut.toOption match {
+    case Some(b) => b
+    case None => false
+  } else false
+
   override def usePolyMapsInEncoding =
     false //B3 NOTE: PolyMaps do not exist in B3
 
@@ -173,6 +183,13 @@ case class CarbonVerifier(override val reporter: Reporter,
     heapModule.resetFields(program, config)
     allModules map (m => m.reset())
     heapModule.enableAllocationEncoding = config == null || !config.disableAllocEncoding.isSupplied // NOTE: config == null happens on the build server / via sbt test
+
+    // set up configuration for check-replacement
+    config.checkNumbers.toOption match {
+      case Some(numbersAsString) => viper.carbon.b3.B3Nodes.checkSet = numbersAsString.toSet
+      case _ =>  viper.carbon.b3.B3Nodes.checkSet = Set.empty[Int]
+    }
+    viper.carbon.b3.B3Development.devLvl = devLvl
 
     var transformNames = false
     if (config == null) Seq() else config.counterexample.toOption match {

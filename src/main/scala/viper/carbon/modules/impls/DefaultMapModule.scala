@@ -315,8 +315,11 @@ class DefaultMapModule(val verifier: Verifier) extends MapModule with Definednes
   override def simplePartialCheckDefinednessAfter(exp: sil.Exp, error: PartialVerificationError, makeChecks: Boolean, definednessStateOpt: Option[DefinednessState]): Stmt = {
     if (makeChecks) exp match {
       case sil.MapLookup(base, key) => {
+        ADVANCED_Stmt("Map", "DMapM->simplePartialCheckDefinednessAfter")
+/*
         val containsExp = translateMapExp(sil.MapContains(key, base)(exp.pos, exp.info, exp.errT))
         Assert(containsExp, error.dueTo(reasons.MapKeyNotContained(base, key)))
+*/
       }
       case _ => EmptyStmt
     }
