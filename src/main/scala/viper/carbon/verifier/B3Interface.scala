@@ -73,7 +73,7 @@ trait B3Interface {
    * @param timeout Currently does nothing. (B3 ADVANCED)
    * @return Currently always ("?", Success), because we dont do error parsing yet
    */
-  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int]): (String,VerificationResult) = {   
+  def invokeB3(program: Program, options: Seq[String], timeout: Option[Int], printToFile: String = null): (String,VerificationResult) = {   
     // find all errors and assign everyone a unique id
     errormap = Map()
     program.visit {
@@ -100,13 +100,32 @@ trait B3Interface {
     }
     val output = outStream
 
-    //Possibly print RawAst //B3 ADVANCED: save this to a file instead of printing it to output. (Only B3's --print flag should actually print it, not carbons --print flag.)
+    // Possibly print RawAst to output (if '--printOut' was used)
     if (printOut) {
       // Show Field Mappings (when using shortened form)
       println("//Field Mappings:")
       B3Naming.printTypVarMapping
       println()
       printRawAst(rawB3Ast)
+    }
+    
+    // Possibly save RawAst-printOut to a file (if one is specified using '--print FILEPATH')
+    if(printToFile != null) {
+      val printOutStream = new ByteArrayOutputStream()
+      val newPrintOut = new PrintStream(printOutStream)
+      val oldPrintOut = System.out
+      try {
+        System.setOut(newPrintOut)
+        printRawAst(rawB3Ast)
+        newPrintOut.flush()
+      } finally {
+        System.setOut(oldPrintOut)
+      }
+      // write Boogie program to the specified file
+      val f = new File(printToFile)
+      val stream = new BufferedOutputStream(new FileOutputStream(f))
+      stream.write(B3Naming.returnTypVarMapping.getBytes ++ printOutStream.toByteArray())
+      stream.close()
     }
 
     // Print B3's output

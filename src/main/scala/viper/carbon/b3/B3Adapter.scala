@@ -659,9 +659,9 @@ object B3Nodes {
         //   ':'s, which would make it hard to find the ':' that separates the label from the expr. B3 ADVANCED: if this is used
         //   to better show errors, the label must always be correctly extracted. => Need to ensure that that is the case.
         // B3 TODO: implement a flag that enables/disables this labeling.
-        case Assert(_, _, b3Code) if checkSet.contains(b3Code) => new RawAst.Stmt_Check(LabeledExpr(showCheckError(error, id), expr).b3fy)
-        case Assert(OpExpr(And, Seq(FalseLit(), FalseLit())), _, _) => new RawAst.Stmt_Check(LabeledExpr(showError(error, id), expr).b3fy)
-        case _ => new RawAst.Stmt_Assert(LabeledExpr(showError(error, id), expr).b3fy)
+        case Assert(_, _, b3Code) if checkSet.contains(b3Code) => new RawAst.Stmt_Check(LabeledExpr(showError(error, id, B3Code), expr).b3fy)
+        case Assert(OpExpr(And, Seq(FalseLit(), FalseLit())), _, _) => new RawAst.Stmt_Check(LabeledExpr(showError(error, id, B3Code), expr).b3fy)
+        case _ => new RawAst.Stmt_Assert(LabeledExpr(showError(error, id, B3Code), expr).b3fy)
       }
     }
   }
@@ -692,14 +692,15 @@ object B3Nodes {
   }
   var checkCounter = 0
 
-  def showError(error: VerificationError, id: Int) = {
+  def showError(error: VerificationError, id: Int, b3Code: Int) = {
+    val b3CodeString = if (B3Development.SHOWB3CODES) s" ¬$b3Code" else ""
     if (devLvl >= 2) // B3 ADVANCED: maybe use a different flag than devLvl (dev) for these at some point in the future
-      s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
+      s"${error.readableMessage.replaceAll("\"", "'")}$b3CodeString [$id]"
+    else if (devLvl == 1) s"$b3CodeString [$id]"
     else s"[$id]"
   }
   def showCheckError(error: VerificationError, id: Int) = {
-    if (devLvl >= 2)
-      s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
+    if (devLvl >= 2) s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
     else s"[$id]"
   }
 
@@ -1038,6 +1039,8 @@ object B3Development {
    * the "and" of all variants is used.
    */
   val COLLECTEDMODE = true
+  /* If true, the unique code for each assert (vs check) is shown (with a '¬' symbol in front of them). */
+  val SHOWB3CODES = true
   var devLvl = 0
   val infos = mutable.Set.empty[(String, String)]
   val todos = mutable.Set.empty[(String, String)]
@@ -1387,7 +1390,8 @@ object B3Naming {
   var specialFunctionReadHeapName = Identifier("x")(Namespace("wrong", -666))
   var specialFunctionUpdateHeapName = Identifier("y")(Namespace("wrong", -666))
   var heapTypVarsToIdx: Map[Seq[B3Nodes.Type],Int] = Map()
-  def printTypVarMapping = heapTypVarsToIdx map {case (typvars, idx) => println(s"// ${idx} <-> ${(typvars map {_.b3fy}).mkString(" ")}")}
+  def returnTypVarMapping = (heapTypVarsToIdx map {case (typvars, idx) => s"// ${idx} <-> ${(typvars map {_.b3fy}).mkString(" ")}"}).mkString("\n") ++ "\n"
+  def printTypVarMapping = println(returnTypVarMapping)
   /** 
    * Returns the correct name to use for the given Identifier, args, and output Type. 
    * For non-parametric functions, this corresponds to the name defined by the Identifier.

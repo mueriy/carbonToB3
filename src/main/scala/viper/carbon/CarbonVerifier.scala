@@ -215,8 +215,9 @@ case class CarbonVerifier(override val reporter: Reporter,
 
     var timeout: Option[Int] = None
 
+    val printToFilePath = if (config == null) null else config.b3Out.toOption.getOrElse(null)
 
-    val invokeResult = invokeB3(_translated, options, timeout)
+    val invokeResult = invokeB3(_translated, options, timeout, printToFilePath)
 
     val t2 = System.currentTimeMillis()
     println(t2-t)

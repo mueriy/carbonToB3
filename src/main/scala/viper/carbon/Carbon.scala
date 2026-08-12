@@ -162,6 +162,12 @@ class CarbonConfig(args: Seq[String]) extends SilFrontendConfig(args, "Carbon") 
     noshort = true
   )
 
+  val b3Out = opt[String]("print",
+    descr = "Write the B3 program printout to the provided filename (default: none)",
+    default = None,
+    noshort = true
+  )
+
   // B3 ADVANCED: clean up these config option & add other options (e.g. whether names should be shortened to a number or not ("HeapType%%NormalField%Ref" vs "HeapType%%0"))
 
 
