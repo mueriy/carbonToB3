@@ -53,23 +53,41 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   }
 
   override def preamble: Seq[Decl] = {
-    registerFunction(Identifier(isGoodState), Seq(0))
+    if (COLLECTEDMODE) {
+      Function(Identifier(isGoodState), (heapModule.allFieldsTypVars map {staticStateContributions(_)}).transpose.flatten, Bool) ++
+      {
+        val prevState = stateModule.state
+        stateModule.replaceState(stateModule.pureState)
+        
+        // TODO: It would be great if we could use StateModule.currentStateContributionValues, but that will not
+        // give us the pure state (see comment there). Once that is fixed, this should be changed accordingly.
+        val stateExps = (components map (_.currentStateExps)).flatten
+        stateModule.replaceState(prevState)
+        
+        // These axioms correspond to the B3 expressions "state(dummyHeap, emptyMask)" of a specific Field version,
+        // which is necessary since function definitional axioms trigger on "state(heap, mask), f(heap, args)",
+        // so without this assumption, function calls with dummyHeap and emptyMask won't trigger the definition.
+        Axiom(FunctionCallExpr(Identifier(isGoodState), stateExps, Bool))
+      }
+    } else {
+      registerFunction(Identifier(isGoodState), Seq(0))
 
-    (heapModule.allFieldsTypVars map {ftvars => Function(Identifier(isGoodState), staticStateContributions(ftvars), Bool)}) ++
-    {
-      val prevState = stateModule.state
-      stateModule.replaceState(stateModule.pureState)
-      
-      // TODO: It would be great if we could use StateModule.currentStateContributionValues, but that will not
-      // give us the pure state (see comment there). Once that is fixed, this should be changed accordingly.
-      val stateExps = components flatMap (_.currentStateExps)
-      val groupedStateExps = groupByFieldSeq(stateExps)
-      stateModule.replaceState(prevState)
-      
-      // These axioms correspond to the B3 expressions "state(dummyHeap, emptyMask)" of a specific Field version,
-      // which is necessary since function definitional axioms trigger on "state(heap, mask), f(heap, args)",
-      // so without this assumption, function calls with dummyHeap and emptyMask won't trigger the definition.
-      groupedStateExps map {stateExpVariant => Axiom(FunctionCallExpr(Identifier(isGoodState), stateExpVariant, Bool))}
+      (heapModule.allFieldsTypVars map {ftvars => Function(Identifier(isGoodState), staticStateContributions(ftvars), Bool)}) ++
+      {
+        val prevState = stateModule.state
+        stateModule.replaceState(stateModule.pureState)
+        
+        // TODO: It would be great if we could use StateModule.currentStateContributionValues, but that will not
+        // give us the pure state (see comment there). Once that is fixed, this should be changed accordingly.
+        val stateExps = components flatMap (_.currentStateExps)
+        val groupedStateExps = groupByFieldSeq(stateExps)
+        stateModule.replaceState(prevState)
+        
+        // These axioms correspond to the B3 expressions "state(dummyHeap, emptyMask)" of a specific Field version,
+        // which is necessary since function definitional axioms trigger on "state(heap, mask), f(heap, args)",
+        // so without this assumption, function calls with dummyHeap and emptyMask won't trigger the definition.
+        groupedStateExps map {stateExpVariant => Axiom(FunctionCallExpr(Identifier(isGoodState), stateExpVariant, Bool))}
+      }
     }
   }
 
@@ -141,10 +159,17 @@ class DefaultStateModule(val verifier: Verifier) extends StateModule {
   def staticGoodState(ftvars: Seq[Type]): Expr = {
     FunctionCallExpr(Identifier(isGoodState), staticStateContributions(ftvars), Bool)
   }
+  def staticGoodState: Expr = {
+    FunctionCallExpr(Identifier(isGoodState), (heapModule.allFieldsTypVars map {staticStateContributions(_)}).transpose.flatten, Bool)
+  }
 
   def currentGoodState: Seq[Expr] = {
-    val groupedVals = groupByFieldSeq(currentStateContributionValues)
-    groupedVals map {FunctionCallExpr(Identifier(isGoodState), _, Bool)}
+    if (COLLECTEDMODE) {
+      FunctionCallExpr(Identifier(isGoodState), currentStateContributionValues, Bool)
+    } else {
+      val groupedVals = groupByFieldSeq(currentStateContributionValues)
+      groupedVals map {FunctionCallExpr(Identifier(isGoodState), _, Bool)}
+    }
   }
 
   private lazy val stateRepository = new mutable.HashMap[String, StateSnapshot]()

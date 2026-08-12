@@ -1032,6 +1032,12 @@ object B3Nodes {
 
 /** For development purposes */
 object B3Development {
+  /** 
+   * If true, the state and GoodMask functions contain all splits, otherwise 
+   * they contain only a single split each, which means that in some places
+   * the "and" of all variants is used.
+   */
+  val COLLECTEDMODE = true
   var devLvl = 0
   val infos = mutable.Set.empty[(String, String)]
   val todos = mutable.Set.empty[(String, String)]

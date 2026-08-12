@@ -95,7 +95,7 @@ class QuantifiedPermModule(val verifier: Verifier)
   private val permDivName = Identifier("PermDiv")
 */
   private val permConstructName = Identifier("Perm")
-  private def goodMaskName(ftvars: Seq[Type]) = Identifier(addFieldMark("GoodMask", ftvars))
+  private val goodMaskName = Identifier("GoodMask")
   private val hasDirectPermName = Identifier("HasDirectPerm")
 /*
   private val predicateMaskFieldName = Identifier("PredicateMaskField")
@@ -202,25 +202,48 @@ class QuantifiedPermModule(val verifier: Verifier)
         Nil
       }) ++
       (if (verifier.respectFunctionPrecPermAmounts) Nil else Seq(ConstDecl(assumePermUpperBoundName, Bool))) ++
-      (allFieldsTypVars flatMap {ftvar =>
-        // good mask
-        Function(goodMaskName(ftvar), FParameter(maskName(ftvar), maskType(ftvar)), Bool) ++
-        Axiom(Forall((stateModule.staticStateContributions(ftvar) map {_.toQ}),
-          Pattern(staticGoodState(ftvar)),
-          staticGoodState(ftvar) ==> staticGoodMask(ftvar)))
+      (if (COLLECTEDMODE) {
+        Function(goodMaskName, allFieldsTypVars map {ftvar => FParameter(maskName(ftvar), maskType(ftvar))}, Bool) ++
+        Axiom(Forall((allFieldsTypVars flatMap {ftvar2 => stateModule.staticStateContributions(ftvar2) map {_.toQ}}),
+          Pattern(staticGoodState),
+          staticGoodState ==> staticGoodMask
+        ))
+      } else {
+        (allFieldsTypVars flatMap {ftvar =>
+          // good mask
+          Function(goodMaskName, FParameter(maskName(ftvar), maskType(ftvar)), Bool) ++
+          Axiom(Forall((allFieldsTypVars flatMap {ftvar2 => stateModule.staticStateContributions(ftvar2) map {_.toQ}}),
+            Pattern(staticGoodState),
+            staticGoodState ==> staticGoodMask(ftvar)))
+        })
       }) ++ 
-      {allFieldsTypVars flatMap {ftvar =>
-        val perm = currentPermission(obj.l, field(ftvar).l)
-        val shouldAssumePermUpperBound = if (verifier.respectFunctionPrecPermAmounts) TrueLit() else assumePermUpperBound
-        Axiom(Forall((staticStateContributions(ftvar, true, true) map {_.toQ}) ++ obj ++ field(ftvar),
-          Pattern(Seq(staticGoodMask(ftvar), perm)),
-          // permissions are non-negative
-          (staticGoodMask(ftvar) ==> ( perm >= noPerm &&
-            // permissions for fields which aren't predicates or wands are smaller than 1
-            ((staticGoodMask(ftvar) && shouldAssumePermUpperBound 
-/* B3 LATER/ADVANCED (predicate/wand): && heapModule.isPredicateField(field.l).not && heapModule.isWandField(field.l).not */
-              ) ==> perm <= fullPerm )))
-      ))}} ++ 
+      (if (COLLECTEDMODE) {
+          allFieldsTypVars flatMap {ftvar =>
+          val perm = currentPermission(obj.l, field(ftvar).l)
+          val shouldAssumePermUpperBound = if (verifier.respectFunctionPrecPermAmounts) TrueLit() else assumePermUpperBound
+          Axiom(Forall((allFieldsTypVars flatMap {ftvar2 => staticStateContributions(ftvar2, true, true) map {_.toQ}}) ++ obj ++ field(ftvar),
+            Pattern(Seq(staticGoodMask, perm)),
+            // permissions are non-negative
+            (staticGoodMask ==> ( perm >= noPerm &&
+              // permissions for fields which aren't predicates or wands are smaller than 1
+              ((staticGoodMask && shouldAssumePermUpperBound 
+  /* B3 LATER/ADVANCED (predicate/wand): && heapModule.isPredicateField(field.l).not && heapModule.isWandField(field.l).not */
+                ) ==> perm <= fullPerm )))
+        ))}
+      } else {
+        {allFieldsTypVars flatMap {ftvar =>
+          val perm = currentPermission(obj.l, field(ftvar).l)
+          val shouldAssumePermUpperBound = if (verifier.respectFunctionPrecPermAmounts) TrueLit() else assumePermUpperBound
+          Axiom(Forall((staticStateContributions(ftvar, true, true) map {_.toQ}) ++ obj ++ field(ftvar),
+            Pattern(Seq(staticGoodMask(ftvar), perm)),
+            // permissions are non-negative
+            (staticGoodMask(ftvar) ==> ( perm >= noPerm &&
+              // permissions for fields which aren't predicates or wands are smaller than 1
+              ((staticGoodMask(ftvar) && shouldAssumePermUpperBound 
+  /* B3 LATER/ADVANCED (predicate/wand): && heapModule.isPredicateField(field.l).not && heapModule.isWandField(field.l).not */
+                ) ==> perm <= fullPerm )))
+        ))}}
+      }) ++ 
       {allFieldsTypVars flatMap {ftvar =>
         val args = staticMask(ftvar) ++ Seq(obj, field(ftvar))
         val funcApp = FunctionCallExpr(hasDirectPermName, args map (_.l), Bool)
@@ -316,7 +339,8 @@ Nil/*B3 ADVANCED (QPerm)
   }
 */
 
-  def staticGoodMask(ftvars: Seq[Type]) = FunctionCallExpr(goodMaskName(ftvars), IdExpr(maskName(ftvars), maskType(ftvars)), Bool)
+  def staticGoodMask(ftvars: Seq[Type]) = FunctionCallExpr(goodMaskName, IdExpr(maskName(ftvars), maskType(ftvars)), Bool)
+  def staticGoodMask = FunctionCallExpr(goodMaskName, allFieldsTypVars map {ftvars => IdExpr(maskName(ftvars), maskType(ftvars))}, Bool)
 
   private def permAdd(a: Expr, b: Expr): Expr = a + b
   private def permSub(a: Expr, b: Expr): Expr = a - b

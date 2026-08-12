@@ -27,6 +27,11 @@ trait StateModule extends Module with ComponentRegistry[CarbonStateComponent] wi
    * Returns a static invocation of the 'is good state' function with the arguments from
    * `stateContributions`.
    */
+  def staticGoodState: Expr
+  /**
+   * Returns a static invocation of the 'is good state' function with the arguments from
+   * `stateContributions`. (Only for the given field variant)
+   */
   def staticGoodState(ftvars: Seq[Type]): Expr
 
   /**

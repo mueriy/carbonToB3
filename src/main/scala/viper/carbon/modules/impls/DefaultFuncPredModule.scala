@@ -341,12 +341,21 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
     }
 */
 
-    Axiom(Forall(
-      ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ args) map {_.toQ},
-      Seq(Pattern((allFieldsTypVars flatMap staticGoodState) ++ fapp)) /*B3 LATER (predicates): ++ (if (!usePredicateTriggers || predicateTriggers.isEmpty) Seq()  else Seq(Trigger(Seq(staticGoodState, triggerFuncStatelessApp(f,args map (_.l))) ++ predicateTriggers))) */,
-      (andAll(allFieldsTypVars flatMap staticGoodState) && assumeFunctionsAbove(height)) ==>
-        (precondition ==> (fapp === body))
-    ))
+    if (COLLECTEDMODE) {
+      Axiom(Forall(
+        ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ args) map {_.toQ},
+        Seq(Pattern(staticGoodState ++ fapp)) /*B3 LATER (predicates): ++ (if (!usePredicateTriggers || predicateTriggers.isEmpty) Seq()  else Seq(Trigger(Seq(staticGoodState, triggerFuncStatelessApp(f,args map (_.l))) ++ predicateTriggers))) */,
+        (staticGoodState && assumeFunctionsAbove(height)) ==>
+          (precondition ==> (fapp === body))
+      ))
+    } else {
+      Axiom(Forall(
+        ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ args) map {_.toQ},
+        Seq(Pattern((allFieldsTypVars flatMap {staticGoodState(_)}) ++ fapp)) /*B3 LATER (predicates): ++ (if (!usePredicateTriggers || predicateTriggers.isEmpty) Seq()  else Seq(Trigger(Seq(staticGoodState, triggerFuncStatelessApp(f,args map (_.l))) ++ predicateTriggers))) */,
+        (andAll(allFieldsTypVars flatMap {staticGoodState(_)}) && assumeFunctionsAbove(height)) ==>
+          (precondition ==> (fapp === body))
+      ))
+    }
   }
 
   private def transformFuncAppsToLimitedForm(exp: Expr, heightToSkip : Int = -1): Expr =  transformFuncAppsToLimitedOrTriggerForm(exp, heightToSkip, false)
@@ -414,13 +423,20 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
             (e transform resultToFapp),tvs,w))
       }
       val bPost = translatedPost transform resultToFapp
-      val allStaticGoodStates = heapModule.allFieldsTypVars map {staticGoodState(_)}
+      val allStaticGoodStates: Seq[Expr] = if (COLLECTEDMODE) staticGoodState else { heapModule.allFieldsTypVars map {staticGoodState(_)} }
       val allStaticStateContributionsStateModule = heapModule.allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}
-      val allStaticStateContributionsHeapModule = heapModule.allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}
-      Axiom(Forall(
-        (allStaticStateContributionsStateModule ++ args) map {_.toQ},
-        Pattern((allStaticGoodStates ++ limitedFapp)),
-        (andAll(allStaticGoodStates) && (assumeFunctionsAbove(height) || triggerFuncApp(f, allStaticStateContributionsHeapModule map (_.l), args map (_.l)))) ==> (precondition ==> transformFuncAppsToLimitedForm(bPost, height))))
+      val allStaticStateContributionsHeapModule = heapModule.allFieldsTypVars flatMap {heapModule.staticStateContributions(_, true, true)}
+      if (COLLECTEDMODE) {
+        Axiom(Forall(
+          (allStaticStateContributionsStateModule ++ args) map {_.toQ},
+          Pattern((staticGoodState ++ limitedFapp)),
+          (staticGoodState && (assumeFunctionsAbove(height) || triggerFuncApp(f, allStaticStateContributionsHeapModule map (_.l), args map (_.l)))) ==> (precondition ==> transformFuncAppsToLimitedForm(bPost, height))))
+      } else {
+        Axiom(Forall(
+          (allStaticStateContributionsStateModule ++ args) map {_.toQ},
+          Pattern((allStaticGoodStates ++ limitedFapp)),
+          (andAll(allStaticGoodStates) && (assumeFunctionsAbove(height) || triggerFuncApp(f, allStaticStateContributionsHeapModule map (_.l), args map (_.l)))) ==> (precondition ==> transformFuncAppsToLimitedForm(bPost, height))))
+      }
     }
   }
 
@@ -470,11 +486,19 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
 */
 
     addADVANCED("QPerm", "DFPM->framingAxiom")
-    Seq(func) ++
-      Seq(Axiom(Forall(
-        ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ realArgs) map {_.toQ},
-        Seq(Pattern((allFieldsTypVars map staticGoodState) ++ transformFuncAppsToLimitedForm(funcApp2))) /* B3 LATER (predicates): ++ (if (predicateTriggers.isEmpty) Seq()  else Seq(Pattern(Seq(staticGoodState, triggerFuncStatelessApp(f,realArgs map (_.l))) ++ predicateTriggers))) */,
-        andAll(allFieldsTypVars map staticGoodState) ==> (transformFuncAppsToLimitedForm(funcApp2) === funcApp))) ) 
+    if (COLLECTEDMODE) {
+      Seq(func) ++
+        Seq(Axiom(Forall(
+          ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ realArgs) map {_.toQ},
+          Seq(Pattern(staticGoodState ++ transformFuncAppsToLimitedForm(funcApp2))) /* B3 LATER (predicates): ++ (if (predicateTriggers.isEmpty) Seq()  else Seq(Pattern(Seq(staticGoodState, triggerFuncStatelessApp(f,realArgs map (_.l))) ++ predicateTriggers))) */,
+          staticGoodState ==> (transformFuncAppsToLimitedForm(funcApp2) === funcApp))) ) 
+    } else {
+      Seq(func) ++
+        Seq(Axiom(Forall(
+          ((allFieldsTypVars flatMap {stateModule.staticStateContributions(_)}) ++ realArgs) map {_.toQ},
+          Seq(Pattern((allFieldsTypVars map staticGoodState) ++ transformFuncAppsToLimitedForm(funcApp2))) /* B3 LATER (predicates): ++ (if (predicateTriggers.isEmpty) Seq()  else Seq(Pattern(Seq(staticGoodState, triggerFuncStatelessApp(f,realArgs map (_.l))) ++ predicateTriggers))) */,
+          andAll(allFieldsTypVars map staticGoodState) ==> (transformFuncAppsToLimitedForm(funcApp2) === funcApp))) ) 
+    }
 /* B3 ADVANCED (QPerm): ++
       translateCondAxioms("function "+f.name, f.formalArgs, funcFrameInfo._2)
 */
