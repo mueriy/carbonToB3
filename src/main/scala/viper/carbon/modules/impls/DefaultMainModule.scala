@@ -311,13 +311,10 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
   }
 
   def translateDomainDecl(d: sil.Domain): Seq[Decl] = {
-    addLATER("domains", "Main: translateDomainDecl"); Seq()
-/*
     env = Environment(verifier, d)
     val res = translateDomain(d)
     env = null
     res
-*/
   }
 
   /***

@@ -82,7 +82,7 @@ class DefaultLoopModule(val verifier: Verifier) extends LoopModule with StmtComp
       ))
 
     if(hasGotos) {
-      sys.error("initializeMethod -> has goto stms!?!?")
+      sys.error("B3 ADVANCED: initializeMethod -> has goto stms, which is not yet supported")
 /*
       usedLoopDetectorOnce = true
       useLoopDetector = true

@@ -151,7 +151,7 @@ class CarbonConfig(args: Seq[String]) extends SilFrontendConfig(args, "Carbon") 
   )
 
   val developerLevel = opt[Int]("dev",
-    descr = "The amount of development information shown. (0 = none, 1 = some (allows running B3 on printed code without changes), 2 = reserve, 3 = all)",
+    descr = "The amount of development information shown. (0 = none, 1 = some (allows running B3 on the printed code after removing all '['s and ']'s), 2 = reserve, 3 = all)",
     default = Some(3),
     noshort = true
   )

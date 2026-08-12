@@ -279,7 +279,7 @@ class DefaultExpModule(val verifier: Verifier) extends ExpModule with Definednes
       case fa@sil.FuncApp(_, _) =>
         translateFuncApp(fa)
       case fa@sil.DomainFuncApp(_, _, _) =>
-        LATER_Expr_bool("domains", "translateExp->DomainFuncApp")//translateDomainFuncApp(fa)
+        translateDomainFuncApp(fa)
       case fa@sil.BackendFuncApp(_, _) =>
         ADVANCED_Expr_bool("Backend", "translateExp->sil.BackendFuncApp")
 /*         

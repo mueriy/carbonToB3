@@ -1010,7 +1010,7 @@ class DefaultHeapModule(val verifier: Verifier)
    * after verifier gets a new program.
    */
   override def reset() = {
-    addADVANCED("predicates", "DHeapM->reset")
+    addLATER("predicates", "DHeapM->reset")
 /*
     PredIdMap = Map()
     NextPredicateId = 0
