@@ -42,7 +42,6 @@ class DefaultDomainModule(val verifier: Verifier) extends DomainModule with Stat
     val as = domain.axioms flatMap translateDomainAxiom
     //s"The type for domain ${domain.name}"
     val ts = TypeDecl(NamedType(this.outputName(domain) , domain.typVars map (tv => TypeVar(tv.name))))
-    println(ts)
     stateModule.replaceState(prevState)
     //s"Translation of domain ${domain.name}"
     ts ++ fs ++ as

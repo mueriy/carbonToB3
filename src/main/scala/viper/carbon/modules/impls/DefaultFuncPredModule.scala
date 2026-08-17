@@ -112,13 +112,11 @@ with DefinednessComponent with ExhaleComponent with InhaleComponent {
       //"Declarations for function framing"
       TypeDecl(frameType) ++ 
       ConstDecl(emptyFrameName, frameType) ++ 
-/* B3 LATER (predicates): [needs fucntion concretization system]
       { registerFunction(frameFragmentName, Seq(0))
         // Since the frame fragment may or may not be used, it makes more sense to create it parametrically and concretizing
         //  it later. This can never cause initiation loops, as it is not used in any axioms because we use 'injective' instead.
         Function(frameFragmentName, Seq(FParameter(Identifier("t"), TypeVar("T"), true)), frameType)
       } ++
-*/
       Function(condFrameName, Seq(FParameter(Identifier("p"), permType), FParameter(Identifier("f"), frameType)), frameType) ++
       { registerFunction(dummyTriggerName, Seq(0))
         // Now we can directly define and return the concrete versions

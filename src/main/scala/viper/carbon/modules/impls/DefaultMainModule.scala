@@ -127,7 +127,8 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
         val b3domains: Seq[Domain] = declCollection collect {case m: Domain => m} 
         val b3types: Seq[TypeDecl] = declCollection collect {case m: TypeDecl => m} 
         val b3taggers: Seq[Tagger] = declCollection collect {case m: Tagger => m} 
-        val b3functions: Seq[Function] = declCollection collect {case m: Function => m} 
+        val b3functions: Seq[Function] = declCollection collect {case m: Function if m.isPure => m}
+        val b3functionsImpure: Seq[Function] = declCollection collect {case m: Function if !m.isPure => m} 
         val b3axioms: Seq[Axiom] = declCollection collect {case m: Axiom => m} 
         val b3procedures: Seq[Procedure] = declCollection collect {case m: Procedure => m} 
         
@@ -135,7 +136,24 @@ class DefaultMainModule(val verifier: Verifier) extends MainModule with Stateles
           sys.error("bad declCollection is the bug")
         }
 
-        Program(b3signatureTypes, b3domains, b3types, b3taggers, b3functions, b3axioms, b3procedures)
+        // Concretizing impure functions
+        // B3 ADVANCED: maybe support concretizing functions with bodies and taggers (might not be needed)
+        // B3 ADVANCED: concretizing axioms (and back and forth between function and axiom concretization)
+        val concretizedB3Functions = b3functionsImpure flatMap {func => 
+          val functionVersions = collection.mutable.Set[(Seq[Type], Type)]()
+          declCollection map {_.visit(
+            {case fc: FunctionCallExpr if fc.name == func.name => functionVersions += (((fc.args map {_.typ}), fc.typ))}
+          )}
+          functionVersions.toSeq map {case (argtypes, outTyp) => 
+            val newArgs = (argtypes zip func.args) map {
+              // B3 NOTE: we create a new Identifier here to avoid an error that happens in some situations when the same Identifier is used with two different types
+              case (typ, oldarg) => FParameter(Identifier(oldarg.name.name), typ, oldarg.isInjective)
+            }
+            Function(func.name, newArgs, outTyp)
+          }
+        }
+
+        Program(b3signatureTypes, b3domains, b3types, b3taggers, b3functions++concretizedB3Functions, b3axioms, b3procedures)
     }
 
     (output.optimized.asInstanceOf[Program], nameMaps.map(e => e._1 -> e._2.toMap))

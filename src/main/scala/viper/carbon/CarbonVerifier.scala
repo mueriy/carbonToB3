@@ -220,7 +220,7 @@ case class CarbonVerifier(override val reporter: Reporter,
     val invokeResult = invokeB3(_translated, options, timeout, printToFilePath)
 
     val t2 = System.currentTimeMillis()
-    println(t2-t)
+    println(f"RUNTIME: ${t2-t} ms")
 
     invokeResult match {
       case (version,result) =>

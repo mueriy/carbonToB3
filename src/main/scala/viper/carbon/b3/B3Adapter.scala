@@ -402,7 +402,7 @@ object B3Nodes {
                           daf(body map {_.b3fy}))
     }
     def functionName: String = funcName(this)
-    def isPure: Boolean = typ.freeTypeVars.size == 0
+    def isPure: Boolean = (args flatMap {_.typ.freeTypeVars}).size + typ.freeTypeVars.size == 0
   }
 
   /** Scala representation of a B3 RawAst FParameter node (a function parameter) */

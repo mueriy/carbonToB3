@@ -184,6 +184,8 @@ trait B3Interface {
       errormap += (otherErrId -> internalError)
     }
 
+    val precollection = collection.mutable.ListBuffer[String]()
+
     var ignoreNonVerification = true
     for (l <- output.linesIterator) {
       // B3 ADVANCED: add cases for errors in B3 (e.g. if some type/function/... is not declared)
@@ -191,7 +193,8 @@ trait B3Interface {
         case CurrentProcedurePattern(n) =>
           ignoreNonVerification = false
           procName = n
-        case _ if ignoreNonVerification => //ignore everything before verification begins (e.g. printout of program)
+        case s if ignoreNonVerification => //ignore everything before verification begins (e.g. printout of program)
+          precollection += s
         case ErrorPattern(id) =>
           errors += id.toInt
         case AlternativePattern(_) =>
@@ -201,6 +204,7 @@ trait B3Interface {
           unexpected(s"Found an unparsable output from B3: $l")
       }
     }
+    if (ignoreNonVerification) unexpected(s"No method (/procedure) verified; either no method (/procedure) exists, or other problem such as parsing error. This was the only output: $precollection")
     (version_found,errors.toSeq)
   }
 }
