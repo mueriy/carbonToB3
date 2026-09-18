@@ -468,7 +468,7 @@ object B3Nodes {
             val allPatternResults = patterns map {case Pattern(pExprs) => (pExprs map {expr => funcName(expr.asInstanceOf[FunctionCallExpr])}).toSet}
             allPatternResults.reduce(_ intersect _).toSeq
         }
-        case _ => B3Development.addADVANCED("axiomExplanations", "Only axioms with a 'forall'-expression as body are currently supported"); Seq()
+        case _ => B3Development.addADVANCED("axiomExplanations", "Auto-generation of 'explains' is currently only supported for axioms with a 'forall'-expression as body."); Seq()
       }
     }
   }
@@ -695,13 +695,13 @@ object B3Nodes {
   def showError(error: VerificationError, id: Int, b3Code: Int) = {
     val b3CodeString = if (B3Development.SHOWB3CODES) s" ¬$b3Code" else ""
     if (devLvl >= 2) // B3 ADVANCED: maybe use a different flag than devLvl (dev) for these at some point in the future
-      s"${error.readableMessage.replaceAll("\"", "'")}$b3CodeString [$id]"
-    else if (devLvl == 1) s"$b3CodeString [$id]"
-    else s"[$id]"
+      s"${error.readableMessage.replaceAll("\"", "'")}$b3CodeString %$id%"
+    else if (devLvl == 1) s"$b3CodeString %$id%"
+    else s"%$id%"
   }
   def showCheckError(error: VerificationError, id: Int) = {
-    if (devLvl >= 2) s"${error.readableMessage.replaceAll("\"", "'")} [$id]"
-    else s"[$id]"
+    if (devLvl >= 2) s"${error.readableMessage.replaceAll("\"", "'")} %$id%"
+    else s"%$id%"
   }
 
   /** (not documented enough to use) */

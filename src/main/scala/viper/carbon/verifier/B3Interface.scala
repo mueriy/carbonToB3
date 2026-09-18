@@ -169,7 +169,7 @@ trait B3Interface {
   private def parse(output: String): (String, Seq[Int]) = {
     // val LogoPattern = "Boogie program verifier version ([0-9.]+),.*".r
     // val SummaryPattern = "Boogie program verifier finished with ([0-9]+) verified, ([0-9]+) error.*".r
-    val ErrorPattern = ".+ \\[([0-9]+)\\]: .+".r
+    val ErrorPattern = ".+ %([0-9]+)%: .+".r
     val CurrentProcedurePattern = "Verifying (.+) ...".r
     val AlternativePattern = "  choose alternative ([0-9]+)".r
     val errors = collection.mutable.ListBuffer[Int]()
