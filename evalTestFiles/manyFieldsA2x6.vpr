@@ -1,0 +1,24 @@
+field fint0: Int
+field fint1: Int
+field fint2: Int
+field fint3: Int
+field fint4: Int
+field fint5: Int
+
+
+method swapInts(a: Ref, b: Ref)
+  requires acc(a.fint0, write) && acc(b.fint0, write)
+  requires acc(a.fint1, write) && acc(b.fint1, write)
+  requires acc(a.fint2, write) && acc(b.fint2, write)
+  requires acc(a.fint3, write) && acc(b.fint3, write)
+  requires acc(a.fint4, write) && acc(b.fint4, write)
+  requires acc(a.fint5, write) && acc(b.fint5, write)
+  requires a != b
+  ensures acc(a.fint0, write) && acc(b.fint0, write)
+  ensures acc(a.fint1, write) && acc(b.fint1, write)
+  ensures acc(a.fint2, write) && acc(b.fint2, write)
+  ensures acc(a.fint3, write) && acc(b.fint3, write)
+  ensures acc(a.fint4, write) && acc(b.fint4, write)
+  ensures acc(a.fint5, write) && acc(b.fint5, write)
+{
+}

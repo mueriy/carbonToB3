@@ -1,0 +1,206 @@
+field f: Int
+
+method swap(a: Ref, b: Ref)
+  requires acc(a.f, write) && acc(b.f, write)
+  requires a != b
+  ensures acc(a.f, write) && acc(b.f, write)
+  ensures b.f == old(a.f) && a.f == old(b.f)
+{
+  var tmp: Int
+  tmp := a.f
+  a.f := b.f
+  b.f := tmp
+}
+
+method client()
+{
+  var x: Ref
+  var y: Ref
+  var z: Ref
+  x := new(f)
+  y := new(f)
+  x.f := 3
+  y.f := 4
+  swap(x, y)
+  assert x.f == 4
+  assert y.f == 3
+  z := x
+}
+
+
+method f0_1(v0_0: Int) returns (value: Int)
+  requires 0 <= v0_0 && v0_0 < 10
+{
+  value := v0_0
+}
+
+method f1_1() returns (value: Int)
+{
+  var x_11: Int
+  x_11 := f1_2()
+  value := x_11
+}
+
+method f2_1() returns (value: Int)
+{
+  var x_24: Int
+  x_24 := f1_1()
+  value := x_24
+}
+
+method f3_1() returns (value: Int)
+{
+  var x_38: Int
+  x_38 := f2_1()
+  value := x_38
+}
+
+method f4_1() returns (value: Int)
+{
+  var x_53: Int
+  x_53 := f3_1()
+  value := x_53
+}
+
+method f0_2() returns (value: Int)
+{
+  var x_54: Int
+  var x_55: Int
+  inhale 0 <= x_54
+  inhale x_54 < 10
+  x_55 := f0_1(x_54)
+  value := x_55
+}
+
+method f1_2() returns (value: Int)
+{
+  var x_66: Int
+  x_66 := f2_2()
+  value := x_66
+}
+
+method f2_2() returns (value: Int)
+{
+  var x_76: Int
+  x_76 := f3_2()
+  value := x_76
+}
+
+method f3_2() returns (value: Int)
+{
+  var x_85: Int
+  x_85 := f3_3()
+  value := x_85
+}
+
+method f4_2() returns (value: Int)
+{
+  var x_101: Int
+  x_101 := f4_1()
+  value := x_101
+}
+
+method f0_3() returns (value: Int)
+{
+  var x_104: Int
+  x_104 := f0_2()
+  value := x_104
+}
+
+method f1_3() returns (value: Int)
+{
+  var x_108: Int
+  x_108 := f0_3()
+  value := x_108
+}
+
+method f2_3() returns (value: Int)
+{
+  var x_113: Int
+  x_113 := f1_3()
+  value := x_113
+}
+
+method f3_3() returns (value: Int)
+{
+  var x_121: Int
+  x_121 := f3_4()
+  value := x_121
+}
+
+method f4_3() returns (value: Int)
+{
+  var x_138: Int
+  x_138 := f4_2()
+  value := x_138
+}
+
+method f0_4() returns (value: Int)
+{
+  var x_142: Int
+  x_142 := f0_3()
+  value := x_142
+}
+
+method f1_4() returns (value: Int)
+{
+  var x_147: Int
+  x_147 := f0_4()
+  value := x_147
+}
+
+method f2_4() returns (value: Int)
+{
+  var x_153: Int
+  x_153 := f2_3()
+  value := x_153
+}
+
+method f3_4() returns (value: Int)
+{
+  var x_160: Int
+  x_160 := f2_4()
+  value := x_160
+}
+
+method f4_4() returns (value: Int)
+{
+  var x_178: Int
+  x_178 := f4_3()
+  value := x_178
+}
+
+method f0_5() returns (value: Int)
+{
+  var x_185: Int
+  x_185 := f1_5()
+  value := x_185
+}
+
+method f1_5() returns (value: Int)
+{
+  var x_191: Int
+  x_191 := f1_4()
+  value := x_191
+}
+
+method f2_5() returns (value: Int)
+{
+  var x_198: Int
+  x_198 := f2_4()
+  value := x_198
+}
+
+method f3_5() returns (value: Int)
+{
+  var x_218: Int
+  x_218 := f4_5()
+  value := x_218
+}
+
+method f4_5() returns (value: Int)
+{
+  var x_237: Int
+  x_237 := f4_4()
+  value := x_237
+}

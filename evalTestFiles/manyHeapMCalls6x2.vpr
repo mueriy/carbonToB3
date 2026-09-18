@@ -1,0 +1,19 @@
+field f1: Int
+field f2: Int
+  
+method m2(x: Ref)
+  requires acc(x.f1) && acc(x.f2)
+  ensures acc(x.f1) && acc(x.f2)
+
+method main(x: Ref, z: Ref)
+  requires acc(x.f1) && acc(x.f2)
+  requires acc(z.f1) && acc(z.f2)
+{
+  m2(x)
+  m2(x)
+  m2(x)
+  m2(x)
+  m2(x)
+  
+  m2(z)
+}

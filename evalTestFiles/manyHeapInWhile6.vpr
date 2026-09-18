@@ -1,0 +1,63 @@
+field fint0: Int
+field fint1: Int
+field fint2: Int
+field fint3: Int
+field fint4: Int
+field fint5: Int
+// field fint6: Int
+// field fint7: Int
+// field fint8: Int
+// field fint9: Int
+// field fint10: Int
+// field fint11: Int
+// field fint12: Int
+// field fint13: Int
+// field fint14: Int
+// field fint15: Int
+// field fint16: Int
+// field fint17: Int
+// field fint18: Int
+// field fint19: Int
+
+
+method foo2(x: Ref)
+  requires acc(x.fint0)
+  requires acc(x.fint1)
+  requires acc(x.fint2)
+  requires acc(x.fint3)
+  requires acc(x.fint4)
+  requires acc(x.fint5)
+  // requires acc(x.fint6)
+  // requires acc(x.fint7)
+  // requires acc(x.fint8)
+  // requires acc(x.fint9)
+  // requires acc(x.fint10)
+  // requires acc(x.fint11)
+  // requires acc(x.fint12)
+  // requires acc(x.fint13)
+  // requires acc(x.fint14)
+  // requires acc(x.fint15)
+{
+  var i: Int := 1
+  while (i != 0)
+    invariant i >= 0
+    invariant acc(x.fint0)
+    invariant acc(x.fint1)
+    invariant acc(x.fint2)
+    invariant acc(x.fint3)
+    invariant acc(x.fint4)
+    invariant acc(x.fint5)
+    // invariant acc(x.fint6)
+    // invariant acc(x.fint7)
+    // invariant acc(x.fint8)
+    // invariant acc(x.fint9)
+    // invariant acc(x.fint10)
+    // invariant acc(x.fint11)
+    // invariant acc(x.fint12)
+    // invariant acc(x.fint13)
+    // invariant acc(x.fint14)
+    // invariant acc(x.fint15)
+    { i := i - 1}
+  assert i == 0
+  assert false
+}

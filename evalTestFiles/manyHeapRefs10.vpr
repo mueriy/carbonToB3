@@ -1,0 +1,77 @@
+field fint0: Int
+
+method foo2() returns (x0: Ref, 
+                       x1: Ref, 
+                       x2: Ref, 
+                       x3: Ref, 
+                       x4: Ref, 
+                       x5: Ref, 
+                       x6: Ref, 
+                       x7: Ref, 
+                       x8: Ref, 
+                       x9: Ref)
+  ensures acc(x0.fint0)
+  ensures acc(x1.fint0)
+  ensures acc(x2.fint0)
+  ensures acc(x3.fint0)
+  ensures acc(x4.fint0)
+  ensures acc(x5.fint0)
+  ensures acc(x6.fint0)
+  ensures acc(x7.fint0)
+  ensures acc(x8.fint0)
+  ensures acc(x9.fint0)
+  // ensures acc(x10.fint0)
+  // ensures acc(x11.fint0)
+  // ensures acc(x12.fint0)
+  // ensures acc(x13.fint0)
+  // ensures acc(x14.fint0)
+  // ensures acc(x15.fint0)
+  // ensures acc(x16.fint0)
+  // ensures acc(x17.fint0)
+  // ensures acc(x18.fint0)
+  // ensures acc(x19.fint0)
+{
+  // var x: Ref
+  inhale acc(x0.fint0)
+  inhale acc(x1.fint0)
+  inhale acc(x2.fint0)
+  inhale acc(x3.fint0)
+  inhale acc(x4.fint0)
+  inhale acc(x5.fint0)
+  inhale acc(x6.fint0)
+  inhale acc(x7.fint0)
+  inhale acc(x8.fint0)
+  inhale acc(x9.fint0)
+  // inhale acc(x10.fint0)
+  // inhale acc(x11.fint0)
+  // inhale acc(x12.fint0)
+  // inhale acc(x13.fint0)
+  // inhale acc(x14.fint0)
+  // inhale acc(x15.fint0)
+  // inhale acc(x16.fint0)
+  // inhale acc(x17.fint0)
+  // inhale acc(x18.fint0)
+  // inhale acc(x19.fint0)
+  x0.fint0 := 0
+  x1.fint0 := 0
+  x2.fint0 := 0
+  x3.fint0 := 0
+  x4.fint0 := 0
+  x5.fint0 := 0
+  x6.fint0 := 0
+  x7.fint0 := 0
+  x8.fint0 := 0
+  x9.fint0 := 0
+  // x10.fint0 := 0
+  // x11.fint0 := 0
+  // x12.fint0 := 0
+  // x13.fint0 := 0
+  // x14.fint0 := 0
+  // x15.fint0 := 0
+  // x16.fint0 := 0
+  // x17.fint0 := 0
+  // x18.fint0 := 0
+  // x19.fint0 := 0
+
+  assert 0 == x0.fint0 + x1.fint0 + x2.fint0 + x3.fint0 + x4.fint0 + x5.fint0 + x6.fint0 + x7.fint0 + x8.fint0 + x9.fint0 //+ x10.fint0 + x11.fint0 + x12.fint0 + x13.fint0 + x14.fint0 + x15.fint0 + x16.fint0 + x17.fint0 + x18.fint0 + x19.fint0
+}

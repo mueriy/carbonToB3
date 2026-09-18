@@ -1,0 +1,112 @@
+field fint0: Int
+field fint1: Int
+field fint2: Int
+field fint3: Int
+field fint4: Int
+field fint5: Int
+// field fint6: Int
+// field fint7: Int
+
+method foo2() returns (u: Ref, v: Ref)
+  ensures acc(u.fint0) && acc(v.fint0)
+  ensures acc(u.fint1) && acc(v.fint1)
+  ensures acc(u.fint2) && acc(v.fint2)
+  ensures acc(u.fint3) && acc(v.fint3)
+  ensures acc(u.fint4) && acc(v.fint4)
+  ensures acc(u.fint5) && acc(v.fint5)
+  // ensures acc(u.fint6) && acc(v.fint6)
+  // ensures acc(u.fint7) && acc(v.fint7)
+{
+  var x: Ref
+  var y: Ref
+  x := new(fint0, fint1, fint2, fint3, fint4, fint5)//, fint6, fint7)
+  y := new(fint0, fint1, fint2, fint3, fint4, fint5)//, fint6, fint7)
+  x.fint0 := 0
+  x.fint1 := 0
+  x.fint2 := 0
+  x.fint3 := 0
+  x.fint4 := 0
+  x.fint5 := 0
+  // x.fint6 := 0
+  // x.fint7 := 0
+  y.fint0 := 0
+  y.fint1 := 0
+  y.fint2 := 0
+  y.fint3 := 0
+  y.fint4 := 0
+  y.fint5 := 0
+  // y.fint6 := 0
+  // y.fint7 := 0
+
+  x.fint0 := x.fint0 + 1
+  x.fint1 := x.fint1 + 1
+  x.fint2 := x.fint2 + 1
+  x.fint3 := x.fint3 + 1
+  x.fint4 := x.fint4 + 1
+  x.fint5 := x.fint5 + 1
+  // x.fint6 := x.fint6 + 1
+  // x.fint7 := x.fint7 + 1
+  y.fint0 := y.fint0 + 1
+  y.fint1 := y.fint1 + 1
+  y.fint2 := y.fint2 + 1
+  y.fint3 := y.fint3 + 1
+  y.fint4 := y.fint4 + 1
+  y.fint5 := y.fint5 + 1
+  // y.fint6 := y.fint6 + 1
+  // y.fint7 := y.fint7 + 1
+
+  x.fint0 := x.fint0 + 1
+  x.fint1 := x.fint1 + 1
+  x.fint2 := x.fint2 + 1
+  x.fint3 := x.fint3 + 1
+  x.fint4 := x.fint4 + 1
+  x.fint5 := x.fint5 + 1
+  // x.fint6 := x.fint6 + 1
+  // x.fint7 := x.fint7 + 1
+  y.fint0 := y.fint0 + 1
+  y.fint1 := y.fint1 + 1
+  y.fint2 := y.fint2 + 1
+  y.fint3 := y.fint3 + 1
+  y.fint4 := y.fint4 + 1
+  y.fint5 := y.fint5 + 1
+  // y.fint6 := y.fint6 + 1
+  // y.fint7 := y.fint7 + 1
+  
+  x.fint0 := x.fint0 + 1
+  x.fint1 := x.fint1 + 1
+  x.fint2 := x.fint2 + 1
+  x.fint3 := x.fint3 + 1
+  x.fint4 := x.fint4 + 1
+  x.fint5 := x.fint5 + 1
+  // x.fint6 := x.fint6 + 1
+  // x.fint7 := x.fint7 + 1
+  y.fint0 := y.fint0 + 1
+  y.fint1 := y.fint1 + 1
+  y.fint2 := y.fint2 + 1
+  y.fint3 := y.fint3 + 1
+  y.fint4 := y.fint4 + 1
+  y.fint5 := y.fint5 + 1
+  // y.fint6 := y.fint6 + 1
+  // y.fint7 := y.fint7 + 1
+  
+  x.fint0 := x.fint0 + 1
+  x.fint1 := x.fint1 + 1
+  x.fint2 := x.fint2 + 1
+  x.fint3 := x.fint3 + 1
+  x.fint4 := x.fint4 + 1
+  x.fint5 := x.fint5 + 1
+  // x.fint6 := x.fint6 + 1
+  // x.fint7 := x.fint7 + 1
+  y.fint0 := y.fint0 + 1
+  y.fint1 := y.fint1 + 1
+  y.fint2 := y.fint2 + 1
+  y.fint3 := y.fint3 + 1
+  y.fint4 := y.fint4 + 1
+  y.fint5 := y.fint5 + 1
+  // y.fint6 := y.fint6 + 1
+  // y.fint7 := y.fint7 + 1
+  assert 4*12 == x.fint0 + x.fint1 + x.fint2 + x.fint3 + x.fint4 + x.fint5 + y.fint0 + y.fint1 + y.fint2 + y.fint3 + y.fint4 + y.fint5
+  u := x
+  v := y
+  assert false
+}

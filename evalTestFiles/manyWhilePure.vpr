@@ -1,0 +1,181 @@
+method manyLoops(n: Int) returns (x: Int)
+  requires n >= 0
+{
+  x := 0
+  var i: Int := 0
+
+  while (i < n)
+    invariant 0 <= i
+    invariant i <= n
+  {
+    x := x + 1
+    i := i + 1
+  }
+
+  i := 0
+
+  while (i < n)
+    invariant 0 <= i
+    invariant i <= n
+  {
+    x := x + 2
+    i := i + 1
+  }
+
+  i := 0
+
+  while (i < n)
+    invariant 0 <= i
+    invariant i <= n
+  {
+    x := x + 3
+    i := i + 1
+  }
+
+  i := 0
+
+  while (i < n)
+    invariant 0 <= i
+    invariant i <= n
+  {
+    x := x + 4
+    i := i + 1
+  }
+
+  i := 0
+
+  while (i < n)
+    invariant 0 <= i
+    invariant i <= n
+  {
+    x := x + 5
+    i := i + 1
+  }
+}
+
+method slowMultiplication(x: Int, y: Int) returns (res: Int)
+  requires x >= 0 && y >= 0
+  ensures res == x * y
+{
+
+  var i: Int := x
+  res := 0
+
+  while (i > 0)
+    invariant 0 <= i
+    invariant res == (x-i)*y
+  {
+    var j: Int := y
+    var addThis: Int := 0
+    while (j > 0)
+      invariant 0 <= j
+      invariant addThis == y-j
+    {
+      addThis := addThis + 1
+      j := j - 1
+    }
+    res := res + addThis
+    i := i - 1
+  }
+}
+
+method slowThreeWayMultiplication(x: Int, y: Int, z: Int) returns (xyz: Int, xy: Int, xz: Int, yz: Int)
+  requires x >= 0 && y >= 0 && z >= 0
+  ensures xyz == x * y * z
+  ensures xy == x * y
+  ensures xz == x * z
+  ensures yz == y * z
+{
+  var i: Int := x
+  xyz := 0
+
+  while (i > 0)
+    invariant 0 <= i
+    invariant xyz == (x-i)*y*z
+  {
+    var j: Int := y
+    var addThis: Int := 0
+
+    while (j > 0)
+      invariant 0 <= j
+      invariant addThis == (y-j)*z
+    {
+      var k: Int := z
+      var addThisAgain: Int := 0
+
+      while (k > 0)
+        invariant 0 <= k
+        invariant addThisAgain == z-k
+      {
+        addThisAgain := addThisAgain + 1
+        k := k - 1
+      }
+
+      addThis := addThis + addThisAgain
+      j := j - 1
+    }
+
+    xyz := xyz + addThis
+    i := i - 1
+  }
+
+  i := x
+  xy := 0
+
+  while (i > 0)
+    invariant 0 <= i
+    invariant xy == (x-i)*y
+  {
+    var j: Int := y
+    var addThis: Int := 0
+    while (j > 0)
+      invariant 0 <= j
+      invariant addThis == y-j
+    {
+      addThis := addThis + 1
+      j := j - 1
+    }
+    xy := xy + addThis
+    i := i - 1
+  }
+
+  i := x
+  xz := 0
+
+  while (i > 0)
+    invariant 0 <= i
+    invariant xz == (x-i)*z
+  {
+    var j: Int := z
+    var addThis: Int := 0
+    while (j > 0)
+      invariant 0 <= j
+      invariant addThis == z-j
+    {
+      addThis := addThis + 1
+      j := j - 1
+    }
+    xz := xz + addThis
+    i := i - 1
+  }
+
+  i := y
+  yz := 0
+
+  while (i > 0)
+    invariant 0 <= i
+    invariant yz == (y-i)*z
+  {
+    var j: Int := z
+    var addThis: Int := 0
+    while (j > 0)
+      invariant 0 <= j
+      invariant addThis == z-j
+    {
+      addThis := addThis + 1
+      j := j - 1
+    }
+    yz := yz + addThis
+    i := i - 1
+  }
+}

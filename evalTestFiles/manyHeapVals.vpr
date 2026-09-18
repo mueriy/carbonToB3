@@ -1,0 +1,94 @@
+field fint0: Int
+field fint1: Int
+field fint2: Int
+field fint3: Int
+field fint4: Int
+field fint5: Int
+// field fint6: Int
+
+
+method foo2() returns (x: Ref, y: Ref)
+  ensures acc(x.fint0) && acc(y.fint0)
+  ensures acc(x.fint1) && acc(y.fint1)
+  ensures acc(x.fint2) && acc(y.fint2)
+  ensures acc(x.fint3) && acc(y.fint3)
+  ensures acc(x.fint4) && acc(y.fint4)
+  ensures acc(x.fint5) && acc(y.fint5)
+  // ensures acc(x.fint6) && acc(y.fint6)
+{
+  inhale acc(x.fint0)
+  inhale acc(x.fint1)
+  inhale acc(x.fint2)
+  inhale acc(x.fint3)
+  inhale acc(x.fint4)
+  inhale acc(x.fint5)
+  // inhale acc(x.fint6)
+  x.fint0 := 0
+  x.fint1 := 0
+  x.fint2 := 0
+  x.fint3 := 0
+  x.fint4 := 0
+  x.fint5 := 0
+  // x.fint6 := 0
+  inhale acc(y.fint0)
+  inhale acc(y.fint1)
+  inhale acc(y.fint2)
+  inhale acc(y.fint3)
+  inhale acc(y.fint4)
+  inhale acc(y.fint5)
+  // inhale acc(y.fint6)
+  y.fint0 := 0
+  y.fint1 := 0
+  y.fint2 := 0
+  y.fint3 := 0
+  y.fint4 := 0
+  y.fint5 := 0
+  // y.fint6 := 0
+
+  x.fint0 := x.fint0 + 1
+  x.fint1 := x.fint1 + 1
+  x.fint2 := x.fint2 + 1
+  x.fint3 := x.fint3 + 1
+  x.fint4 := x.fint4 + 1
+  x.fint5 := x.fint5 + 1
+  // x.fint6 := x.fint6 + 1
+  y.fint0 := y.fint0 + 1
+  y.fint1 := y.fint1 + 1
+  y.fint2 := y.fint2 + 1
+  y.fint3 := y.fint3 + 1
+  y.fint4 := y.fint4 + 1
+  y.fint5 := y.fint5 + 1
+  // y.fint6 := y.fint6 + 1
+
+  // x.fint0 := x.fint0 + 1
+  // x.fint1 := x.fint1 + 1
+  // x.fint2 := x.fint2 + 1
+  // x.fint3 := x.fint3 + 1
+  // x.fint4 := x.fint4 + 1
+  // x.fint5 := x.fint5 + 1
+  // x.fint6 := x.fint6 + 1
+  // y.fint0 := y.fint0 + 1
+  // y.fint1 := y.fint1 + 1
+  // y.fint2 := y.fint2 + 1
+  // y.fint3 := y.fint3 + 1
+  // y.fint4 := y.fint4 + 1
+  // y.fint5 := y.fint5 + 1
+  // y.fint6 := y.fint6 + 1
+  
+  // x.fint0 := x.fint0 + 1
+  // x.fint1 := x.fint1 + 1
+  // x.fint2 := x.fint2 + 1
+  // x.fint3 := x.fint3 + 1
+  // x.fint4 := x.fint4 + 1
+  // x.fint5 := x.fint5 + 1
+  // x.fint6 := x.fint6 + 1
+  // y.fint0 := y.fint0 + 1
+  // y.fint1 := y.fint1 + 1
+  // y.fint2 := y.fint2 + 1
+  // y.fint3 := y.fint3 + 1
+  // y.fint4 := y.fint4 + 1
+  // y.fint5 := y.fint5 + 1
+  // y.fint6 := y.fint6 + 1
+  assert 1*12 == x.fint0 + x.fint1 + x.fint2 + x.fint3 + x.fint4 + x.fint5 + y.fint0 + y.fint1 + y.fint2 + y.fint3 + y.fint4 + y.fint5
+  assert false
+}

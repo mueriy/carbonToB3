@@ -1,0 +1,48 @@
+procedure iflot(){
+  var x: int := 0
+
+  if (true) { x := x + 1 } 
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 }
+  if (true) { x := x + 1 } 
+  if (true) { x := x + 1 } // (17) 36s B3; 1s Boogie
+  //if (true) { x := x + 1 }
+  //if (true) { x := x + 1 } // (19) 144s B3; 2s Boogie
+  //if (true) { x := x + 1 }
+  assert x == 16
+}
+
+//procedure iflotSimple(){
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {}
+//  if false {} //20s (<-- verification time, if all if-statements below this one are removed)
+//  if false {} //37s (...)
+//  if false {} //1m16
+//  if false {} //2m30s
+//  if false {} //5m0s
+//  assert false
+//}

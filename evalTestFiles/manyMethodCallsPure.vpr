@@ -1,0 +1,216 @@
+
+method f_wouldKnowButNoEnsures(v0_0: Int) returns (value: Int)
+  requires 0 <= v0_0 && v0_0 < 10
+{
+  value := v0_0
+}
+
+method f_absolute(v0: Int) returns (value: Int)
+  ensures v0 < 0 ==> value == -v0
+  ensures v0 >= 0 ==> value == v0
+{
+  value := v0
+  if (v0 < 0) {
+    value := value * -1
+  }
+}
+
+method f_unknown() returns (value: Int)
+{
+  value := 18
+}
+
+method f_20() returns (value: Int)
+  ensures value == 20
+{
+  value := 20
+}
+
+method f_invOrNot(b: Bool, v: Int) returns (value: Int)
+  ensures b ==> value == -v
+  ensures !b ==> value == v
+{
+  value := v
+  if (b) {
+    value := value * -1
+  }
+}
+
+method f_0to9() returns (value: Int)
+  ensures 0 <= value < 10 
+{
+  var x: Int
+  inhale 0 <= x
+  inhale x < 10
+  value := x
+}
+
+method f_geq10() returns (value: Int)
+  ensures value >= 10
+{
+  inhale value >= 10
+}
+
+method f_10() returns (value: Int)
+  ensures value == 10
+{
+  inhale value == 10
+}
+
+method f2_10() returns (value: Int)
+  ensures value == 10
+{
+  value := 10
+}
+
+method f_100() returns (value: Int)
+  ensures value == 100
+{
+  value := 100
+}
+
+method f3_10(x: Int) returns (value: Int)
+  requires x == 10
+  ensures value == 10
+{
+  value := x
+}
+
+method f_plus1(x: Int) returns (value: Int)
+  ensures value == x+1
+{
+  value := x+1
+}
+method f_plus10(x: Int) returns (value: Int)
+  ensures value == x+10
+{
+  value := x+10
+}
+method f_plus100(x: Int) returns (value: Int)
+  ensures value == x+100
+{
+  var y: Int := 100
+  value := x+y
+}
+
+method sum(x: Int, y: Int) returns (value: Int)
+  ensures value == x+y
+{
+  value := x
+  value := value + y
+}
+
+method mult(x: Int, y: Int) returns (value: Int)
+  ensures value == x*y
+{
+  value := x
+  value := value * y
+}
+
+method negate(b: Bool) returns (value: Bool)
+  ensures value != b
+{
+  assume b ==> !value
+  assume !b ==> value
+}
+
+
+
+
+
+
+
+
+method main(u: Int, v: Int, b: Bool) returns (value: Int)
+  requires u == -10
+  requires b
+{
+  var x: Int := f_absolute(u)
+  var y: Int := f_absolute(x)
+  assert x == 10 && y == 10
+
+  y := f_unknown()
+  if (y == 0) {
+    y := y + 1
+  } else {
+    y := 1
+  }
+  var twenty: Int := f_20()
+
+  var temp1: Int := f_invOrNot(b, x)
+  var ten: Int := f_absolute(temp1)
+
+  var temp2: Bool := negate(b)
+  var temp3: Int := f_invOrNot(temp2, x)
+  var minusTen: Int := -temp3
+
+  var temp4: Int := sum(ten, ten)
+  assert temp4 == twenty
+  var temp5: Int := mult(ten, 2)
+  assert temp5 == twenty
+  var temp6: Int := f_plus10(ten)
+  assert temp6 == twenty
+  var temp7: Int := mult(minusTen, 2)
+  assert temp7 == -20
+  var temp8: Int := f_invOrNot(b, twenty)
+  assert temp8 == -20
+  assert temp7 == temp8
+
+  var v_0to9: Int := f_0to9()
+  assert v_0to9 >= 0
+  var geq10: Int := f_geq10()
+  assert v_0to9 < geq10
+
+  var temp9: Int := f_10()
+  assert temp9 == ten
+
+  
+  temp9 := f2_10()
+  assert temp9 == ten
+
+  var temp10: Int := ten
+  var temp11: Int := f_plus1(temp10)
+  var temp12: Int := f_plus1(temp11)
+  var temp13: Int := f_plus1(temp12)
+  var temp14: Int := f_plus1(temp13)
+  var temp15: Int := f_plus1(temp14)
+  var temp16: Int := f_plus1(temp15)
+  var temp17: Int := f_plus1(temp16)
+  var temp18: Int := f_plus1(temp17)
+  var temp19: Int := f_plus1(temp18)
+  var temp20: Int := f_plus1(temp19)
+
+  temp10 := ten
+  temp11 := f_plus1(temp10)
+  temp12 := f_plus1(temp11)
+  temp13 := f_plus1(temp12)
+  temp14 := f_plus1(temp13)
+  temp15 := f_plus1(temp14)
+  temp16 := f_plus1(temp15)
+  temp17 := f_plus1(temp16)
+  temp18 := f_plus1(temp17)
+  temp19 := f_plus1(temp18)
+  temp20 := f_plus1(temp19)
+  var temp30: Int := f_plus10(temp20)
+  var temp40: Int := f_plus10(temp30)
+  var temp50: Int := f_plus10(temp40)
+  var temp60: Int := f_plus10(temp50)
+  var temp70: Int := f_plus10(temp60)
+  var temp80: Int := f_plus10(temp70)
+  var temp90: Int := f_plus10(temp80)
+  var temp00: Int := f_plus10(temp90)
+
+  var temp: Int
+  temp := f3_10(ten)
+  assert temp == 10
+
+  temp := f_100()
+  assert temp == temp00
+
+  var temp21: Int := sum(ten, minusTen)
+  var temp22: Int := f_plus100(temp21)
+  assert temp22 == temp
+
+
+  var unkn: Int := f_wouldKnowButNoEnsures(1)
+}

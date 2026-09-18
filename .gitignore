@@ -5,7 +5,6 @@ project/target
 target
 bin/**
 carbon_classpath.txt
-lib/
 lib_old/
 viper_tutorial_examples
 tmp/

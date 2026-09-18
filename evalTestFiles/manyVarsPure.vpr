@@ -1,0 +1,164 @@
+method main() {
+  var x0: Int
+  var x1: Int
+  var x2: Int
+  var x3: Int
+  var x4: Int
+  var x5: Int
+  var x6: Int
+  var x7: Int
+  var x8: Int
+  var x9: Int
+  var x10: Int
+  var x11: Int
+  var x12: Int
+  var x13: Int
+  var x14: Int
+  var x15: Int
+  var x16: Int
+  var x17: Int
+  var x18: Int
+  var x19: Int
+  var x20: Int
+  var x21: Int
+  var x22: Int
+  var x23: Int
+  var x24: Int
+  var x25: Int
+  var x26: Int
+  var x27: Int
+  var x28: Int
+  var x29: Int
+  var x30: Int
+  var x31: Int
+  var x32: Int
+  var x33: Int
+  var x34: Int
+  var x35: Int
+  var x36: Int
+  var x37: Int
+  var x38: Int
+  var x39: Int
+  var x40: Int
+  var x41: Int
+  var x42: Int
+  var x43: Int
+  var x44: Int
+  var x45: Int
+  var x46: Int
+  var x47: Int
+  var x48: Int
+  var x49: Int
+
+  assume x0 == 0
+  assume x1 == 1
+  assume x2 == 2
+  assume x3 == 3
+  assume x4 == 4
+  assume x5 == 5
+  assume x6 == 6
+  assume x7 == 7
+  assume x8 == 8
+  assume x9 == 9
+  assume x10 == 10
+  assume x11 == 11
+  assume x12 == 12
+  assume x13 == 13
+  assume x14 == 14
+  assume x15 == 15
+  assume x16 == 16
+  assume x17 == 17
+  assume x18 == 18
+  assume x19 == 19
+  assert x0*x1*x2*x3*x4*x5*x6*x7*x8*x9 >= 0
+  assert x0+x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+x12+x13+x14+x15+x16+x17+x18+x19 >= 0
+  assert x0+x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+x12+x13+x14+x15+x16+x17+x18+x19 == 190
+  assume x20 > 0
+  assume x21 > 0
+  assume x22 > 0
+  assume x23 > 0
+  assume x24 > 0
+  assume x25 > 0
+  assume x26 > 0
+  assume x27 > 0
+  assume x28 > 0
+  assume x29 > 0
+  assert x20 * x21 * x22 * x23 * x24 * x25 * x26 * x27 * x28 * x29 > 0
+  x30 := 0
+  x31 := 1
+  x32 := 2
+  x33 := 3
+  x34 := 4
+  x35 := 5
+  x36 := 6
+  x37 := 7
+  x38 := 8
+  x39 := 9
+  x40 := 0
+  x41 := x40 + 1
+  x42 := x41 + 1
+  x43 := x42 + 1
+  x44 := x43 + 1
+  x45 := x44 + 1
+  x46 := x45 + 1
+  x47 := x46 + 1
+  x48 := x47 + 1
+  x49 := x48 + 1
+  assert x30 == x40 && x31 == x41 && x32 == x42 && x33 == x43 && x34 == x44 && x35 == x45 && x36 == x46 && x37 == x47 && x38 == x48 && x39 == x49
+  assert x30 == x40 && x31 == x41 && x32 == x42 && x33 == x43 && x34 == x44 && x35 == x45 && x36 == x46 && x37 == x47 && x38 == x48
+  assert x30 == x40 && x31 == x41 && x32 == x42 && x33 == x43 && x34 == x44 && x35 == x45 && x36 == x46 && x37 == x47 
+  assert x30 == x40 && x31 == x41 && x32 == x42 && x33 == x43 && x34 == x44 && x35 == x45 && x36 == x46 
+  assert x30 == x40 && x31 == x41 && x32 == x42 && x33 == x43 && x34 == x44 && x35 == x45 
+  assert x30 == x40 && x31 == x41 && x32 == x42 && x33 == x43 && x34 == x44 
+  assert x30 == x40 && x31 == x41 && x32 == x42 && x33 == x43 
+  assert x30 == x40 && x31 == x41 && x32 == x42 
+  assert x30 == x40 && x31 == x41 
+  assert x30 == x40
+  assert x31 == x41
+  assert x32 == x42
+  assert x33 == x43
+  assert x34 == x44
+  assert x35 == x45
+  assert x36 == x46
+  assert x37 == x47
+  assert x38 == x48
+  assert x39 == x49
+
+  assert x0 == x40 && x1 == x41 && x2 == x42 && x3 == x43 && x4 == x44 && x5 == x45 && x6 == x46 && x7 == x47 && x8 == x48 && x9 == x49
+  assert x0 == x40 && x1 == x41 && x2 == x42 && x3 == x43 && x4 == x44 && x5 == x45 && x6 == x46 && x7 == x47 && x8 == x48
+  assert x0 == x40 && x1 == x41 && x2 == x42 && x3 == x43 && x4 == x44 && x5 == x45 && x6 == x46 && x7 == x47 
+  assert x0 == x40 && x1 == x41 && x2 == x42 && x3 == x43 && x4 == x44 && x5 == x45 && x6 == x46 
+  assert x0 == x40 && x1 == x41 && x2 == x42 && x3 == x43 && x4 == x44 && x5 == x45 
+  assert x0 == x40 && x1 == x41 && x2 == x42 && x3 == x43 && x4 == x44 
+  assert x0 == x40 && x1 == x41 && x2 == x42 && x3 == x43 
+  assert x0 == x40 && x1 == x41 && x2 == x42 
+  assert x0 == x40 && x1 == x41 
+  assert x0 == x40
+  assert x1 == x41
+  assert x2 == x42
+  assert x3 == x43
+  assert x4 == x44
+  assert x5 == x45
+  assert x6 == x46
+  assert x7 == x47
+  assert x8 == x48
+  assert x9 == x49
+
+}
+method antiCheck(x: Int) returns (N: Int)
+  requires x > 0
+  ensures N > 1
+{
+    var N2: Int
+
+    assume N > 0
+    assert x == x
+    assert (forall i: Int, j: Int ::
+      (0 <= i && i < N) && (0 <= j && j < N) 
+        ==> (i * j <= N * N))
+    assert (forall i: Int, j: Int, k: Int ::
+      (0 <= i && i <= N) &&( 0 <= j && j <= N) && (0 <= k && k <= N )
+        ==> i * j <= (N * N)+k)
+    N := x + 1
+
+}

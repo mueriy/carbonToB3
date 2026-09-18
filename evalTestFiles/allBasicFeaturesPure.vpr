@@ -1,0 +1,92 @@
+method f0_12() returns (value: Int)
+	ensures value == 42
+  ensures value % 2 == 0
+{
+  value := 42
+}
+
+method f0_15() returns (value: Int)
+  ensures value % 2 == 1
+{
+  value := 43
+}
+
+function f(x: Int): Int 
+    requires x > 0
+    ensures result == x+x+1
+{
+    2*x+1
+}
+
+method f0_18(v0_9: Int) returns (value: Int)
+  requires v0_9 % 2 == 0
+  ensures value == 72
+{
+  var foo: Int
+  var bar: Int
+  var flag: Bool
+  var meine_var0: Int
+  var meine_var1: Int
+  assert true
+  assert 5 > 2
+  foo := 0
+  assert foo == 0
+  bar := 42
+  assert bar == 42
+  flag := false
+  assert !flag
+  foo := 5
+  assert foo == 5
+  flag := true
+  assert flag
+  foo := 1 + 2
+  assert foo == 3
+  foo := 2 * 3
+  assert foo == 6
+  foo := 3 - 4
+  assert foo == -1
+  foo := 4 / 5
+  assert foo == 0
+  foo := 5 % 6
+  assert foo == 5
+  flag := foo < bar
+  assert flag
+  flag := foo > bar
+  assert !flag
+  flag := foo == bar
+  assert !flag
+  flag := foo != bar
+  assert flag
+  flag := flag && flag
+  assert flag
+  flag := flag || flag
+  assert flag
+  foo := -foo
+  assert foo == -5
+  flag := !flag
+  assert !flag
+  foo := (1 + 2) * (3 + 4)
+  assert foo == 21
+  meine_var0 := 42
+  foo := meine_var0
+  assert foo == 42
+  foo := v0_9
+  assert foo % 2 == 0
+  meine_var1 := f0_12()
+  foo := meine_var1
+  if (true) {
+    foo := foo
+  } else {
+    var meine_var2: Int
+    meine_var2 := 42
+    if (meine_var2 == 2) {
+      foo := 72
+    } else {
+      foo := 1337}
+  }
+  assert foo == 42
+  value := 42
+  value := 72
+	foo := f(foo)
+	assert foo == 85
+}

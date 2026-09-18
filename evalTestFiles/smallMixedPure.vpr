@@ -1,0 +1,101 @@
+method sum(n: Int) returns (res: Int)
+  requires 0 <= n
+  ensures res == n * (n + 1) / 2
+{
+  var i: Int
+  res := 0
+  i := 0
+  while (i <= n)
+    invariant i <= n + 1
+    invariant res == (i - 1) * i / 2 
+  {
+    res := res + i
+    i := i + 1
+  }
+
+  var n2: Int
+  var m: Int
+  var res2: Int
+  var x: Int
+  var y: Int
+  var random: Int
+  assume random >= 0
+  inhale n2 >= 0
+  inhale m >= 0
+  x := n2
+  y := m
+  res2 := 0
+  while (x > 0)
+    invariant res2 + y * x == n2 * m && x >= 0
+  {
+    if (x % 2 == 1) {
+      res2 := res2 + y
+    }
+    assume random == 3
+    // assert random != 0
+    x := x / random
+    y := y * 2
+  }
+  assert res2 == n2 * m
+
+
+
+
+  var rand1: Int
+  var rand2: Int
+  var rand3: Int
+  var rand4: Int
+  var rand5: Int
+  n2 := rand1
+  m := rand2
+  res2 := rand3
+  x := rand4
+  y := rand5
+  inhale n2 >= 0
+  inhale m >= 0
+  x := n2
+  y := m
+  res2 := 0
+  while (x > 0)
+    invariant res2 + y * x == n2 * m
+  {
+    if (x % 2 == 1) {
+      res2 := res2 + y
+    }
+    x := x / 2
+    y := y * 2
+  }
+  assert res2 == n2 * m
+
+  var rand6: Int
+  var rand7: Int
+  var res3: Int
+  x := rand6
+  y := rand7
+  inhale true
+  res3 := x * x + 2 * x * y + y * y
+  assert res3 == (x + y) * (x + y)
+
+
+  var zero: Int := normalMinus(res, n * (n + 1) / 2)
+
+  var idx: Int 
+  while (idx < 0) {
+    if (idx < 0) {
+      idx := -idx
+    }
+  }
+  exhale zero*idx == 0
+  assert zero*idx == res - n * (n + 1) / 2
+}
+
+
+function normalMinus(a: Int, b: Int): Int {
+  normalMinus2(a, b)
+}
+
+domain Normal {
+  function normalMinus2(u: Int, v: Int): Int
+  axiom normalMinus2Ax {
+    forall i:Int, j:Int :: { normalMinus2(i, j) } normalMinus2(i, j) == i-j}
+}

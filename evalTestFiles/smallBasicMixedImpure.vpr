@@ -1,0 +1,170 @@
+// ABSTRACT FUNCS AND PREDS
+
+field f: Ref
+
+function fun01(x: Ref): Int
+  ensures 0 < result
+
+method test01(x: Ref) {
+  assert fun01(x) >= 0
+
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert fun01(x) == 0
+}
+
+method test02(x: Ref, y: Ref) {
+  var r: Int := fun01(x)
+  assert fun01(x) == r
+
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert fun01(x) == fun01(y)
+}
+
+function fun02(x: Ref): Bool
+  requires acc(x.f)
+  ensures x == x.f ==> result
+
+method test03(x: Ref, y: Ref) {
+  inhale acc(x.f)
+  inhale x == x.f
+  assert fun02(x)
+  x.f := y
+
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert fun02(x)
+}
+
+function fun03(x: Ref): Bool
+  requires acc(x.f)
+  ensures x == x.f ==> !result
+{ !fun02(x) }
+
+method test04(x: Ref, y: Ref) {
+  inhale acc(x.f)
+  inhale x == x.f
+  assert !fun03(x)
+  assert fun03(x) == !fun02(x)
+  x.f := y
+
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert !fun03(x)
+}
+
+
+// FUNC2
+
+// Any copyright is dedicated to the Public Domain.
+// http://creativecommons.org/publicdomain/zero/1.0/
+
+field g: Int
+
+// function f1(r: Ref): Int
+//   requires acc(r.f, wildcard)
+// { r.f }
+
+function f3_a(r: Ref): Int
+  //:: ExpectedOutput(not.wellformed:insufficient.permission)
+  requires ((r.g) == 2)
+{ 2 }
+
+function f3_b(r: Ref): Int
+  requires r != null
+  //:: ExpectedOutput(not.wellformed:insufficient.permission)
+  requires ((r.g) == 2)
+{ 2 }
+
+function f4(r: Ref): Int
+  requires acc(r.g, write)
+  requires (r.g) == 2
+{ 2 }
+
+//:: ExpectedOutput(function.not.wellformed:insufficient.permission)
+function f5(r: Ref): Int
+  requires r != null
+{ r.g }
+
+function f6(r: Ref): Int
+  requires r != null
+{
+  //:: ExpectedOutput(application.precondition:insufficient.permission)
+  f4(r)
+}
+
+method t1(r: Ref)
+  requires acc(r.g, write)
+{
+  r.g := 1
+  // assert f1(r) == 1;
+
+  //:: ExpectedOutput(application.precondition:assertion.false)
+  //:: UnexpectedOutput(assert.failed:assertion.false, /Carbon/issue/173/)
+  assert false
+  assert f4(r) > 0;
+  assert false
+}
+
+
+
+
+// HEAP
+
+// Any copyright is dedicated to the Public Domain.
+// http://creativecommons.org/publicdomain/zero/1.0/
+
+
+// field f: Ref
+
+// test aliasing of heap values with other objects
+method t0() {
+    var c: Ref
+
+    c := new(f)
+
+    //:: ExpectedOutput(assert.failed:assertion.false)
+    assert c.f != c // This assertion was expected true in an old version of the test case, but should fail
+}
+
+// test aliasing of heap values with other objects
+method t1_2() {
+    var a: Ref
+    var c: Ref
+
+    inhale acc(a.f, write)
+
+    c := new(f)
+
+    //assert c.f != c // This assertion was in an old version of the test case, but should fail
+
+    assume a != null
+    set_f(a, c)
+
+    //:: ExpectedOutput(assert.failed:assertion.false)
+    assert a.f != c
+}
+
+method set_f(monitor: Ref, value: Ref)
+  requires acc(monitor.f, write)
+  requires monitor != null && value != null
+  ensures acc(monitor.f, write)
+{
+  monitor.f := value
+}
+
+method t2(r: Ref) {
+  if (r != null) {
+    assert perm(r.f) == none
+  } else {
+    assert perm(r.f) == none
+      /* Still expected to pass - perm(e.f) does not require e != null */
+  }
+}
+
+method t3(r:Ref) returns (res:Ref)
+    requires r!=null
+    requires acc(r.f)
+    requires r.f!=null
+    requires acc(r.f.f)
+{
+    res := r.f.f
+}
+
