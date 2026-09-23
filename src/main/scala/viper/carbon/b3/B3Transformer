@@ -1,4 +1,29 @@
 
+
+
+
+
+
+
+//****************************
+// LEGACY PROGRAM
+// This is the first implementation, which used workflow 2 (Viper AST -> internal Boogie AST -> B3 AST).
+// The corresponding old B3Adapter no longer exists, but the 'B3.Nodename's should work like B3 AST nodes, 
+// except that they e.g. use Seq instead of DafnySequence. B3Adapter handled the conversion to make this part
+// seem less complex. It also still uses the double-layer approach for Heap (instead of split-Heap).
+// This file has been left in as a txt to not influence the rest of the program. 
+// It did provided some ideas on how to implement features in the new workflow and might still be able to do so.
+// For example there is a first approach in concretizing types, functions, and axiom. However, since it is a first 
+// (untested) approach, it might also not help at all. Feel free to simply ignore or even remove it.
+//****************************
+
+
+
+
+
+
+
+
 package viper.carbon.b3
 import viper.carbon.b3.{B3Adapter => B3}
 import viper.carbon.boogie._

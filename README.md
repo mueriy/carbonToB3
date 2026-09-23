@@ -26,6 +26,7 @@ And then
   And then run with:  
   `java -jar ./target/scala-*/carbon.jar [options] <path to Viper file>`
 
+If an error message shows `... Error initializing '['z', '3']': Cannot run program "z3": ...`, then Z3 is not in PATH.
 
 Options
 ---
@@ -54,6 +55,6 @@ B3Carbon is based on Carbon; i.e., we took the Carbon project and modified it fo
 
 This project uses [this B3 version](https://github.com/dafny-lang/b3/tree/ea6e8a18dfe9e317d313de769291f989957dc5f2). This version adds domains to B3, but they currently do not work well, which is why we do not actually use them. Instead, we implemented our own system to support multiple concrete variations of "parametric" entities, although parametric domains will need to be supported differently.
 
-All places that currently still need work are marked with either `B3 TODO`, `B3 LATER`, or `B3 ADVANCED`, depending on how soon it should probably be implemented. These tags are also always followed by the least advanced feature that needs it, as best as we could sort them. The next features that should be supported are currently in the 'LATER' category (e.g. predicate). There is also `B3 QUEST`, which explains an idea that could maybe implemented at the end in some capacity, as well as `B3 REAL`, which marks positions that can be updated when B3 supports the real typ (although, this might also be the case for some places marked with one of the first three marker types).
+All places that currently still need work are marked with either `B3 TODO`, `B3 LATER`, or `B3 ADVANCED`, depending on how soon it should probably be implemented. These tags are also always followed by the least advanced feature that needs it, as best as we could sort them. The next features that should be supported are currently in the 'LATER' category (e.g. predicate). There is also `B3 QUEST`, which explains an idea that could maybe implemented at the end in some capacity, as well as `B3 REAL`, which marks positions that can be updated when B3 supports the real typ (although, this might also be the case for some places marked with one of the first three marker types). All parts that where commented out using /* and \*/ that are placed at the start of the line are from Carbon and have not been supported/replaced yet. The /* is usually followed by a comment about the/one feature it is needed for.
 
 By setting the `--def <n>` flag, B3Carbon will output additional information (unless n == 0). Setting n == 1 will show an overview of unsupported parts of the code (in the B3Carbon-project) that would theoretically be executed right now. This shows when the implementation is not finished yet for some feature used in the Viper code. Setting n == 2 or 3 will also add empty statements to the code that are tagged with a description of which part of B3Carbon might want/need to insert additional statements at that location of the B3 code. These two infos together can be very helpful when supporting a new feature to see if some part that is required for this feature got forgotten somewhere. (See object `B3Development` in `B3Adapter.scala` to see the methods used to show these informations.)
