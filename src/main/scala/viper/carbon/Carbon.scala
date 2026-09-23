@@ -104,8 +104,11 @@ class CarbonConfig(args: Seq[String]) extends SilFrontendConfig(args, "Carbon") 
   //   noshort = true
   // )
 
+
+  // B3 does not support custom locations, so z3 must be on PATH. Setting this does nothing.
+  // TODO: Remove this, or implement that the given path is temporarily added to PATH.
   val Z3executable = opt[String]("z3Exe",
-    descr = "Manually-specified full path to Z3.exe executable (default: ${Z3_EXE})",
+    descr = "Manually-specified full path to Z3.exe executable (default: ${Z3_EXE}). DO NOT USE!",
     default = None,
     noshort = true
   )
@@ -168,7 +171,7 @@ class CarbonConfig(args: Seq[String]) extends SilFrontendConfig(args, "Carbon") 
     noshort = true
   )
 
-  // B3 ADVANCED: clean up these config option & add other options (e.g. whether names should be shortened to a number or not ("HeapType%%NormalField%Ref" vs "HeapType%%0"))
+  // B3 ADVANCED: clean up these config option & add other options (e.g. one option could be whether names should be shortened to a number or not ("HeapType%%NormalField%Ref" vs "HeapType%%0" and "functionName%FSomeType%Int%Int" vs "functionName%F0"))
 
 
   verify()
