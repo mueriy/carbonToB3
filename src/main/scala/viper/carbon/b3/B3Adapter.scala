@@ -6,6 +6,16 @@ import scala.collection.mutable
 import viper.silver.ast.Member
 import viper.silver.verifier.VerificationError
 
+//**********************************************************
+// THIS FILE CONTAINS THE FOLLOWING OBJECTS
+// DafnyHelper: helper for working with dafny-objects from B3 (should only be needed inside this file)
+// B3Adapter: helper for running B3
+// B3Nodes: the internal B3 AST; also handles conversion to the actual B3 AST (RAW AST) 
+// B3Development: for development, e.g. to show information about what is still in development
+// B3Implicits: some implicit conversions, e.g. Seq to Stmt-sequence, and other
+// B3Naming: overall naming (Identifier), as well as handling names for concretized functions
+//**********************************************************
+
 /** 
  * Helper methods to make it easier to work with "dafny code" (dafny library and B3.jar).
  * It should only be needed/used in the B3Adapter and B3Nodes objects. Otherwise, normal
@@ -126,6 +136,19 @@ object DafnyHelper {
 /** Helper methods run B3 (run using runB3, or print a RawAst.Program using printRawAst) */
 object B3Adapter {
   import viper.carbon.b3.DafnyHelper._
+
+  /* 
+  B3 QUEST: It could make sense to (re-)add comments to the code for development purposes.
+  - '(Maybe)CommentBlock' could add a labeled statement with the label being the comment if 'dev'-level > 0, 
+  or just add the statement without the comment if dev == 0. 
+  - '(Maybe)Comment' could be implemented as labeled empty statement, or just an empty statement if dev == 0. 
+  - The Decl-comments are not possible though. 
+
+  Alternatively, a new flag could be used for this. It cannot be always used, since printed code that contains
+  such comment-labels cannot be parsed later. 
+
+  (For this, all these Comments were not removed; instead, they were left as comments wherever these objects were removed.)
+  */
 
   // B3 MAIN METHOD (+ AUXILIARY METHODS)
   /** uses B3 to print the RawAst Program (= stage 1/2) */

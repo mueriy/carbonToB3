@@ -4,6 +4,12 @@
 //
 // Copyright (c) 2011-2021 ETH Zurich.
 
+
+//************************************
+// B3 NOTE: This is no longer needed,
+// but is kept for reference purposes.
+//************************************
+
 package viper.carbon.boogie
 
 import viper.silver.utility.DefaultNameGenerator

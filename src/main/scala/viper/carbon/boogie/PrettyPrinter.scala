@@ -4,6 +4,12 @@
 //
 // Copyright (c) 2011-2021 ETH Zurich.
 
+//************************************
+// B3 NOTE: This is no longer needed,
+// but is kept for reference purposes.
+// (removed parts marked with [B3] were from developing the first version of this backend with the old workflow)
+//************************************
+
 package viper.carbon.boogie
 
 import viper.carbon.b3.B3NameGenerator

@@ -12,6 +12,7 @@ import viper.carbon.b3.B3Naming.{Namespace, Identifier}
 case class PolyMapRep(select: Seq[Function], store: Seq[Function], axioms: Seq[Axiom])
 
 /***
+  *  Repurposed class to create the Heap/Mask/Pmask splits:
   *  Class that can desugar a specific category of polymorphic Boogie maps, namely Boogie maps of the form
   *  {@code <...>[ref, Field ...]RangeType} where \code{ref} is type representing references (no type arguments),
   *  {@code Field} is a type constructor representing fields.
@@ -24,6 +25,7 @@ case class PolyMapDesugarHelper(fieldTypeVariants: Seq[Seq[Type]], refType: Type
   implicit val ns = namespace
 
   /**
+   *  Repurposed method to create the Heap/Mask/Pmask splits:
     * Creates store and select functions with corresponding axioms to desugar a Boogie map of the form
     * {@code <...>[ref, Field ... ...]RangeType} .
     * @param mapRepNameConstr         the name constructor that should be used to construct the map name representer

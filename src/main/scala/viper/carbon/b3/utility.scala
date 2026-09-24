@@ -28,7 +28,7 @@ object Statements {
       case If(_, thn, els) => Seq(s) ++ children(thn) ++ children(els)
       case Choose(thn, els) => Seq(s) ++ children(thn) ++ children(els)
       case Block(stmts) => stmts flatMap children
-      case LabeledStmt(_, body) => Seq(s) ++ children(body) // B3 NOTE: maybe we should also add Seq(s) (?)
+      case LabeledStmt(_, body) => Seq(s) ++ children(body)
       case _ => List(s)
     }
   }

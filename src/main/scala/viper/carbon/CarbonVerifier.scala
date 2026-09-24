@@ -229,9 +229,9 @@ case class CarbonVerifier(override val reporter: Reporter,
           case _ => }) }
 
         result match {
-          // [B3 base: Just dont use 'variables' counterexample mode. Later we could add a "B3ModelTransformer" here, modify BoogieModelTransformer, or not allow it at all.]
           case Failure(errors) if transformNames => {
             throw new UnsupportedOperationException("Counterexample model 'variables' is currently not supported when using B3")
+            // [B3 ADVANCED: check if it makes sense to support config.counterexample again. If so, "B3ModelTransformer" must be implemented to support this part here.]
             errors.foreach(e =>  BoogieModelTransformer.transformCounterexample(e, translatedNames))
           }
           case _ => result

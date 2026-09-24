@@ -8,8 +8,7 @@ package viper.carbon.b3
 import viper.carbon.b3.B3Nodes._
 
 /**
- * Optimize a given Boogie program or expression.
-
+ * Optimize a given B3 program or expression.
  */
 object Optimizer {
 
